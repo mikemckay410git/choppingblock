@@ -11,11 +11,16 @@ WebSocketsServer ws(81);
 // Connection tracking
 bool        player2Connected = false;
 unsigned long lastHeartbeat   = 0;
-const unsigned long heartbeatTimeout = 600; // ms
+const unsigned long heartbeatTimeout = 2000; // Increased to 2 seconds for more stable connection
 
 // Remote (Player 2) sensor storage
 uint16_t remoteCap[5] = {0};
 uint16_t remoteShock  = 0;
+
+// Optimization: Track if data has changed to avoid unnecessary WebSocket broadcasts
+bool dataChanged = false;
+uint16_t lastRemoteCap[5] = {0};
+uint16_t lastRemoteShock = 0;
 
 // ─── ESP-NOW Payload ─────────────────────────────────────────────────
 typedef struct struct_message {
@@ -41,11 +46,17 @@ const char html[] PROGMEM = R"rawliteral(
     th, td { border: 1px solid #333; padding: 8px 12px; }
     th { background: #eee; }
     .triggered-cell { background: blue !important; color: white; }
+    .latency-info { font-size: 0.9em; color: #666; margin: 10px 0; }
+    .update-counter { font-size: 0.8em; color: #999; }
   </style>
 </head>
 <body>
   <h1>Tool Target Game</h1>
   <div id="status" class="status-light"></div>
+  <div class="latency-info">
+    <div>Optimized for low latency: 20 Hz updates</div>
+    <div>Updates: <span id="updateCounter">0</span></div>
+  </div>
   <h2>Live Sensor Data</h2>
   <table>
     <thead>
@@ -62,9 +73,16 @@ const char html[] PROGMEM = R"rawliteral(
   </table>
 <script>
   const socket = new WebSocket('ws://' + location.hostname + ':81');
-  socket.onopen = () => console.log('WS open');
+  let updateCount = 0;
+  
+  socket.onopen = () => console.log('WS open - Low latency mode active');
   socket.onmessage = evt => {
     const data = JSON.parse(evt.data);
+    updateCount++;
+    
+    // Update counter
+    document.getElementById('updateCounter').textContent = updateCount;
+    
     // status
     const statusDiv = document.getElementById('status');
     data.connected ? statusDiv.classList.add('connected') : statusDiv.classList.remove('connected');
@@ -87,6 +105,9 @@ const char html[] PROGMEM = R"rawliteral(
       v > 20 ? cell.classList.add('triggered-cell') : cell.classList.remove('triggered-cell');
     });
   };
+  
+  socket.onerror = (error) => console.log('WebSocket error:', error);
+  socket.onclose = () => console.log('WebSocket closed');
 </script>
 </body>
 </html>
@@ -101,22 +122,39 @@ void onDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
     player2Connected = true;
     lastHeartbeat    = millis();
 
-    if (msg.action == 2) {
-      // update remote
-      for (int i = 0; i < 5; i++) remoteCap[i] = msg.cap[i];
-      remoteShock = msg.shock;
-
-      // build JSON with both local & remote
-      String j = "{";
-      j += "\"connected\":" + String(player2Connected ? "true" : "false") + ",";
+    if (msg.action == 1) {
+      // Heartbeat - just update connection status
+      dataChanged = true;
+    } else if (msg.action == 2) {
+      // Sensor update - check if data actually changed
+      dataChanged = false;
       for (int i = 0; i < 5; i++) {
-        j += "\"cap" + String(i) + "_1\":" + String(getCapacitiveValue(i)) + ",";
-        j += "\"cap" + String(i) + "_2\":" + String(remoteCap[i]) + ",";
+        if (msg.cap[i] != lastRemoteCap[i]) {
+          dataChanged = true;
+          lastRemoteCap[i] = msg.cap[i];
+          remoteCap[i] = msg.cap[i];
+        }
       }
-      j += "\"shock_1\":" + String(getShockValue()) + ",";
-      j += "\"shock_2\":" + String(remoteShock) + "}";
+      if (msg.shock != lastRemoteShock) {
+        dataChanged = true;
+        lastRemoteShock = msg.shock;
+        remoteShock = msg.shock;
+      }
+      
+      // Only broadcast if data changed or connection status changed
+      if (dataChanged) {
+        // build JSON with both local & remote
+        String j = "{";
+        j += "\"connected\":" + String(player2Connected ? "true" : "false") + ",";
+        for (int i = 0; i < 5; i++) {
+          j += "\"cap" + String(i) + "_1\":" + String(getCapacitiveValue(i)) + ",";
+          j += "\"cap" + String(i) + "_2\":" + String(remoteCap[i]) + ",";
+        }
+        j += "\"shock_1\":" + String(getShockValue()) + ",";
+        j += "\"shock_2\":" + String(remoteShock) + "}";
 
-      ws.broadcastTXT(j);
+        ws.broadcastTXT(j);
+      }
     }
   }
 }
@@ -148,5 +186,12 @@ void setup() {
 void loop() {
   ws.loop();           // handle WS
   sensorsLoop();       // update local sensors
+  
+  // Check for connection timeout
+  if (player2Connected && (millis() - lastHeartbeat > heartbeatTimeout)) {
+    player2Connected = false;
+    dataChanged = true; // Force update to show disconnected status
+  }
+  
   digitalWrite(LED_PIN, player2Connected ? HIGH : LOW);
 }
