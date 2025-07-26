@@ -15,7 +15,7 @@ struct_message myData;
 
 unsigned long lastSendTime = 0;
 unsigned long lastHeartbeatTime = 0;
-const unsigned long sendInterval = 50;    // 50ms for sensor updates (20 Hz)
+const unsigned long sendInterval = 75;    // 75ms for sensor updates (~13 Hz) - balanced
 const unsigned long heartbeatInterval = 1000; // 1 second for heartbeat
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
@@ -45,7 +45,7 @@ void setup() {
   }
 
   myData.playerId = 2;
-  Serial.println("Player 2 ready - Optimized for low latency (20 Hz updates)");
+  Serial.println("Player 2 ready - Balanced performance (~13 Hz updates)");
 }
 
 void loop() {
@@ -64,15 +64,15 @@ void loop() {
     esp_err_t result = esp_now_send(masterAddress,
                                     (uint8_t*)&myData,
                                     sizeof(myData));
-    if (result == ESP_OK) {
-      // Only log occasionally to avoid spam
-      static int logCounter = 0;
-      if (++logCounter % 20 == 0) { // Log every 20th update (once per second)
-        Serial.println("Sensor updates sent at 20 Hz");
+          if (result == ESP_OK) {
+        // Only log occasionally to avoid spam
+        static int logCounter = 0;
+        if (++logCounter % 13 == 0) { // Log every 13th update (once per second)
+          Serial.println("Sensor updates sent at ~13 Hz");
+        }
+      } else {
+        Serial.println("Send error");
       }
-    } else {
-      Serial.println("Send error");
-    }
     lastSendTime = now;
   }
   

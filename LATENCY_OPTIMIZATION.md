@@ -2,9 +2,9 @@
 
 ## Optimizations Implemented
 
-### 1. ESP-NOW Send Interval Reduction
+### 1. ESP-NOW Send Interval Optimization
 **Player2.ino Changes:**
-- Reduced send interval from 500ms to 50ms (20 Hz updates)
+- Reduced send interval from 500ms to 100ms (10 Hz updates) for stability
 - Added heartbeat functionality (1 second intervals)
 - Improved logging to avoid serial spam
 
@@ -15,18 +15,20 @@ const unsigned long sendInterval = 500; // ms
 
 **After:**
 ```cpp
-const unsigned long sendInterval = 50;    // 50ms for sensor updates (20 Hz)
+const unsigned long sendInterval = 100;   // 100ms for sensor updates (10 Hz)
 const unsigned long heartbeatInterval = 1000; // 1 second for heartbeat
 ```
 
 ### 2. WebSocket Optimization
 **Player1.ino Changes:**
 - Added change detection to avoid unnecessary broadcasts
+- Added rate limiting (50ms minimum between broadcasts)
 - Increased heartbeat timeout for more stable connections
 - Improved connection status handling
 
 **Key Features:**
 - Only broadcasts when sensor data actually changes
+- Rate limiting prevents overwhelming the WebSocket
 - Tracks previous values to detect changes
 - More robust connection timeout handling
 
@@ -40,11 +42,11 @@ const unsigned long heartbeatInterval = 1000; // 1 second for heartbeat
 
 ### Latency Reduction
 - **Before:** ~800ms worst-case latency (500ms send + 300ms poll)
-- **After:** ~100ms worst-case latency (50ms send + 50ms effective poll)
+- **After:** ~150ms worst-case latency (100ms send + 50ms effective poll)
 
 ### Update Frequency
 - **Before:** ~2 Hz updates
-- **After:** 20 Hz updates (10x improvement)
+- **After:** 10 Hz updates (5x improvement) - optimized for stability
 
 ### Network Efficiency
 - Reduced unnecessary WebSocket broadcasts

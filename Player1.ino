@@ -22,6 +22,10 @@ bool dataChanged = false;
 uint16_t lastRemoteCap[5] = {0};
 uint16_t lastRemoteShock = 0;
 
+// Rate limiting for WebSocket broadcasts
+unsigned long lastBroadcastTime = 0;
+const unsigned long broadcastInterval = 25; // 25ms minimum between broadcasts (40 Hz max)
+
 // ─── ESP-NOW Payload ─────────────────────────────────────────────────
 typedef struct struct_message {
   uint8_t  playerId;   // 1=Player1, 2=Player2
@@ -54,7 +58,7 @@ const char html[] PROGMEM = R"rawliteral(
   <h1>Tool Target Game</h1>
   <div id="status" class="status-light"></div>
   <div class="latency-info">
-    <div>Optimized for low latency: 20 Hz updates</div>
+    <div>Balanced performance: ~13 Hz updates</div>
     <div>Updates: <span id="updateCounter">0</span></div>
   </div>
   <h2>Live Sensor Data</h2>
@@ -141,8 +145,8 @@ void onDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
         remoteShock = msg.shock;
       }
       
-      // Only broadcast if data changed or connection status changed
-      if (dataChanged) {
+      // Only broadcast if data changed and rate limit allows
+      if (dataChanged && (millis() - lastBroadcastTime >= broadcastInterval)) {
         // build JSON with both local & remote
         String j = "{";
         j += "\"connected\":" + String(player2Connected ? "true" : "false") + ",";
@@ -154,6 +158,7 @@ void onDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
         j += "\"shock_2\":" + String(remoteShock) + "}";
 
         ws.broadcastTXT(j);
+        lastBroadcastTime = millis();
       }
     }
   }
@@ -166,9 +171,12 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
 
+  // Set WiFi mode to AP+STA for both AP and ESP-NOW
+  WiFi.mode(WIFI_AP_STA);
+  
   // AP + web
   WiFi.softAP("ToolMaster", "12345678");
-  Serial.println(WiFi.softAPIP());
+  Serial.println("AP IP: " + WiFi.softAPIP().toString());
   server.on("/", handleRoot);
   server.begin();
 
@@ -176,14 +184,18 @@ void setup() {
   ws.begin();
 
   // ESP-NOW
-  WiFi.mode(WIFI_STA);
-  if (esp_now_init() != ESP_OK) while(true);
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initializing ESP-NOW");
+    while(true);
+  }
   esp_now_register_recv_cb(onDataRecv);
 
   sensorsInit();
+  Serial.println("Player 1 ready - AP and ESP-NOW active");
 }
 
 void loop() {
+  server.handleClient(); // handle web server requests
   ws.loop();           // handle WS
   sensorsLoop();       // update local sensors
   
@@ -191,6 +203,19 @@ void loop() {
   if (player2Connected && (millis() - lastHeartbeat > heartbeatTimeout)) {
     player2Connected = false;
     dataChanged = true; // Force update to show disconnected status
+    // Force broadcast of disconnected status
+    if (millis() - lastBroadcastTime >= broadcastInterval) {
+      String j = "{";
+      j += "\"connected\":false,";
+      for (int i = 0; i < 5; i++) {
+        j += "\"cap" + String(i) + "_1\":" + String(getCapacitiveValue(i)) + ",";
+        j += "\"cap" + String(i) + "_2\":0,";
+      }
+      j += "\"shock_1\":" + String(getShockValue()) + ",";
+      j += "\"shock_2\":0}";
+      ws.broadcastTXT(j);
+      lastBroadcastTime = millis();
+    }
   }
   
   digitalWrite(LED_PIN, player2Connected ? HIGH : LOW);
