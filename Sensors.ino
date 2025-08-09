@@ -2,14 +2,14 @@
 // Shared sensor routines for ESP32 Tool Target Game
 // Uses the ESP32's touchRead() API with baseline calibration,
 // exponential smoothing, and delta-from-baseline reporting.
-// Optimized for 32mm piezo vibration sensor with peak detection.
+// Also smooths the shock sensor via analogRead().
 
 #include <Arduino.h>
 #include <esp32-hal-adc.h>   // for analogSetPinAttenuation()
 
 // ── Pin definitions ────────────────────────────────────────────
 const int touchPins[5] = { 32, 33, 27, 14, 12 };  // must be touch-capable GPIOs
-const int shockPin     = 39;                     // analogRead() for piezo
+const int shockPin     = 39;                     // analogRead()
 // ────────────────────────────────────────────────────────────────
 
 // ── Smoothed output values ─────────────────────────────────────
@@ -23,18 +23,13 @@ static float    shockSmooth;
 static uint16_t baselineTouch[5];
 // ────────────────────────────────────────────────────────────────
 
-// ── Piezo-specific variables ───────────────────────────────────
-static int    shockBaseline = 0;
-static int    shockPeak     = 0;
-static int    shockThreshold = 50;  // Adjustable threshold for piezo sensitivity
-static unsigned long lastPeakTime = 0;
-static const unsigned long peakDecayTime = 100; // ms for peak decay
-// ────────────────────────────────────────────────────────────────
-
 // ── Config constants ────────────────────────────────────────────
-const float α             = 0.1f;  // smoothing factor (0 < α < 1)
-const int   CALIB_SAMPLES = 100;   // samples for baseline
-const int   CALIB_DELAY   =   5;   // ms between baseline samples
+const float α             = 0.05f; // More sensitive smoothing (was 0.1f)
+const int   CALIB_SAMPLES = 200;   // More samples for better baseline
+const int   CALIB_DELAY   =   2;   // Faster sampling
+
+// Note: Thresholds are now handled in Player1.ino web interface
+// Sensors just output raw amplified values
 // ────────────────────────────────────────────────────────────────
 
 void sensorsInit() {
@@ -56,18 +51,9 @@ void sensorsInit() {
     capacitiveValues[i] = 0;  // start at zero delta
   }
 
-  // 3) Initialize piezo shock sensor with baseline calibration
-  uint32_t shockSum = 0;
-  for (int j = 0; j < CALIB_SAMPLES; j++) {
-    shockSum += analogRead(shockPin);
-    delay(CALIB_DELAY);
-  }
-  shockBaseline = shockSum / CALIB_SAMPLES;
-  shockSmooth   = shockBaseline;
-  shockValue    = 0;
-  shockPeak     = 0;
-  
-  Serial.println("Piezo sensor calibrated - Baseline: " + String(shockBaseline));
+  // 3) Initialize shock smoothing
+  shockSmooth = analogRead(shockPin);
+  shockValue  = int(shockSmooth);
 }
 
 void sensorsLoop() {
@@ -76,31 +62,15 @@ void sensorsLoop() {
     float raw = touchRead(touchPins[i]);
     touchSmooth[i] = α * raw + (1.0f - α) * touchSmooth[i];
     float delta = float(baselineTouch[i]) - touchSmooth[i];
-    capacitiveValues[i] = delta > 0 ? int(delta) : 0;
+    
+    // Always show the raw delta value (amplified)
+    capacitiveValues[i] = int(delta * 2); // Amplify the signal
   }
 
-  // — Piezo shock channel with peak detection —
+  // — Shock channel —
   int rawShock = analogRead(shockPin);
-  int shockDelta = abs(rawShock - shockBaseline);
-  
-  // Update smoothed value
-  shockSmooth = α * rawShock + (1.0f - α) * shockSmooth;
-  
-  // Peak detection for piezo
-  if (shockDelta > shockThreshold) {
-    if (shockDelta > shockPeak) {
-      shockPeak = shockDelta;
-      lastPeakTime = millis();
-    }
-  }
-  
-  // Decay peak over time
-  if (millis() - lastPeakTime > peakDecayTime) {
-    shockPeak = shockPeak * 0.9; // Gradual decay
-  }
-  
-  // Output the peak value for responsive vibration detection
-  shockValue = shockPeak;
+  shockSmooth  = α * rawShock + (1.0f - α) * shockSmooth;
+  shockValue   = int(shockSmooth);
 }
 
 int getCapacitiveValue(int index) {
@@ -110,9 +80,4 @@ int getCapacitiveValue(int index) {
 
 int getShockValue() {
   return shockValue;
-}
-
-// Optional: Function to adjust piezo sensitivity
-void setShockThreshold(int threshold) {
-  shockThreshold = threshold;
 }
