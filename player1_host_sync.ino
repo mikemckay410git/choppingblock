@@ -34,7 +34,7 @@ static float V_SOUND = 3000.0f; // m/s
 // Timing
 static const unsigned long CAPTURE_WINDOW_US     = 8000; // wide for debugging
 static const unsigned long DEADTIME_MS           = 120;  // ms quiet before re‑arm
-static const unsigned long BROADCAST_INTERVAL_MS = 200;  // reduce WS chatter
+static const unsigned long BROADCAST_INTERVAL_MS = 25;   // periodic lightweight WS
 
 // Wi‑Fi AP creds
 static const char* AP_SSID = "ToolBoard";
@@ -449,18 +449,17 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
   switch(type) {
     case WStype_DISCONNECTED:
       Serial.printf("[%u] Disconnected!\n", num);
+      if ((int32_t)num == g_activeWsClient) {
+        g_activeWsClient = -1;
+      }
       break;
     case WStype_CONNECTED:
       Serial.printf("[%u] Connected!\n", num);
-      // allow multiple UI clients
-      // send initial state snapshot
-      {
-        String j = "{";
-        j += "\"connected\":" + String(player2Connected ? "true" : "false") + ",";
-        j += "\"winner\":\"" + winner + "\"";
-        j += "}";
-        ws.sendTXT(num, j);
+      // allow only one UI client at a time to conserve resources
+      if (g_activeWsClient >= 0 && g_activeWsClient != (int32_t)num) {
+        ws.disconnect((uint8_t)g_activeWsClient);
       }
+      g_activeWsClient = (int32_t)num;
       break;
     case WStype_TEXT:
       if (length > 0) {
