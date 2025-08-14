@@ -34,8 +34,8 @@ static const unsigned long DEADTIME_MS           = 120;  // ms quiet before reâ€
 // =======================================================
 
 // ===================== ESP-NOW Configuration =====================
-// MAC of Player 1 (replace with your actual address)
-uint8_t player1Address[] = { 0x78, 0x1C, 0x3C, 0xB8, 0xD5, 0xA9 };
+// Player 1 MAC address (hardcoded for reliability)
+uint8_t player1Address[] = {0x78, 0x1C, 0x3C, 0xB8, 0xD5, 0xA8}; // Player 1 STA MAC
 const uint8_t ESPNOW_BROADCAST_ADDR[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
 typedef struct struct_message {
@@ -367,24 +367,32 @@ void setup(){
   WiFi.mode(WIFI_STA);
   WiFi.disconnect(); // Ensure clean state
   Serial.printf("STA MAC: %s\r\n", WiFi.macAddress().c_str());
+  Serial.println("=== Player 2 MAC Addresses ===");
+  Serial.printf("STA MAC: %s\r\n", WiFi.macAddress().c_str());
+  Serial.println("===============================");
 
   // ESP-NOW setup
   if (esp_now_init() != ESP_OK) {
     Serial.println("Error initializing ESP-NOW");
     while(true);
   }
+  
+  // Clear any existing peers to ensure clean state
+  esp_now_del_peer(ESPNOW_BROADCAST_ADDR);
+  Serial.println("Cleared existing ESP-NOW peers");
+  
   esp_now_register_send_cb(OnDataSent);
   esp_now_register_recv_cb(OnDataRecv);
 
+  // Add Player 1 peer with known MAC address
   esp_now_peer_info_t peerInfo = {};
   memcpy(peerInfo.peer_addr, player1Address, 6);
   peerInfo.channel = 0; // follow current channel
   peerInfo.encrypt = false;
-  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-    Serial.println("Failed to add Player 1 peer (check MAC)");
-    Serial.printf("Configured peer MAC: %02X:%02X:%02X:%02X:%02X:%02X\r\n",
-                  player1Address[0], player1Address[1], player1Address[2],
-                  player1Address[3], player1Address[4], player1Address[5]);
+  if (esp_now_add_peer(&peerInfo) == ESP_OK) {
+    Serial.println("Player 1 peer added successfully");
+  } else {
+    Serial.println("Failed to add Player 1 peer");
   }
 
   myData.playerId = 2;
@@ -540,18 +548,16 @@ void loop(){
   if (player1Connected && (millis() - lastHeartbeat > heartbeatTimeout)) {
     player1Connected = false;
     clockSynced = false; // Reset sync when connection lost
-    Serial.println("Player 1 connection lost");
+    player1MacLearned = false; // Reset MAC learning to force rediscovery
+    Serial.println("Player 1 connection lost - resetting discovery");
   }
 
   // Send heartbeat to Player 1
   static unsigned long lastHeartbeatSend = 0;
   if (millis() - lastHeartbeatSend >= 1000) {
     myData.action = 1; // heartbeat
-    if (player1MacLearned) {
-      esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
-    }
-    // broadcast to help discovery by Player 1
-    esp_now_send(ESPNOW_BROADCAST_ADDR, (uint8_t*)&myData, sizeof(myData));
+    esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
+    Serial.println("Sent heartbeat to Player 1");
     lastHeartbeatSend = millis();
   }
 

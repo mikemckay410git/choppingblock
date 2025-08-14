@@ -42,8 +42,8 @@ static const char* AP_PASS = "12345678";
 // =======================================================
 
 // ===================== ESP-NOW Configuration =====================
-// MAC of Player 2 (replace with your actual address)
-uint8_t player2Address[] = { 0x78, 0x1C, 0x3C, 0xB8, 0xD5, 0xA9 };
+// Player 2 MAC address (hardcoded for reliability)
+uint8_t player2Address[] = {0x6C, 0xC8, 0x40, 0x4E, 0xEC, 0x2C}; // Player 2 STA MAC
 const uint8_t ESPNOW_BROADCAST_ADDR[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
 typedef struct struct_message {
@@ -503,16 +503,24 @@ void setup(){
     V_SOUND = vsSaved;
   }
   Serial.printf("V_SOUND (loaded): %.1f m/s\r\n", V_SOUND);
+  
+  // Clear any stored connection state to ensure clean startup
+  g_prefs.clear();
+  Serial.println("Cleared stored preferences for clean startup");
 
   // Wi‑Fi AP + web UI (keep STA active for ESP-NOW reliability)
   WiFi.mode(WIFI_AP_STA);
   if (WiFi.softAP(AP_SSID, AP_PASS, 1 /*channel*/, 0 /*hidden*/, 2 /*max conn*/)){
     IPAddress ip = WiFi.softAPIP();
     Serial.printf("SoftAP started: SSID=%s PASS=%s IP=%s\r\n", AP_SSID, AP_PASS, ip.toString().c_str());
-    Serial.printf("AP MAC: %s | STA MAC: %s | CH: %d\r\n",
-                  WiFi.softAPmacAddress().c_str(),
-                  WiFi.macAddress().c_str(),
-                  WiFi.channel());
+      Serial.printf("AP MAC: %s | STA MAC: %s | CH: %d\r\n",
+                WiFi.softAPmacAddress().c_str(),
+                WiFi.macAddress().c_str(),
+                WiFi.channel());
+  Serial.println("=== Player 1 MAC Addresses ===");
+  Serial.printf("AP MAC: %s\r\n", WiFi.softAPmacAddress().c_str());
+  Serial.printf("STA MAC: %s\r\n", WiFi.macAddress().c_str());
+  Serial.println("===============================");
   } else {
     Serial.println(F("SoftAP start FAILED"));
   }
@@ -528,14 +536,22 @@ void setup(){
     Serial.println("Error initializing ESP-NOW");
     while(true);
   }
+  
+  // Clear any existing peers to ensure clean state
+  esp_now_del_peer(ESPNOW_BROADCAST_ADDR);
+  Serial.println("Cleared existing ESP-NOW peers");
+  
   esp_now_register_send_cb(OnDataSent);
   esp_now_register_recv_cb(OnDataRecv);
 
+  // Add Player 2 peer with known MAC address
   esp_now_peer_info_t peerInfo = {};
   memcpy(peerInfo.peer_addr, player2Address, 6);
   peerInfo.channel = 0; // follow current channel
   peerInfo.encrypt = false;
-  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+  if (esp_now_add_peer(&peerInfo) == ESP_OK) {
+    Serial.println("Player 2 peer added successfully");
+  } else {
     Serial.println("Failed to add Player 2 peer");
   }
   // AP is already on channel 1 via softAP() call above
@@ -702,18 +718,16 @@ void loop(){
   if (player2Connected && (millis() - lastHeartbeat > heartbeatTimeout)) {
     player2Connected = false;
     clockSynced = false; // Reset sync when connection lost
-    Serial.println("Player 2 connection lost");
+    player2MacLearned = false; // Reset MAC learning to force rediscovery
+    Serial.println("Player 2 connection lost - resetting discovery");
   }
 
   // Send heartbeat to Player 2
   static unsigned long lastHeartbeatSend = 0;
   if (millis() - lastHeartbeatSend >= 1000) {
     myData.action = 1; // heartbeat
-    if (player2MacLearned) {
-      esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
-    }
-    // also broadcast to help discovery
-    esp_now_send(ESPNOW_BROADCAST_ADDR, (uint8_t*)&myData, sizeof(myData));
+    esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
+    Serial.println("Sent heartbeat to Player 2");
     lastHeartbeatSend = millis();
   }
 }
