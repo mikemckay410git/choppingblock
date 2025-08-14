@@ -104,7 +104,7 @@ struct HitResult {
 } g_lastHit;
 
 // Game state
-bool gameActive = false;
+bool gameActive = true;  // Start with game active
 String winner = "none";
 uint32_t player1HitTime = 0;
 uint32_t player2HitTime = 0;
@@ -446,6 +446,8 @@ void syncClock() {
 void handleRoot(){ server.send(200,"text/html",HTML); }
 
 void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
+  String j; // Declare outside switch to avoid scoping issues
+  
   switch(type) {
     case WStype_DISCONNECTED:
       Serial.printf("[%u] Disconnected!\n", num);
@@ -460,6 +462,13 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
         ws.disconnect((uint8_t)g_activeWsClient);
       }
       g_activeWsClient = (int32_t)num;
+      
+      // Send initial state to new client
+      j = "{";
+      j += "\"connected\":" + String(player2Connected ? "true" : "false") + ",";
+      j += "\"winner\":\"" + winner + "\"";
+      j += "}";
+      ws.sendTXT(num, j);
       break;
     case WStype_TEXT:
       if (length > 0) {
@@ -550,7 +559,7 @@ void setup(){
   }
 
   // Initialize game state
-  gameActive = true;
+  gameActive = true;  // Ensure game starts active
   winner = "none";
   player1HitTime = 0;
   player2HitTime = 0;
@@ -631,24 +640,32 @@ void loop(){
       if (first>=0){ r.valid=true; r.x=SX[first]*0.8f; r.y=SY[first]*0.8f; r.mode = (have>=2) ? "partial" : "nearest"; }
     }
 
-    // Record Player 1 hit
-    if (r.valid && gameActive) {
-      player1HitTime = r.hitTime;
-      Serial.printf("Player 1 hit detected at %lu with strength %d\n", player1HitTime, r.hitStrength);
-      
-      // Send hit to Player 2
-      myData.action = 2; // hit detected
-      myData.hitTime = r.hitTime;
-      myData.hitStrength = r.hitStrength;
-      esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
-      
-      // Declare winner immediately
-      winner = "Player 1";
-      gameActive = false;
-      String winMsg = "{\"winner\":\"" + winner + "\"}";
-      ws.broadcastTXT(winMsg);
-      Serial.println("Winner declared: Player 1");
+      // Record Player 1 hit
+  if (r.valid && gameActive) {
+    player1HitTime = r.hitTime;
+    Serial.printf("Player 1 hit detected at %lu with strength %d\n", player1HitTime, r.hitStrength);
+    
+    // Send hit to Player 2
+    myData.action = 2; // hit detected
+    myData.hitTime = r.hitTime;
+    myData.hitStrength = r.hitStrength;
+    esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
+    
+    // Declare winner immediately
+    winner = "Player 1";
+    gameActive = false;
+    String winMsg = "{\"winner\":\"" + winner + "\"}";
+    ws.broadcastTXT(winMsg);
+    Serial.println("Winner declared: Player 1");
+  } else {
+    // Debug output to see what's happening
+    if (!r.valid) {
+      Serial.println("Hit not valid - check sensor readings");
     }
+    if (!gameActive) {
+      Serial.println("Game not active - check game state");
+    }
+  }
 
     // No sensor/location broadcast in minimal UI
 
