@@ -543,7 +543,10 @@
       const qa = QA[ order[idx] ];
       qEl.textContent = qa.q;
       answerText.textContent = qa.a;
-      if (hideAnswer) aEl.classList.remove('show');
+      if (hideAnswer) {
+        aEl.classList.remove('show');
+        btnToggle.textContent = 'Show Answer';
+      }
       counterEl.textContent = `${idx+1} / ${QA.length}`;
     }
 
