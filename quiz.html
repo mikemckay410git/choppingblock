@@ -102,6 +102,32 @@
 
     .hidden { display: none; }
 
+    .file-input {
+      background: linear-gradient(180deg, rgba(106,161,255,.15), rgba(106,161,255,.08));
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .file-input input[type="file"] {
+      display: none;
+    }
+
+    .file-input label {
+      cursor: pointer;
+      color: var(--accent);
+      font-weight: 600;
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .file-input .hint {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
     @media (max-width: 520px) {
       .controls { grid-template-columns: 1fr; }
       .row { gap: 14px; }
@@ -111,8 +137,15 @@
 </head>
 <body>
   <div class="app">
+    <!-- File Upload Section -->
+    <div class="file-input">
+      <label for="csvFile">📁 Choose a CSV Quiz File</label>
+      <input type="file" id="csvFile" accept=".csv" multiple>
+      <div class="hint">Select one or more CSV files with Question,Answer format</div>
+    </div>
+
     <!-- Category Selector -->
-    <div class="category-selector" id="categorySelector">
+    <div class="category-selector hidden" id="categorySelector">
       <h2>Choose a Quiz Category</h2>
       <div class="category-grid" id="categoryGrid">
         <div class="category-btn">Loading categories...</div>
@@ -196,6 +229,7 @@
     let availableCategories = [];
     
     // DOM Elements
+    const fileInput = document.getElementById('csvFile');
     const categorySelector = document.getElementById('categorySelector');
     const categoryGrid = document.getElementById('categoryGrid');
     const quizInterface = document.getElementById('quizInterface');
@@ -217,62 +251,54 @@
     let order = [];
     let idx = 0;
 
-    // === CATEGORY DETECTION ===
-    async function detectCategories() {
-      // List of common CSV filenames to try
-      const commonNames = [
-        'general.csv', 'science.csv', 'history.csv', 'geography.csv', 
-        'math.csv', 'literature.csv', 'movies.csv', 'music.csv',
-        'sports.csv', 'food.csv', 'animals.csv', 'nature.csv',
-        'technology.csv', 'art.csv', 'politics.csv', 'economics.csv',
-        'biology.csv', 'chemistry.csv', 'physics.csv', 'astronomy.csv',
-        'quiz_questions.csv', 'questions.csv', 'trivia.csv', 'quiz.csv'
-      ];
+    // === FILE HANDLING ===
+    fileInput.addEventListener('change', handleFileSelect);
+
+    function handleFileSelect(event) {
+      const files = event.target.files;
+      if (files.length === 0) return;
+
+      availableCategories = [];
       
-      const detectedCategories = [];
-      
-      for (const filename of commonNames) {
-        try {
-          const response = await fetch(filename);
-          if (response.ok) {
-            const categoryName = filename.replace('.csv', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            detectedCategories.push({
-              filename: filename,
-              name: categoryName,
-              url: filename
-            });
-          }
-        } catch (error) {
-          // File doesn't exist, continue to next
-        }
-      }
-      
-      // Also try to detect any CSV files by making a request to a directory listing
-      // This is a fallback method that might work in some server configurations
-      try {
-        const response = await fetch('./');
-        if (response.ok) {
-          const text = await response.text();
-          const csvMatches = text.match(/href="([^"]*\.csv)"/g);
-          if (csvMatches) {
-            csvMatches.forEach(match => {
-              const filename = match.match(/href="([^"]*\.csv)"/)[1];
-              if (!detectedCategories.find(cat => cat.filename === filename)) {
-                const categoryName = filename.replace('.csv', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                detectedCategories.push({
-                  filename: filename,
+      Array.from(files).forEach(file => {
+        if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            try {
+              const csvText = e.target.result;
+              const csvData = parseCSV(csvText);
+              
+              // Convert CSV data to the expected format
+              const questions = csvData.map(row => {
+                const question = row.Question || row.question || row.Q || row.q || Object.values(row)[0];
+                const answer = row.Answer || row.answer || row.A || row.a || Object.values(row)[1];
+                return { q: question, a: answer };
+              }).filter(qa => qa.q && qa.a);
+              
+              if (questions.length > 0) {
+                const categoryName = file.name.replace('.csv', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                availableCategories.push({
+                  filename: file.name,
                   name: categoryName,
-                  url: filename
+                  questions: questions
                 });
+                
+                // If this is the first file loaded, show category selector
+                if (availableCategories.length === 1) {
+                  showCategorySelector();
+                }
+                
+                // Update category grid
+                createCategoryButtons(availableCategories);
               }
-            });
-          }
+            } catch (error) {
+              console.error('Error parsing CSV:', error);
+              alert(`Error parsing ${file.name}: ${error.message}`);
+            }
+          };
+          reader.readAsText(file);
         }
-      } catch (error) {
-        // Directory listing not available, that's okay
-      }
-      
-      return detectedCategories;
+      });
     }
 
     // === CATEGORY SELECTION ===
@@ -292,8 +318,7 @@
       if (categories.length === 0) {
         categoryGrid.innerHTML = `
           <div class="category-btn" style="grid-column: 1 / -1; color: var(--muted);">
-            No CSV files found. Please add CSV files to this folder.<br>
-            <small>Files should be named like: general.csv, science.csv, etc.</small>
+            No valid CSV files loaded. Please select CSV files with Question,Answer format.
           </div>
         `;
         return;
@@ -302,7 +327,7 @@
       categoryGrid.innerHTML = categories.map(category => `
         <div class="category-btn" data-filename="${category.filename}">
           <div style="font-size: 18px; margin-bottom: 4px;">${category.name}</div>
-          <div style="font-size: 12px; color: var(--muted);">${category.filename}</div>
+          <div style="font-size: 12px; color: var(--muted);">${category.questions.length} questions</div>
         </div>
       `).join('');
 
@@ -316,40 +341,21 @@
     }
 
     // === LOAD CATEGORY ===
-    async function loadCategory(filename) {
-      try {
-        const response = await fetch(filename);
-        if (!response.ok) {
-          throw new Error(`Failed to load ${filename}`);
-        }
-        
-        const csvText = await response.text();
-        const csvData = parseCSV(csvText);
-        
-        // Convert CSV data to the expected format
-        QA = csvData.map(row => {
-          // Handle different possible column names
-          const question = row.Question || row.question || row.Q || row.q || Object.values(row)[0];
-          const answer = row.Answer || row.answer || row.A || row.a || Object.values(row)[1];
-          return { q: question, a: answer };
-        }).filter(qa => qa.q && qa.a); // Filter out empty entries
-        
-        if (QA.length === 0) {
-          throw new Error('No valid questions found in CSV file');
-        }
-        
-        currentCategory = filename.replace('.csv', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        quizTitle.textContent = currentCategory;
-        
-        showQuizInterface();
-        setOrder(true);
-        render(true);
-        enableControls();
-        
-      } catch (error) {
-        console.error('Error loading category:', error);
-        alert(`Error loading ${filename}: ${error.message}`);
+    function loadCategory(filename) {
+      const category = availableCategories.find(cat => cat.filename === filename);
+      if (!category) {
+        alert('Category not found');
+        return;
       }
+
+      QA = category.questions;
+      currentCategory = category.name;
+      quizTitle.textContent = currentCategory;
+      
+      showQuizInterface();
+      setOrder(true);
+      render(true);
+      enableControls();
     }
 
     function enableControls() {
@@ -415,24 +421,6 @@
       else if (e.key.toLowerCase() === 'r') { e.preventDefault(); setOrder(true); render(true); }
       else if (e.key === 'Escape') { e.preventDefault(); showCategorySelector(); }
     });
-
-    // Initialize
-    async function init() {
-      try {
-        const categories = await detectCategories();
-        availableCategories = categories;
-        createCategoryButtons(categories);
-      } catch (error) {
-        console.error('Error initializing:', error);
-        categoryGrid.innerHTML = `
-          <div class="category-btn" style="grid-column: 1 / -1; color: var(--muted);">
-            Error loading categories. Please check your CSV files.
-          </div>
-        `;
-      }
-    }
-
-    init();
   </script>
 </body>
 </html>
