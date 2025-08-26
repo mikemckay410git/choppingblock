@@ -103,12 +103,15 @@
     .hidden { display: none; }
 
     .file-input {
-      background: linear-gradient(180deg, rgba(106,161,255,.15), rgba(106,161,255,.08));
-      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.02);
+      border: 1px solid rgba(255,255,255,.06);
       border-radius: 12px;
-      padding: 20px;
-      text-align: center;
-      margin-bottom: 20px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .file-input input[type="file"] {
@@ -118,49 +121,66 @@
     .file-input label {
       cursor: pointer;
       color: var(--accent);
-      font-weight: 600;
-      display: block;
-      margin-bottom: 10px;
+      font-weight: 500;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: rgba(106,161,255,.1);
+      border: 1px solid rgba(106,161,255,.2);
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .file-input label:hover {
+      background: rgba(106,161,255,.15);
+      transform: translateY(-1px);
     }
 
     .file-input .hint {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--muted);
+      opacity: 0.8;
     }
 
     .loaded-files {
-      margin-top: 15px;
-      text-align: left;
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--muted);
     }
 
     .loaded-files h3 {
-      margin: 0 0 10px 0;
-      font-size: 14px;
-      color: var(--accent);
+      display: none;
     }
 
     .file-list {
       list-style: none;
       padding: 0;
       margin: 0;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
     }
 
     .file-list li {
-      background: rgba(255,255,255,.04);
-      border: 1px solid rgba(255,255,255,.08);
-      border-radius: 8px;
-      padding: 8px 12px;
-      margin-bottom: 5px;
-      font-size: 12px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
       color: var(--muted);
+      opacity: 0.8;
     }
 
     .file-list .success {
       color: #4ade80;
+      opacity: 0.9;
     }
 
     .file-list .error {
       color: #f87171;
+      opacity: 0.9;
     }
 
     @media (max-width: 520px) {
@@ -174,9 +194,9 @@
   <div class="app">
     <!-- File Upload Section -->
     <div class="file-input">
-      <label for="csvFile">📁 Choose CSV Quiz Files</label>
+      <label for="csvFile">📁 Load CSV Files</label>
       <input type="file" id="csvFile" accept=".csv" multiple>
-      <div class="hint">Hold Ctrl/Cmd to select multiple CSV files with Question,Answer format</div>
+      <div class="hint">Hold Ctrl/Cmd for multiple files</div>
       
       <div class="loaded-files hidden" id="loadedFiles">
         <h3>Loaded Files:</h3>
@@ -332,13 +352,13 @@
                 });
                 
                 // Add success message to file list
-                addFileToList(file.name, `✅ Loaded ${questions.length} questions`, 'success');
+                addFileToList(file.name, `${questions.length} questions`, 'success');
               } else {
-                addFileToList(file.name, '❌ No valid questions found', 'error');
+                addFileToList(file.name, 'No questions', 'error');
               }
             } catch (error) {
               console.error('Error parsing CSV:', error);
-              addFileToList(file.name, `❌ Error: ${error.message}`, 'error');
+              addFileToList(file.name, 'Error', 'error');
             }
             
             loadedCount++;
@@ -353,7 +373,7 @@
           };
           
           reader.onerror = function() {
-            addFileToList(file.name, '❌ Failed to read file', 'error');
+            addFileToList(file.name, 'Read failed', 'error');
             loadedCount++;
             
             if (loadedCount === totalFiles) {
@@ -366,7 +386,7 @@
           
           reader.readAsText(file);
         } else {
-          addFileToList(file.name, '❌ Not a CSV file', 'error');
+          addFileToList(file.name, 'Not CSV', 'error');
           loadedCount++;
           
           if (loadedCount === totalFiles) {
@@ -385,7 +405,7 @@
     function addFileToList(filename, message, status) {
       const li = document.createElement('li');
       li.className = status;
-      li.innerHTML = `<strong>${filename}</strong>: ${message}`;
+      li.innerHTML = `${filename.replace('.csv', '')}: ${message}`;
       fileList.appendChild(li);
     }
 
