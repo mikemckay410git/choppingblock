@@ -193,7 +193,7 @@
 <body>
   <div class="app">
     <!-- File Upload Section -->
-    <div class="file-input">
+    <div class="file-input" id="fileInputSection">
       <label for="csvFile">📁 Load CSV Files</label>
       <input type="file" id="csvFile" accept=".csv" multiple>
       <div class="hint">Hold Ctrl/Cmd for multiple files</div>
@@ -290,6 +290,7 @@
     
     // DOM Elements
     const fileInput = document.getElementById('csvFile');
+    const fileInputSection = document.getElementById('fileInputSection');
     const loadedFiles = document.getElementById('loadedFiles');
     const fileList = document.getElementById('fileList');
     const categorySelector = document.getElementById('categorySelector');
@@ -413,7 +414,7 @@
     function showCategorySelector() {
       categorySelector.classList.remove('hidden');
       quizInterface.classList.add('hidden');
-      fileInput.parentElement.classList.remove('hidden');
+      fileInputSection.classList.remove('hidden');
       currentCategory = '';
       QA = [];
     }
@@ -421,7 +422,7 @@
     function showQuizInterface() {
       categorySelector.classList.add('hidden');
       quizInterface.classList.remove('hidden');
-      fileInput.parentElement.classList.add('hidden');
+      fileInputSection.classList.add('hidden');
     }
 
     function createCategoryButtons(categories) {
