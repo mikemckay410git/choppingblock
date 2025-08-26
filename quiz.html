@@ -199,7 +199,7 @@
 <body>
   <div class="app">
     <!-- File Upload Section -->
-    <div class="file-input hidden" id="fileInputSection">
+    <div class="file-input" id="fileInputSection">
       <label for="csvFile">📁 Load CSV Files</label>
       <input type="file" id="csvFile" accept=".csv" multiple>
       <div class="hint">Hold Ctrl/Cmd for multiple files</div>
@@ -252,15 +252,6 @@
   </div>
 
   <script>
-    // === INITIAL SETUP ===
-    // Ensure file input section is hidden on page load
-    document.addEventListener('DOMContentLoaded', function() {
-      const fileInputSection = document.getElementById('fileInputSection');
-      if (fileInputSection) {
-        fileInputSection.classList.add('hidden');
-      }
-    });
-
     // === CSV PARSER ===
     function parseCSV(csv) {
       const lines = csv.split('\n');
