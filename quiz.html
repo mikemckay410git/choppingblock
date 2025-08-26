@@ -103,12 +103,12 @@
     .hidden { display: none; }
 
     .file-input {
-      background: linear-gradient(180deg, rgba(106,161,255,.15), rgba(106,161,255,.08));
-      border: 1px solid rgba(255,255,255,.12);
+      background: linear-gradient(180deg, rgba(106,161,255,.08), rgba(106,161,255,.04));
+      border: 1px solid rgba(255,255,255,.08);
       border-radius: 12px;
-      padding: 20px;
+      padding: 16px;
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
 
     .file-input input[type="file"] {
@@ -120,22 +120,23 @@
       color: var(--accent);
       font-weight: 600;
       display: block;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
+      font-size: 14px;
     }
 
     .file-input .hint {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--muted);
     }
 
     .loaded-files {
-      margin-top: 15px;
+      margin-top: 12px;
       text-align: left;
     }
 
     .loaded-files h3 {
-      margin: 0 0 10px 0;
-      font-size: 14px;
+      margin: 0 0 8px 0;
+      font-size: 13px;
       color: var(--accent);
     }
 
@@ -146,12 +147,12 @@
     }
 
     .file-list li {
-      background: rgba(255,255,255,.04);
-      border: 1px solid rgba(255,255,255,.08);
-      border-radius: 8px;
-      padding: 8px 12px;
-      margin-bottom: 5px;
-      font-size: 12px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 6px;
+      padding: 6px 10px;
+      margin-bottom: 4px;
+      font-size: 11px;
       color: var(--muted);
     }
 
@@ -163,6 +164,21 @@
       color: #f87171;
     }
 
+    .add-more-btn {
+      background: linear-gradient(180deg, rgba(106,161,255,.12), rgba(106,161,255,.06));
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--accent);
+      margin-top: 8px;
+      width: 100%;
+    }
+
+    .add-more-btn:hover {
+      background: linear-gradient(180deg, rgba(106,161,255,.18), rgba(106,161,255,.1));
+    }
+
     @media (max-width: 520px) {
       .controls { grid-template-columns: 1fr; }
       .row { gap: 14px; }
@@ -172,23 +188,29 @@
 </head>
 <body>
   <div class="app">
-    <!-- File Upload Section -->
-    <div class="file-input">
-      <label for="csvFile">📁 Choose CSV Quiz Files</label>
-      <input type="file" id="csvFile" accept=".csv" multiple>
-      <div class="hint">Hold Ctrl/Cmd to select multiple CSV files with Question,Answer format</div>
-      
-      <div class="loaded-files hidden" id="loadedFiles">
-        <h3>Loaded Files:</h3>
-        <ul class="file-list" id="fileList"></ul>
-      </div>
-    </div>
-
     <!-- Category Selector -->
-    <div class="category-selector hidden" id="categorySelector">
+    <div class="category-selector" id="categorySelector">
       <h2>Choose a Quiz Category</h2>
+      
+      <!-- File Upload Section (only visible when no categories loaded) -->
+      <div class="file-input" id="fileInput">
+        <label for="csvFile">📁 Choose CSV Quiz Files</label>
+        <input type="file" id="csvFile" accept=".csv" multiple>
+        <div class="hint">Hold Ctrl/Cmd to select multiple CSV files with Question,Answer format</div>
+        
+        <div class="loaded-files hidden" id="loadedFiles">
+          <h3>Loaded Files:</h3>
+          <ul class="file-list" id="fileList"></ul>
+        </div>
+      </div>
+
+      <!-- Add More Files Button (only visible when categories are loaded) -->
+      <button class="add-more-btn hidden" id="addMoreBtn">
+        �� Add More CSV Files
+      </button>
+
       <div class="category-grid" id="categoryGrid">
-        <div class="category-btn">Loading categories...</div>
+        <div class="category-btn">Select CSV files to get started...</div>
       </div>
     </div>
 
@@ -269,7 +291,8 @@
     let availableCategories = [];
     
     // DOM Elements
-    const fileInput = document.getElementById('csvFile');
+    const fileInput = document.getElementById('fileInput');
+    const addMoreBtn = document.getElementById('addMoreBtn');
     const loadedFiles = document.getElementById('loadedFiles');
     const fileList = document.getElementById('fileList');
     const categorySelector = document.getElementById('categorySelector');
@@ -294,14 +317,16 @@
     let idx = 0;
 
     // === FILE HANDLING ===
-    fileInput.addEventListener('change', handleFileSelect);
+    document.getElementById('csvFile').addEventListener('change', handleFileSelect);
+    addMoreBtn.addEventListener('click', () => {
+      document.getElementById('csvFile').click();
+    });
 
     function handleFileSelect(event) {
       const files = event.target.files;
       if (files.length === 0) return;
 
-      // Clear previous categories
-      availableCategories = [];
+      // Clear previous file list
       fileList.innerHTML = '';
       
       let loadedCount = 0;
@@ -343,12 +368,9 @@
             
             loadedCount++;
             
-            // If all files are processed, show category selector
+            // If all files are processed, update UI
             if (loadedCount === totalFiles) {
-              if (availableCategories.length > 0) {
-                showCategorySelector();
-                createCategoryButtons(availableCategories);
-              }
+              updateUIAfterFileLoad();
             }
           };
           
@@ -357,10 +379,7 @@
             loadedCount++;
             
             if (loadedCount === totalFiles) {
-              if (availableCategories.length > 0) {
-                showCategorySelector();
-                createCategoryButtons(availableCategories);
-              }
+              updateUIAfterFileLoad();
             }
           };
           
@@ -370,16 +389,24 @@
           loadedCount++;
           
           if (loadedCount === totalFiles) {
-            if (availableCategories.length > 0) {
-              showCategorySelector();
-              createCategoryButtons(availableCategories);
-            }
+            updateUIAfterFileLoad();
           }
         }
       });
       
       // Show the loaded files section
       loadedFiles.classList.remove('hidden');
+    }
+
+    function updateUIAfterFileLoad() {
+      if (availableCategories.length > 0) {
+        // Hide file input, show add more button
+        fileInput.classList.add('hidden');
+        addMoreBtn.classList.remove('hidden');
+        
+        // Update category grid
+        createCategoryButtons(availableCategories);
+      }
     }
 
     function addFileToList(filename, message, status) {
