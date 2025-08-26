@@ -100,7 +100,13 @@
     .progress { margin-top: 8px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
     .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; color: #cfe1ff; opacity: .9; }
 
-    .hidden { display: none; }
+    .hidden { 
+      display: none !important; 
+      visibility: hidden !important;
+      opacity: 0 !important;
+      height: 0 !important;
+      overflow: hidden !important;
+    }
 
     .file-input {
       background: rgba(255,255,255,.02);
@@ -246,6 +252,15 @@
   </div>
 
   <script>
+    // === INITIAL SETUP ===
+    // Ensure file input section is hidden on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      const fileInputSection = document.getElementById('fileInputSection');
+      if (fileInputSection) {
+        fileInputSection.classList.add('hidden');
+      }
+    });
+
     // === CSV PARSER ===
     function parseCSV(csv) {
       const lines = csv.split('\n');
@@ -417,12 +432,14 @@
       fileInputSection.classList.remove('hidden');
       currentCategory = '';
       QA = [];
+      console.log('Category selector shown, file input visible');
     }
 
     function showQuizInterface() {
       categorySelector.classList.add('hidden');
       quizInterface.classList.remove('hidden');
       fileInputSection.classList.add('hidden');
+      console.log('Quiz interface shown, file input hidden');
     }
 
     function createCategoryButtons(categories) {
