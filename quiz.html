@@ -128,6 +128,41 @@
       color: var(--muted);
     }
 
+    .loaded-files {
+      margin-top: 15px;
+      text-align: left;
+    }
+
+    .loaded-files h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: var(--accent);
+    }
+
+    .file-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .file-list li {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 5px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .file-list .success {
+      color: #4ade80;
+    }
+
+    .file-list .error {
+      color: #f87171;
+    }
+
     @media (max-width: 520px) {
       .controls { grid-template-columns: 1fr; }
       .row { gap: 14px; }
@@ -139,9 +174,14 @@
   <div class="app">
     <!-- File Upload Section -->
     <div class="file-input">
-      <label for="csvFile">📁 Choose a CSV Quiz File</label>
+      <label for="csvFile">📁 Choose CSV Quiz Files</label>
       <input type="file" id="csvFile" accept=".csv" multiple>
-      <div class="hint">Select one or more CSV files with Question,Answer format</div>
+      <div class="hint">Hold Ctrl/Cmd to select multiple CSV files with Question,Answer format</div>
+      
+      <div class="loaded-files hidden" id="loadedFiles">
+        <h3>Loaded Files:</h3>
+        <ul class="file-list" id="fileList"></ul>
+      </div>
     </div>
 
     <!-- Category Selector -->
@@ -230,6 +270,8 @@
     
     // DOM Elements
     const fileInput = document.getElementById('csvFile');
+    const loadedFiles = document.getElementById('loadedFiles');
+    const fileList = document.getElementById('fileList');
     const categorySelector = document.getElementById('categorySelector');
     const categoryGrid = document.getElementById('categoryGrid');
     const quizInterface = document.getElementById('quizInterface');
@@ -258,11 +300,17 @@
       const files = event.target.files;
       if (files.length === 0) return;
 
+      // Clear previous categories
       availableCategories = [];
+      fileList.innerHTML = '';
       
-      Array.from(files).forEach(file => {
+      let loadedCount = 0;
+      const totalFiles = files.length;
+
+      Array.from(files).forEach((file, index) => {
         if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
           const reader = new FileReader();
+          
           reader.onload = function(e) {
             try {
               const csvText = e.target.result;
@@ -283,22 +331,62 @@
                   questions: questions
                 });
                 
-                // If this is the first file loaded, show category selector
-                if (availableCategories.length === 1) {
-                  showCategorySelector();
-                }
-                
-                // Update category grid
-                createCategoryButtons(availableCategories);
+                // Add success message to file list
+                addFileToList(file.name, `✅ Loaded ${questions.length} questions`, 'success');
+              } else {
+                addFileToList(file.name, '❌ No valid questions found', 'error');
               }
             } catch (error) {
               console.error('Error parsing CSV:', error);
-              alert(`Error parsing ${file.name}: ${error.message}`);
+              addFileToList(file.name, `❌ Error: ${error.message}`, 'error');
+            }
+            
+            loadedCount++;
+            
+            // If all files are processed, show category selector
+            if (loadedCount === totalFiles) {
+              if (availableCategories.length > 0) {
+                showCategorySelector();
+                createCategoryButtons(availableCategories);
+              }
             }
           };
+          
+          reader.onerror = function() {
+            addFileToList(file.name, '❌ Failed to read file', 'error');
+            loadedCount++;
+            
+            if (loadedCount === totalFiles) {
+              if (availableCategories.length > 0) {
+                showCategorySelector();
+                createCategoryButtons(availableCategories);
+              }
+            }
+          };
+          
           reader.readAsText(file);
+        } else {
+          addFileToList(file.name, '❌ Not a CSV file', 'error');
+          loadedCount++;
+          
+          if (loadedCount === totalFiles) {
+            if (availableCategories.length > 0) {
+              showCategorySelector();
+              createCategoryButtons(availableCategories);
+            }
+          }
         }
       });
+      
+      // Show the loaded files section
+      loadedFiles.classList.remove('hidden');
+    }
+
+    function addFileToList(filename, message, status) {
+      const li = document.createElement('li');
+      li.className = status;
+      li.innerHTML = `<strong>${filename}</strong>: ${message}`;
+      fileList.appendChild(li);
     }
 
     // === CATEGORY SELECTION ===
