@@ -443,18 +443,37 @@
         return;
       }
 
-      categoryGrid.innerHTML = categories.map(category => `
+      // Add "Combine All" button if there are multiple categories
+      let buttonsHTML = '';
+      if (categories.length > 1) {
+        const totalQuestions = categories.reduce((sum, cat) => sum + cat.questions.length, 0);
+        buttonsHTML += `
+          <div class="category-btn combine-all" style="grid-column: 1 / -1; background: linear-gradient(180deg, rgba(155,225,255,.25), rgba(155,225,255,.15)); border-color: var(--accent-2);">
+            <div style="font-size: 18px; margin-bottom: 4px;">🎯 Combine All Categories</div>
+            <div style="font-size: 12px; color: var(--muted);">${totalQuestions} total questions from ${categories.length} categories</div>
+          </div>
+        `;
+      }
+
+      // Add individual category buttons
+      buttonsHTML += categories.map(category => `
         <div class="category-btn" data-filename="${category.filename}">
           <div style="font-size: 18px; margin-bottom: 4px;">${category.name}</div>
           <div style="font-size: 12px; color: var(--muted);">${category.questions.length} questions</div>
         </div>
       `).join('');
 
+      categoryGrid.innerHTML = buttonsHTML;
+
       // Add click handlers
       categoryGrid.querySelectorAll('.category-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          const filename = btn.dataset.filename;
-          loadCategory(filename);
+          if (btn.classList.contains('combine-all')) {
+            loadCombinedCategories(categories);
+          } else {
+            const filename = btn.dataset.filename;
+            loadCategory(filename);
+          }
         });
       });
     }
@@ -469,6 +488,25 @@
 
       QA = category.questions;
       currentCategory = category.name;
+      quizTitle.textContent = currentCategory;
+      
+      showQuizInterface();
+      setOrder(true);
+      render(true);
+      enableControls();
+    }
+
+    function loadCombinedCategories(categories) {
+      // Combine all questions from all categories
+      QA = [];
+      const categoryNames = [];
+      
+      categories.forEach(category => {
+        QA = QA.concat(category.questions);
+        categoryNames.push(category.name);
+      });
+
+      currentCategory = `Mixed: ${categoryNames.join(', ')}`;
       quizTitle.textContent = currentCategory;
       
       showQuizInterface();
