@@ -291,43 +291,83 @@
     let availableCategories = [];
     
     // DOM Elements
-    const fileInput = document.getElementById('fileInput');
-    const addMoreBtn = document.getElementById('addMoreBtn');
-    const loadedFiles = document.getElementById('loadedFiles');
-    const fileList = document.getElementById('fileList');
-    const categorySelector = document.getElementById('categorySelector');
-    const categoryGrid = document.getElementById('categoryGrid');
-    const quizInterface = document.getElementById('quizInterface');
-    const quizTitle = document.getElementById('quizTitle');
-    const qEl = document.getElementById('q');
-    const aEl = document.getElementById('a');
-    const answerText = document.getElementById('answerText');
-    const counterEl = document.getElementById('counter');
-    const btnPrev = document.getElementById('prev');
-    const btnNext = document.getElementById('next');
-    const btnToggle = document.getElementById('toggle');
-    const btnReshuffle = document.getElementById('reshuffle');
-    const btnRestart = document.getElementById('restart');
-    const btnBackToCategories = document.getElementById('backToCategories');
-    const startRandom = document.getElementById('startRandom');
-    const looping = document.getElementById('looping');
-    const card = document.getElementById('card');
+    let fileInput, addMoreBtn, loadedFiles, fileList, categorySelector, categoryGrid;
+    let quizInterface, quizTitle, qEl, aEl, answerText, counterEl;
+    let btnPrev, btnNext, btnToggle, btnReshuffle, btnRestart, btnBackToCategories;
+    let startRandom, looping, card;
 
     let order = [];
     let idx = 0;
 
-    // === FILE HANDLING ===
-    document.getElementById('csvFile').addEventListener('change', handleFileSelect);
-    addMoreBtn.addEventListener('click', () => {
-      document.getElementById('csvFile').click();
-    });
+    // === INITIALIZE DOM ELEMENTS ===
+    function initializeElements() {
+      fileInput = document.getElementById('fileInput');
+      addMoreBtn = document.getElementById('addMoreBtn');
+      loadedFiles = document.getElementById('loadedFiles');
+      fileList = document.getElementById('fileList');
+      categorySelector = document.getElementById('categorySelector');
+      categoryGrid = document.getElementById('categoryGrid');
+      quizInterface = document.getElementById('quizInterface');
+      quizTitle = document.getElementById('quizTitle');
+      qEl = document.getElementById('q');
+      aEl = document.getElementById('a');
+      answerText = document.getElementById('answerText');
+      counterEl = document.getElementById('counter');
+      btnPrev = document.getElementById('prev');
+      btnNext = document.getElementById('next');
+      btnToggle = document.getElementById('toggle');
+      btnReshuffle = document.getElementById('reshuffle');
+      btnRestart = document.getElementById('restart');
+      btnBackToCategories = document.getElementById('backToCategories');
+      startRandom = document.getElementById('startRandom');
+      looping = document.getElementById('looping');
+      card = document.getElementById('card');
 
+      // Set up event listeners
+      setupEventListeners();
+    }
+
+    // === SETUP EVENT LISTENERS ===
+    function setupEventListeners() {
+      // File handling
+      const csvFileInput = document.getElementById('csvFile');
+      if (csvFileInput) {
+        csvFileInput.addEventListener('change', handleFileSelect);
+      }
+      
+      if (addMoreBtn) {
+        addMoreBtn.addEventListener('click', () => {
+          const csvFileInput = document.getElementById('csvFile');
+          if (csvFileInput) csvFileInput.click();
+        });
+      }
+
+      // Quiz controls
+      if (btnNext) btnNext.addEventListener('click', next);
+      if (btnPrev) btnPrev.addEventListener('click', prev);
+      if (btnToggle) btnToggle.addEventListener('click', toggleAnswer);
+      if (btnReshuffle) btnReshuffle.addEventListener('click', () => { setOrder(true); render(true); });
+      if (btnRestart) btnRestart.addEventListener('click', () => { setOrder(startRandom.checked); render(true); });
+      if (btnBackToCategories) btnBackToCategories.addEventListener('click', showCategorySelector);
+      if (card) card.addEventListener('click', toggleAnswer);
+
+      // Keyboard shortcuts
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+        else if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); toggleAnswer(); }
+        else if (e.key.toLowerCase() === 'r') { e.preventDefault(); setOrder(true); render(true); }
+        else if (e.key === 'Escape') { e.preventDefault(); showCategorySelector(); }
+      });
+    }
+
+    // === FILE HANDLING ===
     function handleFileSelect(event) {
       const files = event.target.files;
       if (files.length === 0) return;
 
       // Clear previous file list
-      fileList.innerHTML = '';
+      if (fileList) fileList.innerHTML = '';
       
       let loadedCount = 0;
       const totalFiles = files.length;
@@ -395,14 +435,14 @@
       });
       
       // Show the loaded files section
-      loadedFiles.classList.remove('hidden');
+      if (loadedFiles) loadedFiles.classList.remove('hidden');
     }
 
     function updateUIAfterFileLoad() {
       if (availableCategories.length > 0) {
         // Hide file input, show add more button
-        fileInput.classList.add('hidden');
-        addMoreBtn.classList.remove('hidden');
+        if (fileInput) fileInput.classList.add('hidden');
+        if (addMoreBtn) addMoreBtn.classList.remove('hidden');
         
         // Update category grid
         createCategoryButtons(availableCategories);
@@ -410,6 +450,8 @@
     }
 
     function addFileToList(filename, message, status) {
+      if (!fileList) return;
+      
       const li = document.createElement('li');
       li.className = status;
       li.innerHTML = `<strong>${filename}</strong>: ${message}`;
@@ -418,18 +460,20 @@
 
     // === CATEGORY SELECTION ===
     function showCategorySelector() {
-      categorySelector.classList.remove('hidden');
-      quizInterface.classList.add('hidden');
+      if (categorySelector) categorySelector.classList.remove('hidden');
+      if (quizInterface) quizInterface.classList.add('hidden');
       currentCategory = '';
       QA = [];
     }
 
     function showQuizInterface() {
-      categorySelector.classList.add('hidden');
-      quizInterface.classList.remove('hidden');
+      if (categorySelector) categorySelector.classList.add('hidden');
+      if (quizInterface) quizInterface.classList.remove('hidden');
     }
 
     function createCategoryButtons(categories) {
+      if (!categoryGrid) return;
+      
       if (categories.length === 0) {
         categoryGrid.innerHTML = `
           <div class="category-btn" style="grid-column: 1 / -1; color: var(--muted);">
@@ -465,7 +509,7 @@
 
       QA = category.questions;
       currentCategory = category.name;
-      quizTitle.textContent = currentCategory;
+      if (quizTitle) quizTitle.textContent = currentCategory;
       
       showQuizInterface();
       setOrder(true);
@@ -490,43 +534,35 @@
       if (QA.length === 0) return;
       
       const qa = QA[ order[idx] ];
-      qEl.textContent = qa.q;
-      answerText.textContent = qa.a;
-      if (hideAnswer) aEl.classList.remove('show');
-      counterEl.textContent = `${idx+1} / ${QA.length}`;
+      if (qEl) qEl.textContent = qa.q;
+      if (answerText) answerText.textContent = qa.a;
+      if (hideAnswer && aEl) aEl.classList.remove('show');
+      if (counterEl) counterEl.textContent = `${idx+1} / ${QA.length}`;
     }
 
     function next() {
       if (idx < order.length - 1) { idx++; render(); }
-      else if (looping.checked) { idx = 0; render(); }
+      else if (looping && looping.checked) { idx = 0; render(); }
     }
 
     function prev() {
       if (idx > 0) { idx--; render(); }
-      else if (looping.checked) { idx = order.length - 1; render(); }
+      else if (looping && looping.checked) { idx = order.length - 1; render(); }
     }
 
     function toggleAnswer() {
+      if (!aEl || !btnToggle) return;
+      
       aEl.classList.toggle('show');
       btnToggle.textContent = aEl.classList.contains('show') ? 'Hide Answer' : 'Show Answer';
     }
 
-    // Events
-    btnNext.addEventListener('click', next);
-    btnPrev.addEventListener('click', prev);
-    btnToggle.addEventListener('click', toggleAnswer);
-    btnReshuffle.addEventListener('click', () => { setOrder(true); render(true); });
-    btnRestart.addEventListener('click', () => { setOrder(startRandom.checked); render(true); });
-    btnBackToCategories.addEventListener('click', showCategorySelector);
-    card.addEventListener('click', toggleAnswer);
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
-      else if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); toggleAnswer(); }
-      else if (e.key.toLowerCase() === 'r') { e.preventDefault(); setOrder(true); render(true); }
-      else if (e.key === 'Escape') { e.preventDefault(); showCategorySelector(); }
-    });
+    // Initialize when DOM is loaded
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeElements);
+    } else {
+      initializeElements();
+    }
   </script>
 </body>
 </html>
