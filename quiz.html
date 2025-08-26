@@ -413,6 +413,7 @@
     function showCategorySelector() {
       categorySelector.classList.remove('hidden');
       quizInterface.classList.add('hidden');
+      fileInput.parentElement.classList.remove('hidden');
       currentCategory = '';
       QA = [];
     }
@@ -420,6 +421,7 @@
     function showQuizInterface() {
       categorySelector.classList.add('hidden');
       quizInterface.classList.remove('hidden');
+      fileInput.parentElement.classList.add('hidden');
     }
 
     function createCategoryButtons(categories) {
