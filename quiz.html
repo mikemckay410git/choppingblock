@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quick‑Fire Quiz (300 Q&A)</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #101a33;
+      --ink: #eaf0ff;
+      --muted: #aab6d3;
+      --accent: #6aa1ff;
+      --accent-2: #9be1ff;
+      --shadow: 0 10px 30px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25);
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: radial-gradient(1200px 800px at 30% -10%, #132240 0%, #0b1220 60%);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--ink); display: grid; place-items: center; padding: 20px;
+    }
+    .app { width: min(900px, 96vw); }
+    h1 { font-weight: 700; letter-spacing: .3px; margin: 0 0 14px; font-size: clamp(20px, 3.3vw, 32px); color: var(--accent-2); }
+
+    .bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; }
+    .pill { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); color: var(--muted); padding: 8px 12px; border-radius: 999px; font-size: 13px; }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 18px; padding: clamp(18px, 3.5vw, 28px);
+      box-shadow: var(--shadow);
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .card:active { transform: scale(.998); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+
+    .q { font-size: clamp(20px, 3vw, 28px); line-height: 1.3; margin: 0; }
+    .a { margin-top: 14px; font-size: clamp(18px, 2.3vw, 22px); color: #d6f2ff; display: none; }
+    .a.show { display: block; }
+
+    .controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 16px; }
+    button {
+      -webkit-tap-highlight-color: transparent;
+      appearance: none; cursor: pointer; user-select: none;
+      border: 1px solid rgba(255,255,255,.14); color: var(--ink);
+      background: linear-gradient(180deg, rgba(106,161,255,.22), rgba(106,161,255,.12));
+      border-radius: 14px; padding: 12px 14px; font-size: 15px; font-weight: 600;
+      box-shadow: var(--shadow); transition: transform .1s ease, filter .2s ease, background .2s ease;
+    }
+    button:hover { filter: brightness(1.05); }
+    button:active { transform: translateY(1px) scale(.998); }
+    .ghost { background: rgba(255,255,255,.06); }
+
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+    .row label { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+
+    .progress { margin-top: 8px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; color: #cfe1ff; opacity: .9; }
+
+    @media (max-width: 520px) {
+      .controls { grid-template-columns: 1fr; }
+      .row { gap: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="bar">
+      <h1>Quick‑Fire Quiz</h1>
+      <div class="pill"><span id="counter">1 / 300</span></div>
+    </div>
+
+    <div class="card" id="card" aria-live="polite">
+      <p class="q" id="q">Loading…</p>
+      <p class="a" id="a"><strong>Answer:</strong> <span id="answerText"></span></p>
+    </div>
+
+    <div class="controls" aria-label="Controls">
+      <button id="prev" title="Previous (←)">◀ Prev</button>
+      <button id="toggle" class="ghost" title="Show/Hide Answer (Space)">Show Answer</button>
+      <button id="next" title="Next (→)">Next ▶</button>
+    </div>
+
+    <div class="row">
+      <label><input type="checkbox" id="startRandom" checked> Start in random order</label>
+      <label><input type="checkbox" id="looping" checked> Loop at ends</label>
+      <button id="reshuffle" class="ghost" title="Reshuffle order (R)">Reshuffle</button>
+      <button id="restart" class="ghost">Restart</button>
+    </div>
+
+    <div class="progress">
+      <div>Shortcuts: <span class="kbd">←/→</span> prev/next, <span class="kbd">Space</span> show, <span class="kbd">R</span> reshuffle</div>
+      <div class="kbd">Tip: Click the card to toggle the answer.</div>
+    </div>
+  </div>
+
+  <script>
+    // === DATA: 300 Q&A ===
+    const QA = [
+      {q: "What do cows drink?", a: "Water"},
+      {q: "What is the opposite of day?", a: "Night"},
+      {q: "What do you put in a toaster?", a: "Bread"},
+      {q: "What’s 2 + 2?", a: "4"},
+      {q: "What colour do you get by mixing blue and yellow?", a: "Green"},
+      {q: "What is the opposite of up?", a: "Down"},
+      {q: "What is the opposite of hot?", a: "Cold"},
+      {q: "What is the opposite of left?", a: "Right"},
+      {q: "What is the opposite of open?", a: "Closed"},
+      {q: "What is the opposite of fast?", a: "Slow"},
+      {q: "What is 1 + 1?", a: "2"},
+      {q: "What is 3 + 2?", a: "5"},
+      {q: "What is 5 + 0?", a: "5"},
+      {q: "What is 4 + 3?", a: "7"},
+      {q: "What is 6 + 1?", a: "7"},
+      {q: "What is 7 + 2?", a: "9"},
+      {q: "What is 8 + 1?", a: "9"},
+      {q: "What is 9 + 0?", a: "9"},
+      {q: "What is 10 − 7?", a: "3"},
+      {q: "What is 6 − 3?", a: "3"},
+      {q: "What shape has three sides?", a: "Triangle"},
+      {q: "What shape has four equal sides?", a: "Square"},
+      {q: "What colour is the sky on a clear day?", a: "Blue"},
+      {q: "What colour are bananas?", a: "Yellow"},
+      {q: "What colour are strawberries?", a: "Red"},
+      {q: "What do bees make?", a: "Honey"},
+      {q: "What do chickens lay?", a: "Eggs"},
+      {q: "What animal says “moo”?", a: "Cow"},
+      {q: "What animal says “woof”?", a: "Dog"},
+      {q: "What animal says “meow”?", a: "Cat"},
+      {q: "What do you use to cut paper?", a: "Scissors"},
+      {q: "What do you wear on your feet?", a: "Shoes"},
+      {q: "What do you write with on a whiteboard?", a: "Marker"},
+      {q: "What do you drink soup with?", a: "Spoon"},
+      {q: "What do you use to call someone?", a: "Phone"},
+      {q: "What do you wear on your head for warmth?", a: "Hat"},
+      {q: "What do you wear on a rainy day?", a: "Raincoat"},
+      {q: "What do you eat cereal with?", a: "Spoon"},
+      {q: "What room do you cook in?", a: "Kitchen"},
+      {q: "Where do you sleep?", a: "Bed"},
+      {q: "What do fish breathe with?", a: "Gills"},
+      {q: "How many legs does a spider have?", a: "8"},
+      {q: "How many legs does a cat have?", a: "4"},
+      {q: "How many wheels does a bicycle have?", a: "2"},
+      {q: "How many days are in a week?", a: "7"},
+      {q: "How many months are in a year?", a: "12"},
+      {q: "How many hours are in a day?", a: "24"},
+      {q: "How many minutes are in an hour?", a: "60"},
+      {q: "How many seconds are in a minute?", a: "60"},
+      {q: "Which day comes after Monday?", a: "Tuesday"},
+      {q: "Which day comes before Sunday?", a: "Saturday"},
+      {q: "Which month comes after May?", a: "June"},
+      {q: "Which month comes before January?", a: "December"},
+      {q: "What season follows spring?", a: "Summer"},
+      {q: "What season is the coldest?", a: "Winter"},
+      {q: "What season is the warmest?", a: "Summer"},
+      {q: "What is H₂O commonly called?", a: "Water"},
+      {q: "What gas do we need to breathe to live?", a: "Oxygen"},
+      {q: "What do plants need from the sun to grow?", a: "Sunlight"},
+      {q: "What do you wear to see better if your eyes are weak?", a: "Glasses"},
+      {q: "What planet do we live on?", a: "Earth"},
+      {q: "What is the name of our natural satellite?", a: "The Moon"},
+      {q: "What star is closest to Earth?", a: "The Sun"},
+      {q: "What direction does the sun rise?", a: "East"},
+      {q: "What direction does the sun set?", a: "West"},
+      {q: "What do you use to tell the time on your wrist?", a: "Watch"},
+      {q: "What do you call a baby cat?", a: "Kitten"},
+      {q: "What do you call a baby dog?", a: "Puppy"},
+      {q: "What do you call a baby cow?", a: "Calf"},
+      {q: "What do you call a baby sheep?", a: "Lamb"},
+      {q: "What colour is an orange fruit?", a: "Orange"},
+      {q: "What colour are most cucumbers?", a: "Green"},
+      {q: "What colour are most tomatoes?", a: "Red"},
+      {q: "What colour is coal?", a: "Black"},
+      {q: "What colour is snow?", a: "White"},
+      {q: "What do you call water that falls from the sky?", a: "Rain"},
+      {q: "What do you call frozen rain?", a: "Hail"},
+      {q: "What do you call a house for a bird?", a: "Nest"},
+      {q: "What do you call a house for a dog?", a: "Kennel"},
+      {q: "What do you call a house for a bee?", a: "Hive"},
+      {q: "What do you call the person who fixes teeth?", a: "Dentist"},
+      {q: "What do you call the person who cuts hair?", a: "Hairdresser"},
+      {q: "What do you call the person who teaches you at school?", a: "Teacher"},
+      {q: "What do you call the person who delivers letters?", a: "Mail carrier"},
+      {q: "What do you call the person who drives a taxi?", a: "Taxi driver"},
+      {q: "What colour do you get by mixing red and white?", a: "Pink"},
+      {q: "What colour do you get by mixing red and blue?", a: "Purple"},
+      {q: "What colour do you get by mixing red and yellow?", a: "Orange"},
+      {q: "What colour do you get by mixing black and white?", a: "Grey"},
+      {q: "Purple is made by mixing red and what other primary colour?", a: "Blue"},
+      {q: "What do you open to enter a room?", a: "Door"},
+      {q: "What do you look out of in a house?", a: "Window"},
+      {q: "What do you sit on at a dining table?", a: "Chair"},
+      {q: "What do you sleep on?", a: "Bed"},
+      {q: "What do you keep your teeth clean with?", a: "Toothbrush"},
+      {q: "What do you wash your hands with?", a: "Soap"},
+      {q: "What do you dry your hands with?", a: "Towel"},
+      {q: "What do you wear to protect your hands in winter?", a: "Gloves"},
+      {q: "What do you wear on your face on a very sunny day?", a: "Sunglasses"},
+      {q: "What do you use to cut your food at dinner?", a: "Knife"},
+      {q: "What do you call a shape with no corners?", a: "Circle"},
+      {q: "What do you call a shape with five sides?", a: "Pentagon"},
+      {q: "What do you call a shape with six sides?", a: "Hexagon"},
+      {q: "What is the first letter of the alphabet?", a: "A"},
+      {q: "What is the last letter of the alphabet?", a: "Z"},
+      {q: "What is the first number after zero?", a: "1"},
+      {q: "What number comes before ten?", a: "9"},
+      {q: "What is half of 10?", a: "5"},
+      {q: "What is double 3?", a: "6"},
+      {q: "What is 9 − 4?", a: "5"},
+      {q: "What is 7 − 2?", a: "5"},
+      {q: "What is 3 + 4?", a: "7"},
+      {q: "What is 8 − 5?", a: "3"},
+      {q: "What is 2 + 6?", a: "8"},
+      {q: "What is 1 + 9?", a: "10"},
+      {q: "What is 12 − 2?", a: "10"},
+      {q: "What is 5 + 5?", a: "10"},
+      {q: "What is 15 − 5?", a: "10"},
+      {q: "What is 3 × 2?", a: "6"},
+      {q: "What is 10 ÷ 2?", a: "5"},
+      {q: "What fruit keeps the doctor away (in the saying)?", a: "Apple"},
+      {q: "What fruit is yellow and curved?", a: "Banana"},
+      {q: "What fruit has seeds on the outside?", a: "Strawberry"},
+      {q: "What fruit is often made into cider?", a: "Apple"},
+      {q: "What fruit is purple and used to make raisins?", a: "Grape"},
+      {q: "What vegetable makes you cry when you cut it?", a: "Onion"},
+      {q: "What vegetable is orange and crunchy?", a: "Carrot"},
+      {q: "What vegetable is used to make chips (fries)?", a: "Potato"},
+      {q: "What vegetable looks like tiny trees?", a: "Broccoli"},
+      {q: "What vegetable is red and often used in sauce?", a: "Tomato"},
+      {q: "What do you wear to swim?", a: "Swimsuit"},
+      {q: "What do you wear on your head at the beach?", a: "Sunhat"},
+      {q: "What do you put on your skin to avoid sunburn?", a: "Sunscreen"},
+      {q: "What do you drink when you wake up to stay hydrated?", a: "Water"},
+      {q: "What hot drink is made from tea leaves?", a: "Tea"},
+      {q: "What hot drink is made from coffee beans?", a: "Coffee"},
+      {q: "What do you add to cereal to make it soggy?", a: "Milk"},
+      {q: "What do you spread on toast that is yellow?", a: "Butter"},
+      {q: "What sweet spread is made by bees?", a: "Honey"},
+      {q: "What do you put on chips to make them salty?", a: "Salt"},
+      {q: "What do you call frozen milk dessert?", a: "Ice cream"},
+      {q: "What do you call bread used for burgers?", a: "Bun"},
+      {q: "What do you call a sweet baked treat with icing?", a: "Cake"},
+      {q: "What do you call the meal in the morning?", a: "Breakfast"},
+      {q: "What do you call the meal in the middle of the day?", a: "Lunch"},
+      {q: "What do you call the meal in the evening?", a: "Dinner"},
+      {q: "What do you call food you eat between meals?", a: "Snack"},
+      {q: "What do you call water with bubbles?", a: "Sparkling water"},
+      {q: "Where do you buy medicine?", a: "Pharmacy"},
+      {q: "What do you call a doctor for animals?", a: "Veterinarian"},
+      {q: "What do you call a person who flies a plane?", a: "Pilot"},
+      {q: "What do you call a person who sails a ship?", a: "Sailor"},
+      {q: "What do you call a person who fixes cars?", a: "Mechanic"},
+      {q: "What do you call a person who builds houses?", a: "Builder"},
+      {q: "What do you call a person who paints walls?", a: "Painter"},
+      {q: "What do you call the person who bakes bread?", a: "Baker"},
+      {q: "What do you call the person who sells fruit and veg?", a: "Greengrocer"},
+      {q: "What do you call the person who delivers parcels?", a: "Courier"},
+      {q: "What do you call the leader of a school?", a: "Principal"},
+      {q: "What do you call the person who looks after books in a library?", a: "Librarian"},
+      {q: "What is the capital of New Zealand?", a: "Wellington"},
+      {q: "What is the capital of Australia?", a: "Canberra"},
+      {q: "What is the capital of England?", a: "London"},
+      {q: "What is the largest ocean on Earth?", a: "Pacific Ocean"},
+      {q: "What is the tallest land animal?", a: "Giraffe"},
+      {q: "What is the fastest land animal?", a: "Cheetah"},
+      {q: "What animal is known as the king of the jungle?", a: "Lion"},
+      {q: "What animal has a long trunk?", a: "Elephant"},
+      {q: "What animal can hop and has a pouch?", a: "Kangaroo"},
+      {q: "What animal gives us wool?", a: "Sheep"},
+      {q: "What animal gives us milk?", a: "Cow"},
+      {q: "What insect makes honey?", a: "Bee"},
+      {q: "What insect has colourful wings?", a: "Butterfly"},
+      {q: "What bug glows at night?", a: "Firefly"},
+      {q: "What sea creature has eight arms?", a: "Octopus"},
+      {q: "What sea creature has a hard shell and walks sideways?", a: "Crab"},
+      {q: "What sea creature is known for its sting?", a: "Jellyfish"},
+      {q: "What pet purrs?", a: "Cat"},
+      {q: "What pet wags its tail when happy?", a: "Dog"},
+      {q: "What do you call a baby chicken?", a: "Chick"},
+      {q: "What do you call a group of fish?", a: "School (of fish)"},
+      {q: "What do you call a group of birds flying together?", a: "Flock"},
+      {q: "What do you call a home made of ice blocks?", a: "Igloo"},
+      {q: "What do you call a house on wheels used for camping?", a: "Caravan"},
+      {q: "What do you call shoes with wheels for skating?", a: "Roller skates"},
+      {q: "What do you ride with two wheels and pedals?", a: "Bicycle"},
+      {q: "What do you drive with four wheels on the road?", a: "Car"},
+      {q: "What do you take to travel in the sky?", a: "Airplane"},
+      {q: "What do you take to travel on tracks?", a: "Train"},
+      {q: "What do you take to cross a river by water?", a: "Ferry"},
+      {q: "What do you wear to keep your head safe when biking?", a: "Helmet"},
+      {q: "What do you strap in with in a car?", a: "Seat belt"},
+      {q: "What light means stop at traffic signals?", a: "Red"},
+      {q: "What light means go at traffic signals?", a: "Green"},
+      {q: "What light means get ready to stop?", a: "Yellow"},
+      {q: "What do you press to honk in a car?", a: "Horn"},
+      {q: "What do you turn to steer a car?", a: "Steering wheel"},
+      {q: "What do you put in a car to make it go (fuel)?", a: "Petrol"},
+      {q: "What do you step on to make a car stop?", a: "Brake"},
+      {q: "What do you check in a car to see behind you?", a: "Rearview mirror"},
+      {q: "What do you use to open a lock?", a: "Key"},
+      {q: "What do you call a portable computer?", a: "Laptop"},
+      {q: "What do you call a phone you can carry everywhere?", a: "Mobile phone"},
+      {q: "What do you call a picture you take with a camera?", a: "Photo"},
+      {q: "What do you call the thing that moves the cursor on a computer?", a: "Mouse"},
+      {q: "What do you call the keys you type on?", a: "Keyboard"},
+      {q: "What do you click to open a link on a computer?", a: "Mouse"},
+      {q: "What do you press to turn a device on?", a: "Power button"},
+      {q: "What do you call the symbol “@”?", a: "At sign"},
+      {q: "What do you call the symbol “#”?", a: "Hash"},
+      {q: "What do you call the symbol “&”?", a: "Ampersand"},
+      {q: "What do you call the symbol “%”?", a: "Percent sign"},
+      {q: "What do you call the symbol “?”", a: "Question mark"},
+      {q: "What do you call the symbol “!”", a: "Exclamation mark"},
+      {q: "What do you call the mark at the end of a sentence?", a: "Full stop"},
+      {q: "What do you call the spaces between words?", a: "Spaces"},
+      {q: "What do you call a book of words and meanings?", a: "Dictionary"},
+      {q: "What do you call a book of maps?", a: "Atlas"},
+      {q: "What do you call the story of someone’s life written by themselves?", a: "Autobiography"},
+      {q: "What do you call words like cat, dog, tree (names of things)?", a: "Nouns"},
+      {q: "What do you call doing words like run and jump?", a: "Verbs"},
+      {q: "What do you call describing words like big and small?", a: "Adjectives"},
+      {q: "What is the opposite of big?", a: "Small"},
+      {q: "What is the opposite of early?", a: "Late"},
+      {q: "What is the opposite of empty?", a: "Full"},
+      {q: "What is the opposite of tall?", a: "Short"},
+      {q: "What is the opposite of dirty?", a: "Clean"},
+      {q: "What is the opposite of happy?", a: "Sad"},
+      {q: "What is the opposite of in?", a: "Out"},
+      {q: "What is the opposite of start?", a: "Stop"},
+      {q: "What is the opposite of push?", a: "Pull"},
+      {q: "What is the opposite of loud?", a: "Quiet"},
+      {q: "What is the opposite of wet?", a: "Dry"},
+      {q: "What is the opposite of light (weight)?", a: "Heavy"},
+      {q: "What is the opposite of light (darkness)?", a: "Dark"},
+      {q: "What is the opposite of front?", a: "Back"},
+      {q: "What is the opposite of near?", a: "Far"},
+      {q: "What is the opposite of yes?", a: "No"},
+      {q: "What is the opposite of soft?", a: "Hard"},
+      {q: "What is the opposite of true?", a: "False"},
+      {q: "What do you call the red organ that pumps blood?", a: "Heart"},
+      {q: "What do you call the organ you use to think?", a: "Brain"},
+      {q: "What do you call the organs you use to breathe?", a: "Lungs"},
+      {q: "What do you call the organ you use to see?", a: "Eyes"},
+      {q: "What do you call the organ you use to hear?", a: "Ears"},
+      {q: "What do you call the organ you use to smell?", a: "Nose"},
+      {q: "What do you call the organ you use to taste?", a: "Tongue"},
+      {q: "What do you call the joints connecting your legs to your feet?", a: "Ankles"},
+      {q: "What do you call the five extensions on your hand?", a: "Fingers"},
+      {q: "What do you call the five extensions on your foot?", a: "Toes"},
+      {q: "What do you call hair above your eyes?", a: "Eyebrows"},
+      {q: "What do you call hair on your eyelids?", a: "Eyelashes"},
+      {q: "What do you call the hard covering on the ends of fingers?", a: "Fingernails"},
+      {q: "What do you call the bone inside your head?", a: "Skull"},
+      {q: "What do you call the bones in your chest that protect your lungs?", a: "Ribs"},
+      {q: "What do you call the liquid that flows in your veins?", a: "Blood"},
+      {q: "Which sense helps you smell flowers?", a: "Smell"},
+      {q: "Which sense lets you see colours?", a: "Sight"},
+      {q: "Which sense lets you hear music?", a: "Hearing"},
+      {q: "Which sense lets you taste ice cream?", a: "Taste"},
+      {q: "Which sense lets you feel a soft blanket?", a: "Touch"},
+      {q: "What do you call water that is solid?", a: "Ice"},
+      {q: "What do you call water that is gas?", a: "Steam"},
+      {q: "What do you call rain that falls as white flakes?", a: "Snow"},
+      {q: "What do you call moving air?", a: "Wind"},
+      {q: "What do you call a bright flash in a storm?", a: "Lightning"},
+      {q: "What do you call the sound that follows lightning?", a: "Thunder"},
+      {q: "What do you call a place with lots of sand and little rain?", a: "Desert"},
+      {q: "What do you call a place full of trees?", a: "Forest"},
+      {q: "What do you call a high land with a pointy top?", a: "Mountain"},
+      {q: "What do you call a small hill of sand at the beach?", a: "Sand dune"},
+      {q: "What do you call a big body of salt water?", a: "Ocean"},
+      {q: "What do you call a big body of fresh water?", a: "Lake"},
+      {q: "What do you call a small stream of water?", a: "Stream"},
+      {q: "What do you call water falling over a cliff?", a: "Waterfall"},
+      {q: "What do you call a turn in a river?", a: "Bend"},
+      {q: "What do you call land with water all around it?", a: "Island"},
+      {q: "What do you call land that sticks out into water?", a: "Peninsula"},
+      {q: "What do you call a map of the world shaped like a ball?", a: "Globe"},
+      {q: "What do you call the fluffy white things in the sky?", a: "Clouds"},
+      {q: "What do you call the biggest planet in our solar system?", a: "Jupiter"},
+      {q: "What do you call the red planet?", a: "Mars"},
+      {q: "What do you call the ringed planet?", a: "Saturn"},
+      {q: "What do you call the path Earth takes around the Sun?", a: "Orbit"},
+      {q: "What do you call a group of stars forming a picture?", a: "Constellation"},
+      {q: "What do you call a star that we see shooting across the sky?", a: "Meteor"},
+      {q: "What do you use to brush your hair?", a: "Hairbrush"},
+      {q: "What do you use to cut your nails?", a: "Nail clippers"},
+      {q: "What do you put on a toothbrush to clean your teeth?", a: "Toothpaste"},
+      {q: "What do you wear to bed?", a: "Pyjamas"},
+      {q: "What do you press to ring someone’s door?", a: "Doorbell"},
+      {q: "What do you put rubbish in?", a: "Bin"},
+      {q: "What do you use to sweep the floor?", a: "Broom"},
+      {q: "What do you use to wipe the floor when wet cleaning?", a: "Mop"},
+      {q: "What do you use to dry yourself after a shower?", a: "Towel"},
+      {q: "What do you use to see in the dark?", a: "Torch"},
+      {q: "What do you call a story that is true?", a: "Non-fiction"},
+      {q: "What do you call a story that is made up?", a: "Fiction"},
+      {q: "What do you call the coins and notes you use to buy things?", a: "Money"},
+      {q: "What do you call the small case that holds your money and cards?", a: "Wallet"}
+    ];
+
+    // === APP STATE ===
+    const qEl = document.getElementById('q');
+    const aEl = document.getElementById('a');
+    const answerText = document.getElementById('answerText');
+    const counterEl = document.getElementById('counter');
+    const btnPrev = document.getElementById('prev');
+    const btnNext = document.getElementById('next');
+    const btnToggle = document.getElementById('toggle');
+    const btnReshuffle = document.getElementById('reshuffle');
+    const btnRestart = document.getElementById('restart');
+    const startRandom = document.getElementById('startRandom');
+    const looping = document.getElementById('looping');
+    const card = document.getElementById('card');
+
+    let order = [...Array(QA.length).keys()];
+    let idx = 0;
+
+    function shuffle(arr){
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function setOrder(randomize) {
+      order = [...Array(QA.length).keys()];
+      if (randomize) shuffle(order);
+      idx = 0;
+    }
+
+    function render(hideAnswer = true) {
+      const qa = QA[ order[idx] ];
+      qEl.textContent = qa.q;
+      answerText.textContent = qa.a;
+      if (hideAnswer) aEl.classList.remove('show');
+      counterEl.textContent = `${idx+1} / ${QA.length}`;
+    }
+
+    function next() {
+      if (idx < order.length - 1) { idx++; render(); }
+      else if (looping.checked) { idx = 0; render(); }
+    }
+
+    function prev() {
+      if (idx > 0) { idx--; render(); }
+      else if (looping.checked) { idx = order.length - 1; render(); }
+    }
+
+    function toggleAnswer() {
+      aEl.classList.toggle('show');
+      btnToggle.textContent = aEl.classList.contains('show') ? 'Hide Answer' : 'Show Answer';
+    }
+
+    // Events
+    btnNext.addEventListener('click', next);
+    btnPrev.addEventListener('click', prev);
+    btnToggle.addEventListener('click', toggleAnswer);
+    btnReshuffle.addEventListener('click', () => { setOrder(true); render(true); });
+    btnRestart.addEventListener('click', () => { setOrder(startRandom.checked); render(true); });
+    card.addEventListener('click', toggleAnswer);
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+      else if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); toggleAnswer(); }
+      else if (e.key.toLowerCase() === 'r') { e.preventDefault(); setOrder(true); render(true); }
+    });
+
+    // Init
+    setOrder(true); // start randomized by default
+    render(true);
+  </script>
+</body>
+</html>
