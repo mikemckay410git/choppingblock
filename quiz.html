@@ -68,6 +68,149 @@
       border-color: var(--accent-2);
     }
 
+    /* New styles for category selection and ratio controls */
+    .category-selection {
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 18px;
+      padding: clamp(18px, 3.5vw, 28px);
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+    }
+
+    .category-selection h2 {
+      margin: 0 0 16px 0;
+      font-size: clamp(18px, 2.5vw, 24px);
+      color: var(--accent);
+    }
+
+    .category-selection h3 {
+      margin: 16px 0 12px 0;
+      font-size: clamp(16px, 2vw, 20px);
+      color: var(--accent-2);
+    }
+
+    .category-item {
+      background: rgba(255,255,255,.02);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .category-item.selected {
+      background: rgba(155,225,255,.08);
+      border-color: var(--accent-2);
+    }
+
+    .category-checkbox {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--accent-2);
+    }
+
+    .category-info {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .category-name {
+      font-weight: 600;
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+
+    .category-count {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .ratio-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .ratio-label {
+      font-size: 14px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .ratio-slider {
+      width: 120px;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255,255,255,.1);
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .ratio-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent-2);
+      cursor: pointer;
+    }
+
+    .ratio-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent-2);
+      cursor: pointer;
+      border: none;
+    }
+
+    .ratio-value {
+      font-size: 14px;
+      color: var(--accent-2);
+      font-weight: 600;
+      min-width: 40px;
+      text-align: center;
+    }
+
+    .selection-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .selection-actions button {
+      flex: 1;
+      min-width: 120px;
+    }
+
+    .total-questions {
+      background: rgba(155,225,255,.1);
+      border: 1px solid rgba(155,225,255,.2);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 16px;
+      text-align: center;
+    }
+
+    .total-questions .number {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--accent-2);
+    }
+
+    .total-questions .label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
     .card {
       background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
       border: 1px solid rgba(255,255,255,.12);
@@ -206,6 +349,10 @@
       .controls { grid-template-columns: 1fr; }
       .row { gap: 14px; }
       .category-grid { grid-template-columns: 1fr; }
+      .category-item { flex-direction: column; align-items: flex-start; }
+      .ratio-controls { width: 100%; justify-content: space-between; }
+      .selection-actions { flex-direction: column; }
+      .selection-actions button { min-width: auto; }
     }
   </style>
 </head>
@@ -228,6 +375,28 @@
       <h2>Choose a Quiz Category</h2>
       <div class="category-grid" id="categoryGrid">
         <div class="category-btn">Loading categories...</div>
+      </div>
+    </div>
+
+    <!-- Category Selection Interface -->
+    <div class="category-selection hidden" id="categorySelection">
+      <h2>Custom Quiz Builder</h2>
+      <p style="color: var(--muted); margin-bottom: 20px;">Select which categories to include and adjust the ratio of questions from each category.</p>
+      
+      <div id="categoryItems">
+        <!-- Category items will be generated here -->
+      </div>
+
+      <div class="total-questions hidden" id="totalQuestions">
+        <div class="number" id="totalNumber">0</div>
+        <div class="label">Total Questions</div>
+      </div>
+
+      <div class="selection-actions">
+        <button id="startCustomQuiz" class="ghost">Start Custom Quiz</button>
+        <button id="selectAllCategories">Select All</button>
+        <button id="clearAllCategories">Clear All</button>
+        <button id="backToSimpleCategories">← Back to Simple Selection</button>
       </div>
     </div>
 
@@ -315,6 +484,14 @@
     const fileList = document.getElementById('fileList');
     const categorySelector = document.getElementById('categorySelector');
     const categoryGrid = document.getElementById('categoryGrid');
+    const categorySelection = document.getElementById('categorySelection');
+    const categoryItems = document.getElementById('categoryItems');
+    const totalQuestions = document.getElementById('totalQuestions');
+    const totalNumber = document.getElementById('totalNumber');
+    const startCustomQuiz = document.getElementById('startCustomQuiz');
+    const selectAllCategories = document.getElementById('selectAllCategories');
+    const clearAllCategories = document.getElementById('clearAllCategories');
+    const backToSimpleCategories = document.getElementById('backToSimpleCategories');
     const quizInterface = document.getElementById('quizInterface');
     const quizTitle = document.getElementById('quizTitle');
     const qEl = document.getElementById('q');
@@ -443,9 +620,30 @@
 
     function showQuizInterface() {
       categorySelector.classList.add('hidden');
+      categorySelection.classList.add('hidden');
       quizInterface.classList.remove('hidden');
       fileInputSection.classList.add('hidden');
       console.log('Quiz interface shown, file input hidden');
+    }
+
+    function showCustomMixBuilder(categories) {
+      categorySelector.classList.add('hidden');
+      categorySelection.classList.remove('hidden');
+      quizInterface.classList.add('hidden');
+      fileInputSection.classList.add('hidden');
+      
+      createCategorySelectionItems(categories);
+      console.log('Custom mix builder shown');
+    }
+
+    function showCategorySelector() {
+      categorySelector.classList.remove('hidden');
+      categorySelection.classList.add('hidden');
+      quizInterface.classList.add('hidden');
+      fileInputSection.classList.remove('hidden');
+      currentCategory = '';
+      QA = [];
+      console.log('Category selector shown, file input visible');
     }
 
     function createCategoryButtons(categories) {
@@ -458,7 +656,7 @@
         return;
       }
 
-      // Add "Combine All" button if there are multiple categories
+      // Add "Combine All" and "Custom Mix" buttons if there are multiple categories
       let buttonsHTML = '';
       if (categories.length > 1) {
         const totalQuestions = categories.reduce((sum, cat) => sum + cat.questions.length, 0);
@@ -466,6 +664,10 @@
           <div class="category-btn combine-all" style="grid-column: 1 / -1; background: linear-gradient(180deg, rgba(155,225,255,.25), rgba(155,225,255,.15)); border-color: var(--accent-2);">
             <div style="font-size: 18px; margin-bottom: 4px;">🎯 Combine All Categories</div>
             <div style="font-size: 12px; color: var(--muted);">${totalQuestions} total questions from ${categories.length} categories</div>
+          </div>
+          <div class="category-btn custom-mix" style="grid-column: 1 / -1; background: linear-gradient(180deg, rgba(106,161,255,.25), rgba(106,161,255,.15)); border-color: var(--accent);">
+            <div style="font-size: 18px; margin-bottom: 4px;">⚙️ Custom Mix Builder</div>
+            <div style="font-size: 12px; color: var(--muted);">Select categories and set question ratios</div>
           </div>
         `;
       }
@@ -485,6 +687,8 @@
         btn.addEventListener('click', () => {
           if (btn.classList.contains('combine-all')) {
             loadCombinedCategories(categories);
+          } else if (btn.classList.contains('custom-mix')) {
+            showCustomMixBuilder(categories);
           } else {
             const filename = btn.dataset.filename;
             loadCategory(filename);
@@ -527,6 +731,141 @@
       });
 
       currentCategory = `Mixed: ${categoryNames.join(', ')}`;
+      quizTitle.textContent = currentCategory;
+      
+      showQuizInterface();
+      setOrder(true);
+      render(true);
+      enableControls();
+    }
+
+    function createCategorySelectionItems(categories) {
+      categoryItems.innerHTML = '';
+      
+      categories.forEach((category, index) => {
+        const item = document.createElement('div');
+        item.className = 'category-item';
+        item.innerHTML = `
+          <input type="checkbox" class="category-checkbox" id="cat-${index}" data-index="${index}">
+          <div class="category-info">
+            <div class="category-name">${category.name}</div>
+            <div class="category-count">${category.questions.length} questions</div>
+          </div>
+          <div class="ratio-controls">
+            <span class="ratio-label">Ratio:</span>
+            <input type="range" class="ratio-slider" id="ratio-${index}" min="1" max="10" value="5" data-index="${index}">
+            <span class="ratio-value" id="ratio-value-${index}">5</span>
+          </div>
+        `;
+        
+        categoryItems.appendChild(item);
+        
+        // Add event listeners
+        const checkbox = item.querySelector('.category-checkbox');
+        const slider = item.querySelector('.ratio-slider');
+        const ratioValue = item.querySelector('.ratio-value');
+        
+        checkbox.addEventListener('change', () => {
+          item.classList.toggle('selected', checkbox.checked);
+          updateTotalQuestions();
+        });
+        
+        slider.addEventListener('input', () => {
+          ratioValue.textContent = slider.value;
+          updateTotalQuestions();
+        });
+      });
+      
+      updateTotalQuestions();
+    }
+
+    function updateTotalQuestions() {
+      const selectedCategories = [];
+      let totalRatio = 0;
+      
+      categoryItems.querySelectorAll('.category-checkbox:checked').forEach(checkbox => {
+        const index = parseInt(checkbox.dataset.index);
+        const slider = document.getElementById(`ratio-${index}`);
+        const ratio = parseInt(slider.value);
+        
+        selectedCategories.push({
+          index: index,
+          ratio: ratio
+        });
+        totalRatio += ratio;
+      });
+      
+      if (selectedCategories.length === 0) {
+        totalQuestions.classList.add('hidden');
+        startCustomQuiz.disabled = true;
+        return;
+      }
+      
+      // Calculate total questions based on ratios
+      const baseQuestions = 100; // Base number of questions
+      let totalQuestionsCount = 0;
+      
+      selectedCategories.forEach(cat => {
+        const category = availableCategories[cat.index];
+        const ratio = cat.ratio / totalRatio;
+        const questionsForCategory = Math.round(baseQuestions * ratio);
+        totalQuestionsCount += Math.min(questionsForCategory, category.questions.length);
+      });
+      
+      totalNumber.textContent = totalQuestionsCount;
+      totalQuestions.classList.remove('hidden');
+      startCustomQuiz.disabled = false;
+    }
+
+    function loadCustomQuiz() {
+      const selectedCategories = [];
+      let totalRatio = 0;
+      
+      categoryItems.querySelectorAll('.category-checkbox:checked').forEach(checkbox => {
+        const index = parseInt(checkbox.dataset.index);
+        const slider = document.getElementById(`ratio-${index}`);
+        const ratio = parseInt(slider.value);
+        
+        selectedCategories.push({
+          index: index,
+          ratio: ratio
+        });
+        totalRatio += ratio;
+      });
+      
+      if (selectedCategories.length === 0) {
+        alert('Please select at least one category');
+        return;
+      }
+      
+      // Build the custom quiz
+      QA = [];
+      const categoryNames = [];
+      const baseQuestions = 100;
+      
+      selectedCategories.forEach(cat => {
+        const category = availableCategories[cat.index];
+        const ratio = cat.ratio / totalRatio;
+        const questionsForCategory = Math.round(baseQuestions * ratio);
+        
+        // Shuffle the category questions and take the required number
+        const shuffledQuestions = shuffle([...category.questions]);
+        const selectedQuestions = shuffledQuestions.slice(0, Math.min(questionsForCategory, category.questions.length));
+        
+        // Add category information to each question
+        const questionsWithCategory = selectedQuestions.map(qa => ({
+          ...qa,
+          category: category.name
+        }));
+        
+        QA = QA.concat(questionsWithCategory);
+        categoryNames.push(category.name);
+      });
+      
+      // Shuffle the final combined questions
+      QA = shuffle(QA);
+      
+      currentCategory = `Custom Mix: ${categoryNames.join(', ')}`;
       quizTitle.textContent = currentCategory;
       
       showQuizInterface();
@@ -603,12 +942,37 @@
     btnBackToCategories.addEventListener('click', showCategorySelector);
     card.addEventListener('click', toggleAnswer);
 
+    // Custom mix builder events
+    startCustomQuiz.addEventListener('click', loadCustomQuiz);
+    selectAllCategories.addEventListener('click', () => {
+      categoryItems.querySelectorAll('.category-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+        checkbox.closest('.category-item').classList.add('selected');
+      });
+      updateTotalQuestions();
+    });
+    clearAllCategories.addEventListener('click', () => {
+      categoryItems.querySelectorAll('.category-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+        checkbox.closest('.category-item').classList.remove('selected');
+      });
+      updateTotalQuestions();
+    });
+    backToSimpleCategories.addEventListener('click', showCategorySelector);
+
     window.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
       else if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); toggleAnswer(); }
       else if (e.key.toLowerCase() === 'r') { e.preventDefault(); setOrder(true); render(true); }
-      else if (e.key === 'Escape') { e.preventDefault(); showCategorySelector(); }
+      else if (e.key === 'Escape') { 
+        e.preventDefault(); 
+        if (!categorySelection.classList.contains('hidden')) {
+          showCategorySelector();
+        } else if (!quizInterface.classList.contains('hidden')) {
+          showCategorySelector();
+        }
+      }
     });
   </script>
 </body>
