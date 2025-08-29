@@ -141,36 +141,38 @@ h1 { font-weight: 700; letter-spacing: .3px; margin: 0 0 14px; font-size: clamp(
 .bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; }
 .pill { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); color: var(--muted); padding: 8px 12px; border-radius: 999px; font-size: 13px; }
 
- .quiz-card {
-   background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
-   border: 1px solid rgba(255,255,255,.12);
-   border-radius: 18px; padding: clamp(18px, 3.5vw, 28px);
-   box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25);
-   transition: transform .2s ease, box-shadow .2s ease;
-   margin-bottom: 20px;
-   min-height: 200px;
-   display: flex;
-   flex-direction: column;
-   justify-content: center;
- }
+   .quiz-card {
+    background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 18px; padding: clamp(18px, 3.5vw, 28px);
+    box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25);
+    transition: transform .2s ease, box-shadow .2s ease;
+    margin-bottom: 20px;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
 .quiz-card:active { transform: scale(.998); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
 
  .q { font-size: clamp(20px, 3vw, 28px); line-height: 1.3; margin: 0; min-height: 1.3em; }
  .a { margin-top: 14px; font-size: clamp(18px, 2.3vw, 22px); color: #d6f2ff; opacity: 0; visibility: hidden; max-height: 0; overflow: hidden; transition: opacity 0.3s ease, visibility 0.3s ease, max-height 0.3s ease; }
  .a.show { opacity: 1; visibility: visible; max-height: 200px; }
 
-.category-badge {
-  background: linear-gradient(180deg, rgba(155,225,255,.15), rgba(155,225,255,.08));
-  border: 1px solid rgba(155,225,255,.2);
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent-2);
-  margin-bottom: 12px;
-  display: inline-block;
-  align-self: flex-start;
-}
+ .category-badge {
+   background: linear-gradient(180deg, rgba(155,225,255,.15), rgba(155,225,255,.08));
+   border: 1px solid rgba(155,225,255,.2);
+   border-radius: 8px;
+   padding: 6px 12px;
+   font-size: 12px;
+   font-weight: 600;
+   color: var(--accent-2);
+   position: absolute;
+   top: 12px;
+   left: 12px;
+   z-index: 1;
+ }
 
 .controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 16px; }
 button {
