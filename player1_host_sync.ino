@@ -193,20 +193,7 @@ button:active { transform: translateY(1px) scale(.998); }
   overflow: hidden !important;
 }
 
-/* Game Mode Styles */
-.game-card {
-  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
-  border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 28px 22px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04); text-align:center; width:min(520px, 92vw);
-  margin-bottom: 20px;
-}
-#headline{font-size:clamp(18px, 6vw, 28px); margin:0 0 16px; text-align:center; width:100%; word-wrap:break-word; overflow-wrap:break-word}
-.winner{display:none; margin:8px auto 10px; padding:10px 14px; border-radius:12px; font-weight:800; font-size:clamp(18px,5.5vw,26px);
-  background:linear-gradient(135deg, rgba(99,102,241,.25), rgba(139,92,246,.25)); border:1px solid rgba(99,102,241,.35);
-  max-width:min(92vw, 520px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-.btnRow{display:flex; justify-content:center; margin-top:12px}
-.btn{background:linear-gradient(135deg, var(--accent), var(--accent2)); color:white; border:none; padding:12px 22px; border-radius:12px; cursor:pointer; font-size:16px; box-shadow:0 8px 20px rgba(99,102,241,.35)}
-.btn:disabled{background:#374151; box-shadow:none; cursor:not-allowed}
+
 
 /* Mode Toggle */
 .mode-toggle {
@@ -418,11 +405,10 @@ button:active { transform: translateY(1px) scale(.998); }
   <div id=connDot class="bad"></div>
   
   <div class="app">
-    <!-- Mode Toggle -->
-    <div class="mode-toggle">
-      <button class="mode-btn active" id="quizModeBtn" onclick="switchMode('quiz')">📚 Quiz Mode</button>
-      <button class="mode-btn" id="gameModeBtn" onclick="switchMode('game')">🎮 Game Mode</button>
-    </div>
+         <!-- Mode Toggle -->
+     <div class="mode-toggle">
+       <button class="mode-btn active" id="quizModeBtn" onclick="switchMode('quiz')">📚 Quiz Mode</button>
+     </div>
 
     <!-- Quiz Interface -->
     <div id="quizInterface">
@@ -483,29 +469,16 @@ button:active { transform: translateY(1px) scale(.998); }
        </div>
     </div>
 
-    <!-- Game Interface -->
-    <div id="gameInterface" class="hidden">
-      <div class="game-card">
-        <h2 id=headline>Game waiting...</h2>
-        <div class=winner id=winnerBox style="display:none">Winner: <span id=winnerText></span></div>
-        <div class=btnRow id=btnRow style="display:none"><button id=resetBtn class=btn onclick=resetGame() disabled>Reset Round</button></div>
-      </div>
-    </div>
+    
   </div>
 
 <script>
 // WebSocket connection
 const ws=new WebSocket('ws://'+location.hostname+':81');
 const connDot=document.getElementById('connDot');
-const headline=document.getElementById('headline');
-const winnerBox=document.getElementById('winnerBox');
-const winnerText=document.getElementById('winnerText');
-const resetBtn=document.getElementById('resetBtn');
-const btnRow=document.getElementById('btnRow');
 
 // Quiz elements
 const quizInterface = document.getElementById('quizInterface');
-const gameInterface = document.getElementById('gameInterface');
 const fileInputSection = document.getElementById('fileInputSection');
 const loadedFiles = document.getElementById('loadedFiles');
 const fileList = document.getElementById('fileList');
@@ -639,11 +612,9 @@ function switchMode(mode) {
   
   // Update button states
   document.getElementById('quizModeBtn').classList.toggle('active', mode === 'quiz');
-  document.getElementById('gameModeBtn').classList.toggle('active', mode === 'game');
   
   // Show/hide interfaces
   quizInterface.classList.toggle('hidden', mode !== 'quiz');
-  gameInterface.classList.toggle('hidden', mode !== 'game');
   
   // Hide the mode toggle after selection
   document.querySelector('.mode-toggle').classList.add('hidden');
@@ -684,9 +655,9 @@ window.addEventListener('keydown', (e) => {
 });
 
 // Game functions
-function showWinner(n){winnerText.textContent=n;winnerBox.style.display='inline-block';headline.textContent='Round finished';btnRow.style.display='flex';resetBtn.disabled=false}
-function hideWinner(){winnerText.textContent='';winnerBox.style.display='none';btnRow.style.display='none';resetBtn.disabled=true}
-function resetGame(){ws.send(JSON.stringify({action:'reset'}));hideWinner();headline.textContent=(connDot.className==='ok')?'Ready to strike!':'Game waiting...'}
+function showWinner(n){winnerName.textContent=n;winnerDisplay.classList.remove('hidden')}
+function hideWinner(){winnerDisplay.classList.add('hidden')}
+function resetGame(){ws.send(JSON.stringify({action:'reset'}));hideWinner()}
 
 // WebSocket event handling
 ws.onmessage=e=>{
@@ -694,7 +665,6 @@ ws.onmessage=e=>{
   if(d.connected!==undefined){
     if(d.connected){
       connDot.className='ok';
-      if(winnerBox.style.display!=='inline-block')headline.textContent='Ready to strike!'
       
       // Update quiz mode status
       if(currentMode === 'quiz') {
@@ -704,7 +674,6 @@ ws.onmessage=e=>{
     }else{
       connDot.className='bad';
       hideWinner();
-      headline.textContent='Game waiting...'
       
       // Update quiz mode status
       if(currentMode === 'quiz') {
@@ -727,7 +696,6 @@ ws.onmessage=e=>{
       }
     }else{
       hideWinner();
-      headline.textContent=(connDot.className==='ok')?'Ready to strike!':'Game waiting...'
       
       // Update quiz mode status
       if(currentMode === 'quiz') {
