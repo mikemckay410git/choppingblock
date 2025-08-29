@@ -195,27 +195,7 @@ button:active { transform: translateY(1px) scale(.998); }
 
 
 
-/* Mode Toggle */
-.mode-toggle {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-  justify-content: center;
-}
-.mode-btn {
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.08);
-  color: var(--muted);
-  padding: 8px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-.mode-btn.active {
-  background: linear-gradient(180deg, rgba(106,161,255,.25), rgba(106,161,255,.15));
-  border-color: var(--accent);
-  color: var(--ink);
-}
+
 
 /* File Upload Styles */
 .file-input {
@@ -395,23 +375,17 @@ button:active { transform: translateY(1px) scale(.998); }
    display: inline-block;
  }
 
- @media (max-width: 520px) {
-   .controls { grid-template-columns: 1fr; }
-   .mode-toggle { flex-direction: column; }
-   .category-grid { grid-template-columns: 1fr; }
- }
+   @media (max-width: 520px) {
+    .controls { grid-template-columns: 1fr; }
+    .category-grid { grid-template-columns: 1fr; }
+  }
 </style>
 </head><body>
   <div id=connDot class="bad"></div>
   
-  <div class="app">
-         <!-- Mode Toggle -->
-     <div class="mode-toggle">
-       <button class="mode-btn active" id="quizModeBtn" onclick="switchMode('quiz')">📚 Quiz Mode</button>
-     </div>
-
-    <!-- Quiz Interface -->
-    <div id="quizInterface">
+     <div class="app">
+     <!-- Quiz Interface -->
+     <div id="quizInterface">
       <!-- File Upload Section -->
       <div class="file-input" id="fileInputSection">
         <label for="csvFile">📁 Load CSV Files</label>
@@ -508,7 +482,6 @@ const winnerName = document.getElementById('winnerName');
 let QA = [];
 let order = [];
 let idx = 0;
-let currentMode = 'quiz';
 let availableCategories = [];
 
 // Sample quiz data (you can replace this with your CSV data)
@@ -581,14 +554,12 @@ function next() {
     render(); 
   }
   
-  // Rearm the game when moving to next question
-  if (currentMode === 'quiz') {
-    ws.send(JSON.stringify({action: 'reset'}));
-    // Hide winner display and answer
-    winnerDisplay.classList.add('hidden');
-    aEl.classList.remove('show');
-    btnToggle.textContent = 'Show Answer';
-  }
+     // Rearm the game when moving to next question
+   ws.send(JSON.stringify({action: 'reset'}));
+   // Hide winner display and answer
+   winnerDisplay.classList.add('hidden');
+   aEl.classList.remove('show');
+   btnToggle.textContent = 'Show Answer';
 }
 
 function prev() {
@@ -606,37 +577,18 @@ function toggleAnswer() {
   btnToggle.textContent = aEl.classList.contains('show') ? 'Hide Answer' : 'Show Answer';
 }
 
-// Mode switching
-function switchMode(mode) {
-  currentMode = mode;
-  
-  // Update button states
-  document.getElementById('quizModeBtn').classList.toggle('active', mode === 'quiz');
-  
-  // Show/hide interfaces
-  quizInterface.classList.toggle('hidden', mode !== 'quiz');
-  
-  // Hide the mode toggle after selection
-  document.querySelector('.mode-toggle').classList.add('hidden');
-  
-  // Initialize game status for quiz mode
-  if (mode === 'quiz') {
-    // Set initial status based on connection
-    if (connDot.className === 'ok') {
-      statusDot.className = 'status-dot connected';
-      statusText.textContent = 'Ready to strike!';
-    } else {
-      statusDot.className = 'status-dot';
-      statusText.textContent = 'Waiting for players...';
-    }
-    // Hide winner display initially
-    winnerDisplay.classList.add('hidden');
+// Initialize quiz mode status
+function initQuizMode() {
+  // Set initial status based on connection
+  if (connDot.className === 'ok') {
+    statusDot.className = 'status-dot connected';
+    statusText.textContent = 'Ready to strike!';
+  } else {
+    statusDot.className = 'status-dot';
+    statusText.textContent = 'Waiting for players...';
   }
-  
-  // Send mode change to toolboard
-  if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({action: 'mode', mode: mode}));
-  }
+  // Hide winner display initially
+  winnerDisplay.classList.add('hidden');
 }
 
 // Quiz event listeners
@@ -647,11 +599,9 @@ card.addEventListener('click', toggleAnswer);
 
 // Keyboard shortcuts
 window.addEventListener('keydown', (e) => {
-  if (currentMode === 'quiz') {
-    if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
-    else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
-    else if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); toggleAnswer(); }
-  }
+  if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+  else if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); toggleAnswer(); }
 });
 
 // Game functions
@@ -665,55 +615,37 @@ ws.onmessage=e=>{
   if(d.connected!==undefined){
     if(d.connected){
       connDot.className='ok';
-      
-      // Update quiz mode status
-      if(currentMode === 'quiz') {
-        statusDot.className = 'status-dot connected';
-        statusText.textContent = 'Ready to strike!';
-      }
+      statusDot.className = 'status-dot connected';
+      statusText.textContent = 'Ready to strike!';
     }else{
       connDot.className='bad';
       hideWinner();
-      
-      // Update quiz mode status
-      if(currentMode === 'quiz') {
-        statusDot.className = 'status-dot';
-        statusText.textContent = 'Waiting for players...';
-      }
+      statusDot.className = 'status-dot';
+      statusText.textContent = 'Waiting for players...';
     }
   }
   if(d.winner!==undefined){
     if(d.winner&&d.winner!=='none'){
       showWinner(d.winner)
-      
-      // Update quiz mode winner display
-      if(currentMode === 'quiz') {
-        winnerName.textContent = d.winner;
-        winnerDisplay.classList.remove('hidden');
-        // Automatically reveal answer when someone wins
-        aEl.classList.add('show');
-        btnToggle.textContent = 'Hide Answer';
-      }
+      winnerName.textContent = d.winner;
+      winnerDisplay.classList.remove('hidden');
+      // Automatically reveal answer when someone wins
+      aEl.classList.add('show');
+      btnToggle.textContent = 'Hide Answer';
     }else{
       hideWinner();
-      
-      // Update quiz mode status
-      if(currentMode === 'quiz') {
-        winnerDisplay.classList.add('hidden');
-        // Hide answer when game resets
-        aEl.classList.remove('show');
-        btnToggle.textContent = 'Show Answer';
-      }
+      winnerDisplay.classList.add('hidden');
+      // Hide answer when game resets
+      aEl.classList.remove('show');
+      btnToggle.textContent = 'Show Answer';
     }
   }
   // Handle toolboard controls for quiz
   if(d.quizAction){
-    if(currentMode === 'quiz') {
-      switch(d.quizAction) {
-        case 'next': next(); break;
-        case 'prev': prev(); break;
-        case 'toggle': toggleAnswer(); break;
-      }
+    switch(d.quizAction) {
+      case 'next': next(); break;
+      case 'prev': prev(); break;
+      case 'toggle': toggleAnswer(); break;
     }
   }
 };
@@ -950,6 +882,7 @@ function loadCombinedCategories(categories) {
 // Initialize quiz on load
 document.addEventListener('DOMContentLoaded', function() {
   initQuiz();
+  initQuizMode();
 });
 </script>
 </body></html>
