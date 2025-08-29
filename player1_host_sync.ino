@@ -350,16 +350,69 @@ button:active { transform: translateY(1px) scale(.998); }
   box-shadow: 0 8px 25px rgba(0,0,0,.3);
 }
 
-.category-btn.selected {
-  background: linear-gradient(180deg, rgba(155,225,255,.25), rgba(155,225,255,.15));
-  border-color: var(--accent-2);
-}
+ .category-btn.selected {
+   background: linear-gradient(180deg, rgba(155,225,255,.25), rgba(155,225,255,.15));
+   border-color: var(--accent-2);
+ }
 
-@media (max-width: 520px) {
-  .controls { grid-template-columns: 1fr; }
-  .mode-toggle { flex-direction: column; }
-  .category-grid { grid-template-columns: 1fr; }
-}
+ /* Game Status in Quiz Mode */
+ .game-status {
+   background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+   border: 1px solid rgba(255,255,255,.12);
+   border-radius: 12px;
+   padding: 16px;
+   margin-bottom: 20px;
+   text-align: center;
+ }
+
+ .status-indicator {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   gap: 8px;
+   margin-bottom: 8px;
+ }
+
+ .status-dot {
+   width: 12px;
+   height: 12px;
+   border-radius: 50%;
+   background: var(--bad);
+   box-shadow: 0 0 8px rgba(239,68,68,.5);
+   transition: all 0.3s ease;
+ }
+
+ .status-dot.connected {
+   background: var(--ok);
+   box-shadow: 0 0 8px rgba(16,185,129,.5);
+ }
+
+ .status-text {
+   font-size: 14px;
+   color: var(--muted);
+   font-weight: 500;
+ }
+
+ .winner-display {
+   margin-top: 12px;
+ }
+
+ .winner-badge {
+   background: linear-gradient(135deg, rgba(99,102,241,.25), rgba(139,92,246,.25));
+   border: 1px solid rgba(99,102,241,.35);
+   border-radius: 8px;
+   padding: 8px 16px;
+   font-weight: 600;
+   font-size: 16px;
+   color: var(--ink);
+   display: inline-block;
+ }
+
+ @media (max-width: 520px) {
+   .controls { grid-template-columns: 1fr; }
+   .mode-toggle { flex-direction: column; }
+   .category-grid { grid-template-columns: 1fr; }
+ }
 </style>
 </head><body>
   <div id=connDot class="bad"></div>
@@ -393,30 +446,41 @@ button:active { transform: translateY(1px) scale(.998); }
         </div>
       </div>
 
-      <!-- Quiz Display -->
-      <div class="quiz-display hidden" id="quizDisplay">
-        <div class="bar">
-          <h1 id="quizTitle">Quick‑Fire Quiz</h1>
-          <div class="pill"><span id="counter">Loading...</span></div>
-        </div>
+             <!-- Quiz Display -->
+       <div class="quiz-display hidden" id="quizDisplay">
+         <div class="bar">
+           <h1 id="quizTitle">Quick‑Fire Quiz</h1>
+           <div class="pill"><span id="counter">Loading...</span></div>
+         </div>
 
-        <div class="quiz-card" id="card" aria-live="polite">
-          <div class="category-badge hidden" id="categoryBadge"></div>
-          <p class="q" id="q">Loading…</p>
-          <p class="a" id="a"><strong>Answer:</strong> <span id="answerText"></span></p>
-        </div>
+         <!-- Game Status in Quiz Mode -->
+         <div class="game-status" id="gameStatus">
+           <div class="status-indicator">
+             <span class="status-dot" id="statusDot"></span>
+             <span class="status-text" id="statusText">Waiting for players...</span>
+           </div>
+           <div class="winner-display hidden" id="winnerDisplay">
+             <div class="winner-badge" id="winnerBadge">Winner: <span id="winnerName"></span></div>
+           </div>
+         </div>
 
-        <div class="controls" aria-label="Controls">
-          <button id="prev" title="Previous (←)">◀ Prev</button>
-          <button id="toggle" class="ghost" title="Show/Hide Answer (Space)">Show Answer</button>
-          <button id="next" title="Next (→)">Next ▶</button>
-        </div>
+         <div class="quiz-card" id="card" aria-live="polite">
+           <div class="category-badge hidden" id="categoryBadge"></div>
+           <p class="q" id="q">Loading…</p>
+           <p class="a" id="a"><strong>Answer:</strong> <span id="answerText"></span></p>
+         </div>
 
-        <div class="progress">
-          <div>Shortcuts: <span class="kbd">←/→</span> prev/next, <span class="kbd">Space</span> show</div>
-          <div class="kbd">Tip: Click the card to toggle the answer.</div>
-        </div>
-      </div>
+         <div class="controls" aria-label="Controls">
+           <button id="prev" title="Previous (←)">◀ Prev</button>
+           <button id="toggle" class="ghost" title="Show/Hide Answer (Space)">Show Answer</button>
+           <button id="next" title="Next (→)">Next ▶</button>
+         </div>
+
+         <div class="progress">
+           <div>Shortcuts: <span class="kbd">←/→</span> prev/next, <span class="kbd">Space</span> show</div>
+           <div class="kbd">Tip: Click the card to toggle the answer.</div>
+         </div>
+       </div>
     </div>
 
     <!-- Game Interface -->
@@ -459,6 +523,13 @@ const btnNext = document.getElementById('next');
 const btnToggle = document.getElementById('toggle');
 const card = document.getElementById('card');
 const csvFileInput = document.getElementById('csvFile');
+
+// Game status elements in quiz mode
+const gameStatus = document.getElementById('gameStatus');
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const winnerDisplay = document.getElementById('winnerDisplay');
+const winnerName = document.getElementById('winnerName');
 
 // Quiz state
 let QA = [];
@@ -536,6 +607,15 @@ function next() {
     idx = 0; 
     render(); 
   }
+  
+  // Rearm the game when moving to next question
+  if (currentMode === 'quiz') {
+    ws.send(JSON.stringify({action: 'reset'}));
+    // Hide winner display and answer
+    winnerDisplay.classList.add('hidden');
+    aEl.classList.remove('show');
+    btnToggle.textContent = 'Show Answer';
+  }
 }
 
 function prev() {
@@ -564,6 +644,20 @@ function switchMode(mode) {
   // Show/hide interfaces
   quizInterface.classList.toggle('hidden', mode !== 'quiz');
   gameInterface.classList.toggle('hidden', mode !== 'game');
+  
+  // Initialize game status for quiz mode
+  if (mode === 'quiz') {
+    // Set initial status based on connection
+    if (connDot.className === 'ok') {
+      statusDot.className = 'status-dot connected';
+      statusText.textContent = 'Ready to strike!';
+    } else {
+      statusDot.className = 'status-dot';
+      statusText.textContent = 'Waiting for players...';
+    }
+    // Hide winner display initially
+    winnerDisplay.classList.add('hidden');
+  }
   
   // Send mode change to toolboard
   if (ws.readyState === WebSocket.OPEN) {
@@ -598,18 +692,47 @@ ws.onmessage=e=>{
     if(d.connected){
       connDot.className='ok';
       if(winnerBox.style.display!=='inline-block')headline.textContent='Ready to strike!'
+      
+      // Update quiz mode status
+      if(currentMode === 'quiz') {
+        statusDot.className = 'status-dot connected';
+        statusText.textContent = 'Ready to strike!';
+      }
     }else{
       connDot.className='bad';
       hideWinner();
       headline.textContent='Game waiting...'
+      
+      // Update quiz mode status
+      if(currentMode === 'quiz') {
+        statusDot.className = 'status-dot';
+        statusText.textContent = 'Waiting for players...';
+      }
     }
   }
   if(d.winner!==undefined){
     if(d.winner&&d.winner!=='none'){
       showWinner(d.winner)
+      
+      // Update quiz mode winner display
+      if(currentMode === 'quiz') {
+        winnerName.textContent = d.winner;
+        winnerDisplay.classList.remove('hidden');
+        // Automatically reveal answer when someone wins
+        aEl.classList.add('show');
+        btnToggle.textContent = 'Hide Answer';
+      }
     }else{
       hideWinner();
       headline.textContent=(connDot.className==='ok')?'Ready to strike!':'Game waiting...'
+      
+      // Update quiz mode status
+      if(currentMode === 'quiz') {
+        winnerDisplay.classList.add('hidden');
+        // Hide answer when game resets
+        aEl.classList.remove('show');
+        btnToggle.textContent = 'Show Answer';
+      }
     }
   }
   // Handle toolboard controls for quiz
