@@ -156,8 +156,8 @@ h1 { font-weight: 700; letter-spacing: .3px; margin: 0 0 14px; font-size: clamp(
   }
 .quiz-card:active { transform: scale(.998); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
 
- .q { font-size: clamp(20px, 3vw, 28px); line-height: 1.3; margin: 0; min-height: 1.3em; position: relative; }
- .a { position: absolute; top: 100%; left: 0; right: 0; margin-top: 14px; font-size: clamp(18px, 2.3vw, 22px); color: #d6f2ff; opacity: 0; visibility: hidden; max-height: 0; overflow: hidden; transition: opacity 0.3s ease, visibility 0.3s ease, max-height 0.3s ease; }
+ .q { font-size: clamp(20px, 3vw, 28px); line-height: 1.3; margin: 0; min-height: 1.3em; }
+ .a { position: absolute; bottom: 0; left: 0; right: 0; margin-top: 14px; font-size: clamp(18px, 2.3vw, 22px); color: #d6f2ff; opacity: 0; visibility: hidden; max-height: 0; overflow: hidden; transition: opacity 0.3s ease, visibility 0.3s ease, max-height 0.3s ease; }
  .a.show { opacity: 1; visibility: visible; max-height: 200px; }
 
  .category-badge {
