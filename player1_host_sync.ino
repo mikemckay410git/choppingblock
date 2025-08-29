@@ -526,6 +526,9 @@ function render(hideAnswer = true) {
     // Restore transition after a brief delay
     setTimeout(() => {
       aEl.style.transition = '';
+      aEl.style.opacity = '';
+      aEl.style.visibility = '';
+      aEl.style.maxHeight = '';
     }, 50);
   }
   
