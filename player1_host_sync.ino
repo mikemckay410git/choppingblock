@@ -516,6 +516,17 @@ function render(hideAnswer = true) {
   if (hideAnswer) {
     aEl.classList.remove('show');
     btnToggle.textContent = 'Show Answer';
+    // Force immediate hiding by adding a temporary class
+    aEl.style.transition = 'none';
+    aEl.style.opacity = '0';
+    aEl.style.visibility = 'hidden';
+    aEl.style.maxHeight = '0';
+    // Force a reflow to ensure the styles are applied immediately
+    aEl.offsetHeight;
+    // Restore transition after a brief delay
+    setTimeout(() => {
+      aEl.style.transition = '';
+    }, 50);
   }
   
   const qa = QA[order[idx]];
