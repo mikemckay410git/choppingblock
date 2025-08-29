@@ -151,9 +151,9 @@ h1 { font-weight: 700; letter-spacing: .3px; margin: 0 0 14px; font-size: clamp(
 }
 .quiz-card:active { transform: scale(.998); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
 
-.q { font-size: clamp(20px, 3vw, 28px); line-height: 1.3; margin: 0; }
-.a { margin-top: 14px; font-size: clamp(18px, 2.3vw, 22px); color: #d6f2ff; display: none; }
-.a.show { display: block; }
+ .q { font-size: clamp(20px, 3vw, 28px); line-height: 1.3; margin: 0; }
+ .a { margin-top: 14px; font-size: clamp(18px, 2.3vw, 22px); color: #d6f2ff; opacity: 0; visibility: hidden; height: 0; overflow: hidden; transition: opacity 0.3s ease, visibility 0.3s ease, height 0.3s ease; }
+ .a.show { opacity: 1; visibility: visible; height: auto; }
 
 .category-badge {
   background: linear-gradient(180deg, rgba(155,225,255,.15), rgba(155,225,255,.08));
@@ -322,26 +322,40 @@ button:active { transform: translateY(1px) scale(.998); }
    border-color: var(--accent-2);
  }
 
-   /* Game Status in Quiz Mode */
+     /* Game Status in Quiz Mode */
   .game-status {
+    position: relative;
+    height: 60px;
     margin-bottom: 20px;
     text-align: center;
   }
 
    .winner-display {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
     margin-top: 0;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
   }
 
- .winner-badge {
-   background: linear-gradient(135deg, rgba(99,102,241,.25), rgba(139,92,246,.25));
-   border: 1px solid rgba(99,102,241,.35);
-   border-radius: 8px;
-   padding: 8px 16px;
-   font-weight: 600;
-   font-size: 16px;
-   color: var(--ink);
-   display: inline-block;
- }
+   .winner-display:not(.hidden) {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .winner-badge {
+    background: linear-gradient(135deg, rgba(99,102,241,.25), rgba(139,92,246,.25));
+    border: 1px solid rgba(99,102,241,.35);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--ink);
+    display: inline-block;
+  }
 
    @media (max-width: 520px) {
     .controls { grid-template-columns: 1fr; }
