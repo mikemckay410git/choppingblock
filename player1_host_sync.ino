@@ -406,9 +406,9 @@ button:active { transform: translateY(1px) scale(.998); }
 
                    <!-- Game Status in Quiz Mode -->
           <div class="game-status" id="gameStatus">
-            <div class="winner-display hidden" id="winnerDisplay">
-              <div class="winner-badge" id="winnerBadge">Winner: <span id="winnerName"></span></div>
-            </div>
+                         <div class="winner-display hidden" id="winnerDisplay">
+               <div class="winner-badge" id="winnerBadge"><span id="winnerName"></span></div>
+             </div>
           </div>
 
          <div class="quiz-card" id="card" aria-live="polite">
