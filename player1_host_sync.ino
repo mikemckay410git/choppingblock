@@ -77,6 +77,11 @@ WebSocketsServer ws(81);
 Preferences g_prefs;
 int32_t g_activeWsClient = -1; // enforce single WebSocket client
 
+// Function declarations
+void resetGame();
+void determineWinner();
+void syncClock();
+
 volatile unsigned long g_firstTime[SENSOR_COUNT]; // first arrival micros() per sensor
 volatile uint32_t      g_hitMask = 0;             // bit i set when sensor i latched first arrival
 volatile bool          g_armed = true;            // ready for new hit
