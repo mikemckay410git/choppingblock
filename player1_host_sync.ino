@@ -332,37 +332,9 @@ button:active { transform: translateY(1px) scale(.998); }
    text-align: center;
  }
 
- .status-indicator {
-   display: flex;
-   align-items: center;
-   justify-content: center;
-   gap: 8px;
-   margin-bottom: 8px;
- }
-
- .status-dot {
-   width: 12px;
-   height: 12px;
-   border-radius: 50%;
-   background: var(--bad);
-   box-shadow: 0 0 8px rgba(239,68,68,.5);
-   transition: all 0.3s ease;
- }
-
- .status-dot.connected {
-   background: var(--ok);
-   box-shadow: 0 0 8px rgba(16,185,129,.5);
- }
-
- .status-text {
-   font-size: 14px;
-   color: var(--muted);
-   font-weight: 500;
- }
-
- .winner-display {
-   margin-top: 12px;
- }
+   .winner-display {
+    margin-top: 0;
+  }
 
  .winner-badge {
    background: linear-gradient(135deg, rgba(99,102,241,.25), rgba(139,92,246,.25));
@@ -413,16 +385,12 @@ button:active { transform: translateY(1px) scale(.998); }
            <div class="pill"><span id="counter">Loading...</span></div>
          </div>
 
-         <!-- Game Status in Quiz Mode -->
-         <div class="game-status" id="gameStatus">
-           <div class="status-indicator">
-             <span class="status-dot" id="statusDot"></span>
-             <span class="status-text" id="statusText">Waiting for players...</span>
-           </div>
-           <div class="winner-display hidden" id="winnerDisplay">
-             <div class="winner-badge" id="winnerBadge">Winner: <span id="winnerName"></span></div>
-           </div>
-         </div>
+                   <!-- Game Status in Quiz Mode -->
+          <div class="game-status" id="gameStatus">
+            <div class="winner-display hidden" id="winnerDisplay">
+              <div class="winner-badge" id="winnerBadge">Winner: <span id="winnerName"></span></div>
+            </div>
+          </div>
 
          <div class="quiz-card" id="card" aria-live="polite">
            <div class="category-badge hidden" id="categoryBadge"></div>
@@ -473,8 +441,6 @@ const csvFileInput = document.getElementById('csvFile');
 
 // Game status elements in quiz mode
 const gameStatus = document.getElementById('gameStatus');
-const statusDot = document.getElementById('statusDot');
-const statusText = document.getElementById('statusText');
 const winnerDisplay = document.getElementById('winnerDisplay');
 const winnerName = document.getElementById('winnerName');
 
@@ -579,14 +545,6 @@ function toggleAnswer() {
 
 // Initialize quiz mode status
 function initQuizMode() {
-  // Set initial status based on connection
-  if (connDot.className === 'ok') {
-    statusDot.className = 'status-dot connected';
-    statusText.textContent = 'Ready to strike!';
-  } else {
-    statusDot.className = 'status-dot';
-    statusText.textContent = 'Waiting for players...';
-  }
   // Hide winner display initially
   winnerDisplay.classList.add('hidden');
 }
@@ -615,13 +573,9 @@ ws.onmessage=e=>{
   if(d.connected!==undefined){
     if(d.connected){
       connDot.className='ok';
-      statusDot.className = 'status-dot connected';
-      statusText.textContent = 'Ready to strike!';
     }else{
       connDot.className='bad';
       hideWinner();
-      statusDot.className = 'status-dot';
-      statusText.textContent = 'Waiting for players...';
     }
   }
   if(d.winner!==undefined){
