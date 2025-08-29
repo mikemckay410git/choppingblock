@@ -200,7 +200,7 @@ button:active { transform: translateY(1px) scale(.998); }
   box-shadow: 0 10px 30px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04); text-align:center; width:min(520px, 92vw);
   margin-bottom: 20px;
 }
-#headline{font-size:clamp(18px, 6vw, 28px); margin:0 0 16px}
+#headline{font-size:clamp(18px, 6vw, 28px); margin:0 0 16px; text-align:center; width:100%; word-wrap:break-word; overflow-wrap:break-word}
 .winner{display:none; margin:8px auto 10px; padding:10px 14px; border-radius:12px; font-weight:800; font-size:clamp(18px,5.5vw,26px);
   background:linear-gradient(135deg, rgba(99,102,241,.25), rgba(139,92,246,.25)); border:1px solid rgba(99,102,241,.35);
   max-width:min(92vw, 520px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -644,6 +644,9 @@ function switchMode(mode) {
   // Show/hide interfaces
   quizInterface.classList.toggle('hidden', mode !== 'quiz');
   gameInterface.classList.toggle('hidden', mode !== 'game');
+  
+  // Hide the mode toggle after selection
+  document.querySelector('.mode-toggle').classList.add('hidden');
   
   // Initialize game status for quiz mode
   if (mode === 'quiz') {
