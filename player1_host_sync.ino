@@ -512,6 +512,12 @@ function shuffle(arr) {
 function render(hideAnswer = true) {
   if (QA.length === 0) return;
   
+  // Immediately hide answer first to prevent ghosting
+  if (hideAnswer) {
+    aEl.classList.remove('show');
+    btnToggle.textContent = 'Show Answer';
+  }
+  
   const qa = QA[order[idx]];
   qEl.textContent = qa.q;
   answerText.textContent = qa.a;
@@ -523,10 +529,6 @@ function render(hideAnswer = true) {
     categoryBadge.classList.add('hidden');
   }
   
-  if (hideAnswer) {
-    aEl.classList.remove('show');
-    btnToggle.textContent = 'Show Answer';
-  }
   counterEl.textContent = `${idx+1} / ${QA.length}`;
 }
 
