@@ -322,15 +322,11 @@ button:active { transform: translateY(1px) scale(.998); }
    border-color: var(--accent-2);
  }
 
- /* Game Status in Quiz Mode */
- .game-status {
-   background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
-   border: 1px solid rgba(255,255,255,.12);
-   border-radius: 12px;
-   padding: 16px;
-   margin-bottom: 20px;
-   text-align: center;
- }
+   /* Game Status in Quiz Mode */
+  .game-status {
+    margin-bottom: 20px;
+    text-align: center;
+  }
 
    .winner-display {
     margin-top: 0;
