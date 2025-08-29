@@ -335,7 +335,6 @@ button:active { transform: translateY(1px) scale(.998); }
       margin-bottom: 20px;
       text-align: center;
       overflow: visible;
-      padding: 20px 0;
     }
 
    .player-display {
