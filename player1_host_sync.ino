@@ -583,6 +583,13 @@ function prev() {
     idx = order.length - 1; 
     render(); 
   }
+  
+  // Rearm the game when moving to previous question
+  ws.send(JSON.stringify({action: 'reset'}));
+  // Hide winner display and answer
+  hideWinner();
+  aEl.classList.remove('show');
+  btnToggle.textContent = 'Show Answer';
 }
 
 function toggleAnswer() {
