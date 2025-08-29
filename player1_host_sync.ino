@@ -328,14 +328,15 @@ button:active { transform: translateY(1px) scale(.998); }
    border-color: var(--accent-2);
  }
 
-           /* Game Status in Quiz Mode */
-   .game-status {
-     position: relative;
-     height: 80px;
-     margin-bottom: 20px;
-     text-align: center;
-     overflow: hidden;
-   }
+               /* Game Status in Quiz Mode */
+    .game-status {
+      position: relative;
+      height: 80px;
+      margin-bottom: 20px;
+      text-align: center;
+      overflow: visible;
+      padding: 20px 0;
+    }
 
    .player-display {
      display: flex;
