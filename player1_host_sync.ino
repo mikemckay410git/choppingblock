@@ -328,43 +328,49 @@ button:active { transform: translateY(1px) scale(.998); }
    border-color: var(--accent-2);
  }
 
-     /* Game Status in Quiz Mode */
-  .game-status {
-    position: relative;
-    height: 60px;
-    margin-bottom: 20px;
-    text-align: center;
-    overflow: hidden;
-  }
+           /* Game Status in Quiz Mode */
+   .game-status {
+     position: relative;
+     height: 80px;
+     margin-bottom: 20px;
+     text-align: center;
+     overflow: hidden;
+   }
 
-   .winner-display {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    margin-top: 0;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
-    pointer-events: none;
-  }
+   .player-display {
+     display: flex;
+     justify-content: center;
+     gap: 20px;
+     align-items: center;
+     height: 100%;
+   }
 
-   .winner-display:not(.hidden) {
-    opacity: 1;
-    visibility: visible;
-  }
+   .player-tile {
+     background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+     border: 1px solid rgba(255,255,255,.08);
+     border-radius: 12px;
+     padding: 16px 24px;
+     min-width: 120px;
+     transition: all 0.3s ease;
+     opacity: 0.4;
+     filter: grayscale(1);
+   }
 
-  .winner-badge {
-    background: linear-gradient(135deg, rgba(99,102,241,.25), rgba(139,92,246,.25));
-    border: 1px solid rgba(99,102,241,.35);
-    border-radius: 8px;
-    padding: 8px 16px;
-    font-weight: 600;
-    font-size: 16px;
-    color: var(--ink);
-    display: inline-block;
-    white-space: nowrap;
-  }
+   .player-tile.winner {
+     background: linear-gradient(135deg, rgba(99,102,241,.25), rgba(139,92,246,.25));
+     border: 1px solid rgba(99,102,241,.35);
+     opacity: 1;
+     filter: grayscale(0);
+     transform: scale(1.05);
+     box-shadow: 0 8px 25px rgba(99,102,241,.3);
+   }
+
+   .player-name {
+     font-weight: 600;
+     font-size: 16px;
+     color: var(--ink);
+     text-align: center;
+   }
 
    @media (max-width: 520px) {
     .controls { grid-template-columns: 1fr; }
@@ -404,12 +410,17 @@ button:active { transform: translateY(1px) scale(.998); }
            <div class="pill"><span id="counter">Loading...</span></div>
          </div>
 
-                   <!-- Game Status in Quiz Mode -->
-          <div class="game-status" id="gameStatus">
-                         <div class="winner-display hidden" id="winnerDisplay">
-               <div class="winner-badge" id="winnerBadge"><span id="winnerName"></span></div>
+                                       <!-- Game Status in Quiz Mode -->
+           <div class="game-status" id="gameStatus">
+             <div class="player-display">
+               <div class="player-tile" id="player1Tile">
+                 <div class="player-name">Player 1</div>
+               </div>
+               <div class="player-tile" id="player2Tile">
+                 <div class="player-name">Player 2</div>
+               </div>
              </div>
-          </div>
+           </div>
 
          <div class="quiz-card" id="card" aria-live="polite">
            <div class="category-badge hidden" id="categoryBadge"></div>
@@ -460,8 +471,8 @@ const csvFileInput = document.getElementById('csvFile');
 
 // Game status elements in quiz mode
 const gameStatus = document.getElementById('gameStatus');
-const winnerDisplay = document.getElementById('winnerDisplay');
-const winnerName = document.getElementById('winnerName');
+const player1Tile = document.getElementById('player1Tile');
+const player2Tile = document.getElementById('player2Tile');
 
 // Quiz state
 let QA = [];
@@ -555,12 +566,12 @@ function next() {
     render(); 
   }
   
-     // Rearm the game when moving to next question
-   ws.send(JSON.stringify({action: 'reset'}));
-   // Hide winner display and answer
-   winnerDisplay.classList.add('hidden');
-   aEl.classList.remove('show');
-   btnToggle.textContent = 'Show Answer';
+           // Rearm the game when moving to next question
+    ws.send(JSON.stringify({action: 'reset'}));
+    // Hide winner display and answer
+    hideWinner();
+    aEl.classList.remove('show');
+    btnToggle.textContent = 'Show Answer';
 }
 
 function prev() {
@@ -580,8 +591,9 @@ function toggleAnswer() {
 
 // Initialize quiz mode status
 function initQuizMode() {
-  // Hide winner display initially
-  winnerDisplay.classList.add('hidden');
+  // Reset player tiles to default state
+  player1Tile.classList.remove('winner');
+  player2Tile.classList.remove('winner');
 }
 
 // Quiz event listeners
@@ -598,9 +610,28 @@ window.addEventListener('keydown', (e) => {
 });
 
 // Game functions
-function showWinner(n){winnerName.textContent=n;winnerDisplay.classList.remove('hidden')}
-function hideWinner(){winnerDisplay.classList.add('hidden')}
-function resetGame(){ws.send(JSON.stringify({action:'reset'}));hideWinner()}
+function showWinner(player) {
+  // Remove winner class from both tiles
+  player1Tile.classList.remove('winner');
+  player2Tile.classList.remove('winner');
+  
+  // Add winner class to the winning player's tile
+  if (player === 'Player 1') {
+    player1Tile.classList.add('winner');
+  } else if (player === 'Player 2') {
+    player2Tile.classList.add('winner');
+  }
+}
+
+function hideWinner() {
+  player1Tile.classList.remove('winner');
+  player2Tile.classList.remove('winner');
+}
+
+function resetGame() {
+  ws.send(JSON.stringify({action:'reset'}));
+  hideWinner();
+}
 
 // WebSocket event handling
 ws.onmessage=e=>{
@@ -613,22 +644,19 @@ ws.onmessage=e=>{
       hideWinner();
     }
   }
-  if(d.winner!==undefined){
-    if(d.winner&&d.winner!=='none'){
-      showWinner(d.winner)
-      winnerName.textContent = d.winner;
-      winnerDisplay.classList.remove('hidden');
-      // Automatically reveal answer when someone wins
-      aEl.classList.add('show');
-      btnToggle.textContent = 'Hide Answer';
-    }else{
-      hideWinner();
-      winnerDisplay.classList.add('hidden');
-      // Hide answer when game resets
-      aEl.classList.remove('show');
-      btnToggle.textContent = 'Show Answer';
-    }
-  }
+     if(d.winner!==undefined){
+     if(d.winner&&d.winner!=='none'){
+       showWinner(d.winner);
+       // Automatically reveal answer when someone wins
+       aEl.classList.add('show');
+       btnToggle.textContent = 'Hide Answer';
+     }else{
+       hideWinner();
+       // Hide answer when game resets
+       aEl.classList.remove('show');
+       btnToggle.textContent = 'Show Answer';
+     }
+   }
   // Handle toolboard controls for quiz
   if(d.quizAction){
     switch(d.quizAction) {
