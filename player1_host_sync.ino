@@ -113,9 +113,9 @@ uint32_t player2HitTime = 0;
 // ===================== UI =====================
 const char HTML[] PROGMEM = R"HTML(
 <!doctype html><html><head><meta name=viewport content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"><meta charset="utf-8">
-<title>Game</title>
+<title>ToolBoard Quiz</title>
 <style>
-:root{ --text:#e5e7eb; --ok:#10b981; --bad:#ef4444; --accent:#6366f1; --accent2:#8b5cf6; }
+:root{ --text:#e5e7eb; --ok:#10b981; --bad:#ef4444; --accent:#6366f1; --accent2:#8b5cf6; --bg:#0b1220; --card:#101a33; --ink:#eaf0ff; --muted:#aab6d3; }
 html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
 html,body{height:100%}
 body{ margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; color:var(--text);
@@ -129,6 +129,72 @@ body{ margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; color:var(--text);
   border:2px solid rgba(255,255,255,0.25); }
 .ok{background:var(--ok); box-shadow:0 0 0 2px rgba(255,255,255,0.15), 0 0 14px rgba(16,185,129,.45)}
 .bad{background:var(--bad); box-shadow:0 0 0 2px rgba(255,255,255,0.15), 0 0 14px rgba(239,68,68,.45)}
+
+/* Quiz Styles */
+.app { width: min(900px, 96vw); }
+h1 { font-weight: 700; letter-spacing: .3px; margin: 0 0 14px; font-size: clamp(20px, 3.3vw, 32px); color: var(--accent2); }
+.bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; }
+.pill { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); color: var(--muted); padding: 8px 12px; border-radius: 999px; font-size: 13px; }
+
+.quiz-card {
+  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 18px; padding: clamp(18px, 3.5vw, 28px);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25);
+  transition: transform .2s ease, box-shadow .2s ease;
+  margin-bottom: 20px;
+}
+.quiz-card:active { transform: scale(.998); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+
+.q { font-size: clamp(20px, 3vw, 28px); line-height: 1.3; margin: 0; }
+.a { margin-top: 14px; font-size: clamp(18px, 2.3vw, 22px); color: #d6f2ff; display: none; }
+.a.show { display: block; }
+
+.category-badge {
+  background: linear-gradient(180deg, rgba(155,225,255,.15), rgba(155,225,255,.08));
+  border: 1px solid rgba(155,225,255,.2);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-2);
+  margin-bottom: 12px;
+  display: inline-block;
+  align-self: flex-start;
+}
+
+.controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 16px; }
+button {
+  -webkit-tap-highlight-color: transparent;
+  appearance: none; cursor: pointer; user-select: none;
+  border: 1px solid rgba(255,255,255,.14); color: var(--ink);
+  background: linear-gradient(180deg, rgba(106,161,255,.22), rgba(106,161,255,.12));
+  border-radius: 14px; padding: 12px 14px; font-size: 15px; font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25); 
+  transition: transform .1s ease, filter .2s ease, background .2s ease;
+}
+button:hover { filter: brightness(1.05); }
+button:active { transform: translateY(1px) scale(.998); }
+.ghost { background: rgba(255,255,255,.06); }
+
+.progress { margin-top: 8px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+.kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; color: #cfe1ff; opacity: .9; }
+
+.hidden { 
+  display: none !important; 
+  visibility: hidden !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Game Mode Styles */
+.game-card {
+  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+  border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 28px 22px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04); text-align:center; width:min(520px, 92vw);
+  margin-bottom: 20px;
+}
 #headline{font-size:clamp(18px, 6vw, 28px); margin:0 0 16px}
 .winner{display:none; margin:8px auto 10px; padding:10px 14px; border-radius:12px; font-weight:800; font-size:clamp(18px,5.5vw,26px);
   background:linear-gradient(135deg, rgba(99,102,241,.25), rgba(139,92,246,.25)); border:1px solid rgba(99,102,241,.35);
@@ -136,15 +202,230 @@ body{ margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; color:var(--text);
 .btnRow{display:flex; justify-content:center; margin-top:12px}
 .btn{background:linear-gradient(135deg, var(--accent), var(--accent2)); color:white; border:none; padding:12px 22px; border-radius:12px; cursor:pointer; font-size:16px; box-shadow:0 8px 20px rgba(99,102,241,.35)}
 .btn:disabled{background:#374151; box-shadow:none; cursor:not-allowed}
+
+/* Mode Toggle */
+.mode-toggle {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  justify-content: center;
+}
+.mode-btn {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.08);
+  color: var(--muted);
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.mode-btn.active {
+  background: linear-gradient(180deg, rgba(106,161,255,.25), rgba(106,161,255,.15));
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+/* File Upload Styles */
+.file-input {
+  background: rgba(255,255,255,.02);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.file-input input[type="file"] {
+  display: none;
+}
+
+.file-input label {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 500;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(106,161,255,.1);
+  border: 1px solid rgba(106,161,255,.2);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.file-input label:hover {
+  background: rgba(106,161,255,.15);
+  transform: translateY(-1px);
+}
+
+.file-input .hint {
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.loaded-files {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.loaded-files h3 {
+  display: none;
+}
+
+.file-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.file-list li {
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.file-list .success {
+  color: #4ade80;
+  opacity: 0.9;
+}
+
+.file-list .error {
+  color: #f87171;
+  opacity: 0.9;
+}
+
+/* Category Selector Styles */
+.category-selector {
+  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 18px; padding: clamp(18px, 3.5vw, 28px);
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
+
+.category-selector h2 {
+  margin: 0 0 16px 0;
+  font-size: clamp(18px, 2.5vw, 24px);
+  color: var(--accent);
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.category-btn {
+  background: linear-gradient(180deg, rgba(106,161,255,.15), rgba(106,161,255,.08));
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 600;
+}
+
+.category-btn:hover {
+  background: linear-gradient(180deg, rgba(106,161,255,.25), rgba(106,161,255,.15));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0,0,0,.3);
+}
+
+.category-btn.selected {
+  background: linear-gradient(180deg, rgba(155,225,255,.25), rgba(155,225,255,.15));
+  border-color: var(--accent-2);
+}
+
+@media (max-width: 520px) {
+  .controls { grid-template-columns: 1fr; }
+  .mode-toggle { flex-direction: column; }
+  .category-grid { grid-template-columns: 1fr; }
+}
 </style>
 </head><body>
   <div id=connDot class="bad"></div>
-  <div class=card>
-    <h2 id=headline>Game waiting...</h2>
-    <div class=winner id=winnerBox style="display:none">Winner: <span id=winnerText></span></div>
-    <div class=btnRow id=btnRow style="display:none"><button id=resetBtn class=btn onclick=resetGame() disabled>Reset Round</button></div>
+  
+  <div class="app">
+    <!-- Mode Toggle -->
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="quizModeBtn" onclick="switchMode('quiz')">📚 Quiz Mode</button>
+      <button class="mode-btn" id="gameModeBtn" onclick="switchMode('game')">🎮 Game Mode</button>
+    </div>
+
+    <!-- Quiz Interface -->
+    <div id="quizInterface">
+      <!-- File Upload Section -->
+      <div class="file-input" id="fileInputSection">
+        <label for="csvFile">📁 Load CSV Files</label>
+        <input type="file" id="csvFile" accept=".csv" multiple>
+        <div class="hint">Hold Ctrl/Cmd for multiple files</div>
+        
+        <div class="loaded-files hidden" id="loadedFiles">
+          <h3>Loaded Files:</h3>
+          <ul class="file-list" id="fileList"></ul>
+        </div>
+      </div>
+
+      <!-- Category Selector -->
+      <div class="category-selector hidden" id="categorySelector">
+        <h2>Choose a Quiz Category</h2>
+        <div class="category-grid" id="categoryGrid">
+          <div class="category-btn">Loading categories...</div>
+        </div>
+      </div>
+
+      <!-- Quiz Display -->
+      <div class="quiz-display hidden" id="quizDisplay">
+        <div class="bar">
+          <h1 id="quizTitle">Quick‑Fire Quiz</h1>
+          <div class="pill"><span id="counter">Loading...</span></div>
+        </div>
+
+        <div class="quiz-card" id="card" aria-live="polite">
+          <div class="category-badge hidden" id="categoryBadge"></div>
+          <p class="q" id="q">Loading…</p>
+          <p class="a" id="a"><strong>Answer:</strong> <span id="answerText"></span></p>
+        </div>
+
+        <div class="controls" aria-label="Controls">
+          <button id="prev" title="Previous (←)">◀ Prev</button>
+          <button id="toggle" class="ghost" title="Show/Hide Answer (Space)">Show Answer</button>
+          <button id="next" title="Next (→)">Next ▶</button>
+        </div>
+
+        <div class="progress">
+          <div>Shortcuts: <span class="kbd">←/→</span> prev/next, <span class="kbd">Space</span> show</div>
+          <div class="kbd">Tip: Click the card to toggle the answer.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Interface -->
+    <div id="gameInterface" class="hidden">
+      <div class="game-card">
+        <h2 id=headline>Game waiting...</h2>
+        <div class=winner id=winnerBox style="display:none">Winner: <span id=winnerText></span></div>
+        <div class=btnRow id=btnRow style="display:none"><button id=resetBtn class=btn onclick=resetGame() disabled>Reset Round</button></div>
+      </div>
+    </div>
   </div>
+
 <script>
+// WebSocket connection
 const ws=new WebSocket('ws://'+location.hostname+':81');
 const connDot=document.getElementById('connDot');
 const headline=document.getElementById('headline');
@@ -152,10 +433,425 @@ const winnerBox=document.getElementById('winnerBox');
 const winnerText=document.getElementById('winnerText');
 const resetBtn=document.getElementById('resetBtn');
 const btnRow=document.getElementById('btnRow');
+
+// Quiz elements
+const quizInterface = document.getElementById('quizInterface');
+const gameInterface = document.getElementById('gameInterface');
+const fileInputSection = document.getElementById('fileInputSection');
+const loadedFiles = document.getElementById('loadedFiles');
+const fileList = document.getElementById('fileList');
+const categorySelector = document.getElementById('categorySelector');
+const categoryGrid = document.getElementById('categoryGrid');
+const quizDisplay = document.getElementById('quizDisplay');
+const quizTitle = document.getElementById('quizTitle');
+const qEl = document.getElementById('q');
+const aEl = document.getElementById('a');
+const answerText = document.getElementById('answerText');
+const categoryBadge = document.getElementById('categoryBadge');
+const counterEl = document.getElementById('counter');
+const btnPrev = document.getElementById('prev');
+const btnNext = document.getElementById('next');
+const btnToggle = document.getElementById('toggle');
+const card = document.getElementById('card');
+const csvFileInput = document.getElementById('csvFile');
+
+// Quiz state
+let QA = [];
+let order = [];
+let idx = 0;
+let currentMode = 'quiz';
+let availableCategories = [];
+
+// Sample quiz data (you can replace this with your CSV data)
+const sampleQuestions = [
+  { q: "What is the capital of France?", a: "Paris", category: "Geography" },
+  { q: "What is 2 + 2?", a: "4", category: "Math" },
+  { q: "What is the largest planet in our solar system?", a: "Jupiter", category: "Science" },
+  { q: "Who wrote Romeo and Juliet?", a: "William Shakespeare", category: "Literature" },
+  { q: "What is the chemical symbol for gold?", a: "Au", category: "Science" },
+  { q: "What year did World War II end?", a: "1945", category: "History" },
+  { q: "What is the main component of the sun?", a: "Hydrogen", category: "Science" },
+  { q: "What is the largest ocean on Earth?", a: "Pacific Ocean", category: "Geography" },
+  { q: "What is the square root of 144?", a: "12", category: "Math" },
+  { q: "Who painted the Mona Lisa?", a: "Leonardo da Vinci", category: "Art" }
+];
+
+// Initialize quiz
+function initQuiz() {
+  // Start with sample questions
+  availableCategories = [{
+    filename: 'sample.csv',
+    name: 'Sample Questions',
+    questions: sampleQuestions
+  }];
+  showCategorySelector();
+  createCategoryButtons(availableCategories);
+}
+
+function setOrder(randomize) {
+  order = [...Array(QA.length).keys()];
+  if (randomize) shuffle(order);
+  idx = 0;
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function render(hideAnswer = true) {
+  if (QA.length === 0) return;
+  
+  const qa = QA[order[idx]];
+  qEl.textContent = qa.q;
+  answerText.textContent = qa.a;
+  
+  if (qa.category) {
+    categoryBadge.textContent = qa.category;
+    categoryBadge.classList.remove('hidden');
+  } else {
+    categoryBadge.classList.add('hidden');
+  }
+  
+  if (hideAnswer) {
+    aEl.classList.remove('show');
+    btnToggle.textContent = 'Show Answer';
+  }
+  counterEl.textContent = `${idx+1} / ${QA.length}`;
+}
+
+function next() {
+  if (idx < order.length - 1) { 
+    idx++; 
+    render(); 
+  } else {
+    idx = 0; 
+    render(); 
+  }
+}
+
+function prev() {
+  if (idx > 0) { 
+    idx--; 
+    render(); 
+  } else {
+    idx = order.length - 1; 
+    render(); 
+  }
+}
+
+function toggleAnswer() {
+  aEl.classList.toggle('show');
+  btnToggle.textContent = aEl.classList.contains('show') ? 'Hide Answer' : 'Show Answer';
+}
+
+// Mode switching
+function switchMode(mode) {
+  currentMode = mode;
+  
+  // Update button states
+  document.getElementById('quizModeBtn').classList.toggle('active', mode === 'quiz');
+  document.getElementById('gameModeBtn').classList.toggle('active', mode === 'game');
+  
+  // Show/hide interfaces
+  quizInterface.classList.toggle('hidden', mode !== 'quiz');
+  gameInterface.classList.toggle('hidden', mode !== 'game');
+  
+  // Send mode change to toolboard
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({action: 'mode', mode: mode}));
+  }
+}
+
+// Quiz event listeners
+btnNext.addEventListener('click', next);
+btnPrev.addEventListener('click', prev);
+btnToggle.addEventListener('click', toggleAnswer);
+card.addEventListener('click', toggleAnswer);
+
+// Keyboard shortcuts
+window.addEventListener('keydown', (e) => {
+  if (currentMode === 'quiz') {
+    if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+    else if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); toggleAnswer(); }
+  }
+});
+
+// Game functions
 function showWinner(n){winnerText.textContent=n;winnerBox.style.display='inline-block';headline.textContent='Round finished';btnRow.style.display='flex';resetBtn.disabled=false}
 function hideWinner(){winnerText.textContent='';winnerBox.style.display='none';btnRow.style.display='none';resetBtn.disabled=true}
-ws.onmessage=e=>{const d=JSON.parse(e.data);if(d.connected!==undefined){if(d.connected){connDot.className='ok';if(winnerBox.style.display!=='inline-block')headline.textContent='Ready to strike!'}else{connDot.className='bad';hideWinner();headline.textContent='Game waiting...'}}if(d.winner!==undefined){if(d.winner&&d.winner!=='none'){showWinner(d.winner)}else{hideWinner();headline.textContent=(connDot.className==='ok')?'Ready to strike!':'Game waiting...'}}};
 function resetGame(){ws.send(JSON.stringify({action:'reset'}));hideWinner();headline.textContent=(connDot.className==='ok')?'Ready to strike!':'Game waiting...'}
+
+// WebSocket event handling
+ws.onmessage=e=>{
+  const d=JSON.parse(e.data);
+  if(d.connected!==undefined){
+    if(d.connected){
+      connDot.className='ok';
+      if(winnerBox.style.display!=='inline-block')headline.textContent='Ready to strike!'
+    }else{
+      connDot.className='bad';
+      hideWinner();
+      headline.textContent='Game waiting...'
+    }
+  }
+  if(d.winner!==undefined){
+    if(d.winner&&d.winner!=='none'){
+      showWinner(d.winner)
+    }else{
+      hideWinner();
+      headline.textContent=(connDot.className==='ok')?'Ready to strike!':'Game waiting...'
+    }
+  }
+  // Handle toolboard controls for quiz
+  if(d.quizAction){
+    if(currentMode === 'quiz') {
+      switch(d.quizAction) {
+        case 'next': next(); break;
+        case 'prev': prev(); break;
+        case 'toggle': toggleAnswer(); break;
+      }
+    }
+  }
+};
+
+// === CSV PARSER ===
+function parseCSV(csv) {
+  const lines = csv.split('\n');
+  const headers = lines[0].split(',').map(h => h.replace(/"/g, ''));
+  const data = [];
+  
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].trim() === '') continue;
+    
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let j = 0; j < lines[i].length; j++) {
+      const char = lines[i][j];
+      
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.trim());
+    
+    const row = {};
+    headers.forEach((header, index) => {
+      row[header] = values[index] ? values[index].replace(/^"|"$/g, '') : '';
+    });
+    data.push(row);
+  }
+  
+  return data;
+}
+
+// === FILE HANDLING ===
+csvFileInput.addEventListener('change', handleFileSelect);
+
+function handleFileSelect(event) {
+  const files = event.target.files;
+  if (files.length === 0) return;
+
+  // Clear previous categories
+  availableCategories = [];
+  fileList.innerHTML = '';
+  
+  let loadedCount = 0;
+  const totalFiles = files.length;
+
+  Array.from(files).forEach((file, index) => {
+    if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        try {
+          const csvText = e.target.result;
+          const csvData = parseCSV(csvText);
+          
+          // Convert CSV data to the expected format
+          const questions = csvData.map(row => {
+            const question = row.Question || row.question || row.Q || row.q || Object.values(row)[0];
+            const answer = row.Answer || row.answer || row.A || row.a || Object.values(row)[1];
+            const category = row.Category || row.category || row.Cat || row.cat || 'General';
+            return { q: question, a: answer, category: category };
+          }).filter(qa => qa.q && qa.a);
+          
+          if (questions.length > 0) {
+            const categoryName = file.name.replace('.csv', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            availableCategories.push({
+              filename: file.name,
+              name: categoryName,
+              questions: questions
+            });
+            
+            // Add success message to file list
+            addFileToList(file.name, `${questions.length} questions`, 'success');
+          } else {
+            addFileToList(file.name, 'No questions', 'error');
+          }
+        } catch (error) {
+          console.error('Error parsing CSV:', error);
+          addFileToList(file.name, 'Error', 'error');
+        }
+        
+        loadedCount++;
+        
+        // If all files are processed, show category selector
+        if (loadedCount === totalFiles) {
+          if (availableCategories.length > 0) {
+            showCategorySelector();
+            createCategoryButtons(availableCategories);
+          }
+        }
+      };
+      
+      reader.onerror = function() {
+        addFileToList(file.name, 'Read failed', 'error');
+        loadedCount++;
+        
+        if (loadedCount === totalFiles) {
+          if (availableCategories.length > 0) {
+            showCategorySelector();
+            createCategoryButtons(availableCategories);
+          }
+        }
+      };
+      
+      reader.readAsText(file);
+    } else {
+      addFileToList(file.name, 'Not CSV', 'error');
+      loadedCount++;
+      
+      if (loadedCount === totalFiles) {
+        if (availableCategories.length > 0) {
+          showCategorySelector();
+          createCategoryButtons(availableCategories);
+        }
+      }
+    }
+  });
+  
+  // Show the loaded files section
+  loadedFiles.classList.remove('hidden');
+}
+
+function addFileToList(filename, message, status) {
+  const li = document.createElement('li');
+  li.className = status;
+  li.innerHTML = `${filename.replace('.csv', '')}: ${message}`;
+  fileList.appendChild(li);
+}
+
+// === CATEGORY SELECTION ===
+function showCategorySelector() {
+  categorySelector.classList.remove('hidden');
+  quizDisplay.classList.add('hidden');
+  fileInputSection.classList.remove('hidden');
+}
+
+function showQuizDisplay() {
+  categorySelector.classList.add('hidden');
+  quizDisplay.classList.remove('hidden');
+  fileInputSection.classList.add('hidden');
+}
+
+function createCategoryButtons(categories) {
+  if (categories.length === 0) {
+    categoryGrid.innerHTML = `
+      <div class="category-btn" style="grid-column: 1 / -1; color: var(--muted);">
+        No valid CSV files loaded. Please select CSV files with Question,Answer format.
+      </div>
+    `;
+    return;
+  }
+
+  // Add "Combine All" button if there are multiple categories
+  let buttonsHTML = '';
+  if (categories.length > 1) {
+    const totalQuestions = categories.reduce((sum, cat) => sum + cat.questions.length, 0);
+    buttonsHTML += `
+      <div class="category-btn combine-all" style="grid-column: 1 / -1; background: linear-gradient(180deg, rgba(155,225,255,.25), rgba(155,225,255,.15)); border-color: var(--accent-2);">
+        <div style="font-size: 18px; margin-bottom: 4px;">🎯 Combine All Categories</div>
+        <div style="font-size: 12px; color: var(--muted);">${totalQuestions} total questions from ${categories.length} categories</div>
+      </div>
+    `;
+  }
+
+  // Add individual category buttons
+  buttonsHTML += categories.map(category => `
+    <div class="category-btn" data-filename="${category.filename}">
+      <div style="font-size: 18px; margin-bottom: 4px;">${category.name}</div>
+      <div style="font-size: 12px; color: var(--muted);">${category.questions.length} questions</div>
+    </div>
+  `).join('');
+
+  categoryGrid.innerHTML = buttonsHTML;
+
+  // Add click handlers
+  categoryGrid.querySelectorAll('.category-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('combine-all')) {
+        loadCombinedCategories(categories);
+      } else {
+        const filename = btn.dataset.filename;
+        loadCategory(filename);
+      }
+    });
+  });
+}
+
+function loadCategory(filename) {
+  const category = availableCategories.find(cat => cat.filename === filename);
+  if (!category) {
+    alert('Category not found');
+    return;
+  }
+
+  QA = category.questions;
+  quizTitle.textContent = category.name;
+  
+  showQuizDisplay();
+  setOrder(true);
+  render(true);
+}
+
+function loadCombinedCategories(categories) {
+  // Combine all questions from all categories
+  QA = [];
+  const categoryNames = [];
+  
+  categories.forEach(category => {
+    // Add category information to each question
+    const questionsWithCategory = category.questions.map(qa => ({
+      ...qa,
+      category: category.name
+    }));
+    QA = QA.concat(questionsWithCategory);
+    categoryNames.push(category.name);
+  });
+
+  quizTitle.textContent = `Mixed: ${categoryNames.join(', ')}`;
+  
+  showQuizDisplay();
+  setOrder(true);
+  render(true);
+}
+
+// Initialize quiz on load
+document.addEventListener('DOMContentLoaded', function() {
+  initQuiz();
+});
 </script>
 </body></html>
 )HTML";
@@ -475,6 +1171,10 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
         String message = String((char*)payload);
         if (message.indexOf("reset") != -1) {
           resetGame();
+        } else if (message.indexOf("mode") != -1) {
+          // Handle mode change from web interface
+          // This could be used to switch between quiz and game modes
+          Serial.println("Mode change requested from web interface");
         }
       }
       break;
@@ -657,30 +1357,54 @@ void loop(){
     }
 
       // Record Player 1 hit
-  if (r.valid && gameActive) {
-    player1HitTime = r.hitTime;
-    Serial.printf("Player 1 hit detected at %lu with strength %d\n", player1HitTime, r.hitStrength);
+  if (r.valid) {
+    // Determine hit location for quiz controls
+    String quizAction = "";
+    if (r.x < 0.2f && r.y < 0.2f) {
+      // Top-left: Previous question
+      quizAction = "prev";
+      Serial.println("Quiz: Previous question");
+    } else if (r.x > 0.2f && r.y < 0.2f) {
+      // Top-right: Next question
+      quizAction = "next";
+      Serial.println("Quiz: Next question");
+    } else if (r.x < 0.2f && r.y > 0.2f) {
+      // Bottom-left: Toggle answer
+      quizAction = "toggle";
+      Serial.println("Quiz: Toggle answer");
+    } else if (r.x > 0.2f && r.y > 0.2f) {
+      // Bottom-right: Show answer
+      quizAction = "toggle";
+      Serial.println("Quiz: Show answer");
+    }
     
-    // Send hit to Player 2
-    myData.action = 2; // hit detected
-    myData.hitTime = r.hitTime;
-    myData.hitStrength = r.hitStrength;
-    esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
+    // Send quiz action to web interface
+    if (quizAction != "") {
+      String quizMsg = "{\"quizAction\":\"" + quizAction + "\"}";
+      ws.broadcastTXT(quizMsg);
+    }
     
-    // Declare winner immediately
-    winner = "Player 1";
-    gameActive = false;
-    String winMsg = "{\"winner\":\"" + winner + "\"}";
-    ws.broadcastTXT(winMsg);
-    Serial.println("Winner declared: Player 1");
+    // Handle game mode if active
+    if (gameActive) {
+      player1HitTime = r.hitTime;
+      Serial.printf("Player 1 hit detected at %lu with strength %d\n", player1HitTime, r.hitStrength);
+      
+      // Send hit to Player 2
+      myData.action = 2; // hit detected
+      myData.hitTime = r.hitTime;
+      myData.hitStrength = r.hitStrength;
+      esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
+      
+      // Declare winner immediately
+      winner = "Player 1";
+      gameActive = false;
+      String winMsg = "{\"winner\":\"" + winner + "\"}";
+      ws.broadcastTXT(winMsg);
+      Serial.println("Winner declared: Player 1");
+    }
   } else {
     // Debug output to see what's happening
-    if (!r.valid) {
-      Serial.println("Hit not valid - check sensor readings");
-    }
-    if (!gameActive) {
-      Serial.println("Game not active - check game state");
-    }
+    Serial.println("Hit not valid - check sensor readings");
   }
 
     // No sensor/location broadcast in minimal UI
