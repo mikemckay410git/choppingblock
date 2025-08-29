@@ -345,25 +345,26 @@ button:active { transform: translateY(1px) scale(.998); }
      height: 100%;
    }
 
-   .player-tile {
-     background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
-     border: 1px solid rgba(255,255,255,.08);
-     border-radius: 12px;
-     padding: 16px 24px;
-     min-width: 120px;
-     transition: all 0.3s ease;
-     opacity: 0.4;
-     filter: grayscale(1);
-   }
+       .player-tile {
+      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+      padding: 12px 18px;
+      min-width: 100px;
+      transition: all 0.3s ease;
+      opacity: 0.4;
+      filter: grayscale(1);
+      transform: scale(0.9);
+    }
 
-   .player-tile.winner {
-     background: linear-gradient(135deg, rgba(99,102,241,.25), rgba(139,92,246,.25));
-     border: 1px solid rgba(99,102,241,.35);
-     opacity: 1;
-     filter: grayscale(0);
-     transform: scale(1.05);
-     box-shadow: 0 8px 25px rgba(99,102,241,.3);
-   }
+    .player-tile.winner {
+      background: linear-gradient(135deg, rgba(99,102,241,.25), rgba(139,92,246,.25));
+      border: 1px solid rgba(99,102,241,.35);
+      opacity: 1;
+      filter: grayscale(0);
+      transform: scale(1.0);
+      box-shadow: 0 8px 25px rgba(99,102,241,.3);
+    }
 
    .player-name {
      font-weight: 600;
