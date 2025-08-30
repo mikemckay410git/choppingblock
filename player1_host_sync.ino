@@ -1333,10 +1333,12 @@ function handleFileSelect(event) {
           const csvData = parseCSV(csvText);
           
           // Convert CSV data to the expected format
+          const categoryName = file.name.replace('.csv', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
           const questions = csvData.map(row => {
             const question = row.Question || row.question || row.Q || row.q || Object.values(row)[0];
             const answer = row.Answer || row.answer || row.A || row.a || Object.values(row)[1];
-            const category = row.Category || row.category || row.Cat || row.cat || 'General';
+            // Use the filename as the category name for all questions in this file
+            const category = row.Category || row.category || row.Cat || row.cat || categoryName;
             return { q: question, a: answer, category: category };
           }).filter(qa => qa.q && qa.a);
           
