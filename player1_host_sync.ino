@@ -416,10 +416,14 @@ button:active { transform: translateY(1px) scale(.998); }
         cursor: default;
       }
 
-      .player-tile:not(.scorable):hover {
-        transform: none;
-        box-shadow: none;
-      }
+             .player-tile:not(.scorable):hover {
+         transform: none !important;
+         box-shadow: none !important;
+       }
+
+       .player-tile:not(.scorable) .player-name:hover {
+         color: var(--ink) !important;
+       }
 
            /* Exit Button Styles */
       .exit-btn {
