@@ -666,6 +666,10 @@ let availableCategories = [];
 let player1NameText = 'Player 1';
 let player2NameText = 'Player 2';
 
+// Quiz state persistence
+let currentCategory = null;
+let currentQuestionIndex = 0;
+
 // Sample quiz data (you can replace this with your CSV data)
 const sampleQuestions = [
   { q: "What is the capital of France?", a: "Paris", category: "Geography" },
@@ -700,6 +704,19 @@ function loadPersistedData() {
       if (availableCategories.length > 0) {
         showCategorySelector();
         createCategoryButtons(availableCategories);
+        
+        // Load current quiz state
+        const savedCurrentCategory = localStorage.getItem('currentCategory');
+        const savedQuestionIndex = localStorage.getItem('currentQuestionIndex');
+        
+        if (savedCurrentCategory && savedQuestionIndex !== null) {
+          currentCategory = savedCurrentCategory;
+          currentQuestionIndex = parseInt(savedQuestionIndex);
+          
+          // Restore the quiz to where you left off
+          restoreQuizState();
+        }
+        
         return; // Don't show sample questions if we have saved categories
       }
     }
@@ -726,6 +743,12 @@ function savePersistedData() {
     
     // Save categories
     localStorage.setItem('quizCategories', JSON.stringify(availableCategories));
+    
+    // Save current quiz state
+    if (currentCategory) {
+      localStorage.setItem('currentCategory', currentCategory);
+      localStorage.setItem('currentQuestionIndex', currentQuestionIndex.toString());
+    }
   } catch (error) {
     console.error('Error saving persisted data:', error);
   }
@@ -796,12 +819,16 @@ function next() {
     render(); 
   }
   
-           // Rearm the game when moving to next question
-    ws.send(JSON.stringify({action: 'reset'}));
-    // Hide winner display and answer
-    hideWinner();
-    aEl.classList.remove('show');
-    btnToggle.textContent = 'Show Answer';
+  // Update current question index and save
+  currentQuestionIndex = idx;
+  savePersistedData();
+  
+  // Rearm the game when moving to next question
+  ws.send(JSON.stringify({action: 'reset'}));
+  // Hide winner display and answer
+  hideWinner();
+  aEl.classList.remove('show');
+  btnToggle.textContent = 'Show Answer';
 }
 
 function prev() {
@@ -812,6 +839,10 @@ function prev() {
     idx = order.length - 1; 
     render(); 
   }
+  
+  // Update current question index and save
+  currentQuestionIndex = idx;
+  savePersistedData();
   
   // Rearm the game when moving to previous question
   ws.send(JSON.stringify({action: 'reset'}));
@@ -910,6 +941,12 @@ function exitToCategories() {
   hideWinner();
   aEl.classList.remove('show');
   btnToggle.textContent = 'Show Answer';
+  
+  // Clear current quiz state
+  currentCategory = null;
+  currentQuestionIndex = 0;
+  localStorage.removeItem('currentCategory');
+  localStorage.removeItem('currentQuestionIndex');
   
   // Hide modal
   hideExitConfirmation();
@@ -1157,6 +1194,10 @@ function loadCategory(filename) {
   QA = category.questions;
   quizTitle.textContent = category.name;
   
+  // Set current category and reset question index
+  currentCategory = filename;
+  currentQuestionIndex = 0;
+  
   showQuizDisplay();
   setOrder(true);
   render(true);
@@ -1181,6 +1222,10 @@ function loadCombinedCategories(categories) {
   });
 
   quizTitle.textContent = `Mixed: ${categoryNames.join(', ')}`;
+  
+  // Set current category and reset question index
+  currentCategory = 'combined';
+  currentQuestionIndex = 0;
   
   showQuizDisplay();
   setOrder(true);
@@ -1336,6 +1381,27 @@ document.addEventListener('keydown', function(e) {
     hideExitConfirmation();
   }
 });
+
+// Restore quiz state to where you left off
+function restoreQuizState() {
+  if (currentCategory === 'combined') {
+    // Restore combined categories
+    loadCombinedCategories(availableCategories);
+  } else {
+    // Restore specific category
+    const category = availableCategories.find(cat => cat.filename === currentCategory);
+    if (category) {
+      QA = category.questions;
+      quizTitle.textContent = category.name;
+      showQuizDisplay();
+      setOrder(true);
+      
+      // Set the question index to where you left off
+      idx = currentQuestionIndex;
+      render(true);
+    }
+  }
+}
 
 // Initialize quiz on load
 document.addEventListener('DOMContentLoaded', function() {
