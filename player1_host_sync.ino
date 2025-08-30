@@ -345,17 +345,17 @@ button:active { transform: translateY(1px) scale(.998); }
      height: 100%;
    }
 
-       .player-tile {
-      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
-      border: 1px solid rgba(255,255,255,.08);
-      border-radius: 12px;
-      padding: 12px 18px;
-      min-width: 100px;
-      transition: all 0.3s ease;
-      opacity: 0.4;
-      filter: grayscale(1);
-      transform: scale(0.9);
-    }
+               .player-tile {
+       background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+       border: 1px solid rgba(255,255,255,.08);
+       border-radius: 12px;
+       padding: 12px 18px;
+       min-width: 100px;
+       /* No transitions */
+       opacity: 0.4;
+       filter: grayscale(1);
+       transform: scale(0.9);
+     }
 
          .player-tile.winner {
        background: linear-gradient(135deg, rgba(99,102,241,.25), rgba(139,92,246,.25));
@@ -373,15 +373,15 @@ button:active { transform: translateY(1px) scale(.998); }
        text-align: center;
        cursor: pointer;
        user-select: none;
-       transition: color 0.2s ease;
+       /* No transitions */
      }
 
      .player-name:hover {
-       color: var(--accent);
+       /* No hover effects */
      }
 
      .player-tile:not(.scorable) .player-name:hover {
-       color: var(--ink);
+       /* No hover effects */
      }
 
      .player-name.editing {
@@ -400,7 +400,7 @@ button:active { transform: translateY(1px) scale(.998); }
 
            .player-tile.scorable {
         cursor: pointer;
-        transition: all 0.2s ease;
+        /* No transitions */
       }
 
              .player-tile.scorable:hover {
