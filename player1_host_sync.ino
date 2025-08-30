@@ -669,6 +669,7 @@ let player2NameText = 'Player 2';
 // Quiz state persistence
 let currentCategory = null;
 let currentQuestionIndex = 0;
+let savedOrder = null; // Store the shuffled order to restore exactly
 
 // Sample quiz data (you can replace this with your CSV data)
 const sampleQuestions = [
@@ -708,10 +709,21 @@ function loadPersistedData() {
         // Load current quiz state
         const savedCurrentCategory = localStorage.getItem('currentCategory');
         const savedQuestionIndex = localStorage.getItem('currentQuestionIndex');
+        const savedOrderData = localStorage.getItem('savedOrder');
         
         if (savedCurrentCategory && savedQuestionIndex !== null) {
           currentCategory = savedCurrentCategory;
           currentQuestionIndex = parseInt(savedQuestionIndex);
+          
+          // Restore the saved order if available
+          if (savedOrderData) {
+            try {
+              savedOrder = JSON.parse(savedOrderData);
+            } catch (error) {
+              console.error('Error parsing saved order:', error);
+              savedOrder = null;
+            }
+          }
           
           // Restore the quiz to where you left off
           restoreQuizState();
@@ -748,6 +760,10 @@ function savePersistedData() {
     if (currentCategory) {
       localStorage.setItem('currentCategory', currentCategory);
       localStorage.setItem('currentQuestionIndex', currentQuestionIndex.toString());
+      // Save the current question order to restore exactly
+      if (order.length > 0) {
+        localStorage.setItem('savedOrder', JSON.stringify(order));
+      }
     }
   } catch (error) {
     console.error('Error saving persisted data:', error);
@@ -945,8 +961,10 @@ function exitToCategories() {
   // Clear current quiz state
   currentCategory = null;
   currentQuestionIndex = 0;
+  savedOrder = null;
   localStorage.removeItem('currentCategory');
   localStorage.removeItem('currentQuestionIndex');
+  localStorage.removeItem('savedOrder');
   
   // Hide modal
   hideExitConfirmation();
@@ -1386,7 +1404,34 @@ document.addEventListener('keydown', function(e) {
 function restoreQuizState() {
   if (currentCategory === 'combined') {
     // Restore combined categories
-    loadCombinedCategories(availableCategories);
+    // Combine all questions from all categories
+    QA = [];
+    const categoryNames = [];
+    
+    availableCategories.forEach(category => {
+      // Add category information to each question
+      const questionsWithCategory = category.questions.map(qa => ({
+        ...qa,
+        category: category.name
+      }));
+      QA = QA.concat(questionsWithCategory);
+      categoryNames.push(category.name);
+    });
+
+    quizTitle.textContent = `Mixed: ${categoryNames.join(', ')}`;
+    showQuizDisplay();
+    
+    // Restore the exact order if we have it saved
+    if (savedOrder && savedOrder.length === QA.length) {
+      order = [...savedOrder]; // Copy the saved order
+      idx = currentQuestionIndex;
+    } else {
+      // Fallback to normal randomization
+      setOrder(true);
+      idx = currentQuestionIndex;
+    }
+    
+    render(true);
   } else {
     // Restore specific category
     const category = availableCategories.find(cat => cat.filename === currentCategory);
@@ -1394,10 +1439,17 @@ function restoreQuizState() {
       QA = category.questions;
       quizTitle.textContent = category.name;
       showQuizDisplay();
-      setOrder(true);
       
-      // Set the question index to where you left off
-      idx = currentQuestionIndex;
+      // Restore the exact order if we have it saved
+      if (savedOrder && savedOrder.length === QA.length) {
+        order = [...savedOrder]; // Copy the saved order
+        idx = currentQuestionIndex;
+      } else {
+        // Fallback to normal randomization
+        setOrder(true);
+        idx = currentQuestionIndex;
+      }
+      
       render(true);
     }
   }
