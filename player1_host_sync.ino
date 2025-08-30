@@ -954,58 +954,58 @@ let nameEditTimer;
 let isEditingName = false;
 
 function setupPlayerNameEditing() {
+  // Use double-tap for mobile editing (more reliable than long press)
+  let lastTap = 0;
+  let tapTimer;
+  
   // Player 1 name editing
-  let player1PressTimer;
-  player1Name.addEventListener('touchstart', function(e) {
-    player1PressTimer = setTimeout(() => {
-      startEditingName(player1Name, 'Player 1');
-    }, 800);
-  });
-
   player1Name.addEventListener('touchend', function(e) {
-    clearTimeout(player1PressTimer);
-  });
-
-  player1Name.addEventListener('touchmove', function(e) {
-    clearTimeout(player1PressTimer);
+    const currentTime = new Date().getTime();
+    const tapLength = currentTime - lastTap;
+    
+    if (tapLength < 500 && tapLength > 0) {
+      // Double tap detected
+      e.preventDefault();
+      startEditingName(player1Name, 'Player 1');
+    } else {
+      // Single tap - wait for potential double tap
+      tapTimer = setTimeout(() => {
+        // Single tap confirmed
+      }, 500);
+    }
+    lastTap = currentTime;
   });
 
   // Player 2 name editing
-  let player2PressTimer;
-  player2Name.addEventListener('touchstart', function(e) {
-    player2PressTimer = setTimeout(() => {
-      startEditingName(player2Name, 'Player 2');
-    }, 800);
-  });
-
+  let lastTap2 = 0;
+  let tapTimer2;
+  
   player2Name.addEventListener('touchend', function(e) {
-    clearTimeout(player2PressTimer);
-  });
-
-  player2Name.addEventListener('touchmove', function(e) {
-    clearTimeout(player2PressTimer);
-  });
-
-  // Desktop long press simulation
-  player1Name.addEventListener('mousedown', function(e) {
-    nameEditTimer = setTimeout(() => {
-      startEditingName(player1Name, 'Player 1');
-    }, 800);
-  });
-
-  player2Name.addEventListener('mousedown', function(e) {
-    nameEditTimer = setTimeout(() => {
+    const currentTime = new Date().getTime();
+    const tapLength = currentTime - lastTap2;
+    
+    if (tapLength < 500 && tapLength > 0) {
+      // Double tap detected
+      e.preventDefault();
       startEditingName(player2Name, 'Player 2');
-    }, 800);
+    } else {
+      // Single tap - wait for potential double tap
+      tapTimer2 = setTimeout(() => {
+        // Single tap confirmed
+      }, 500);
+    }
+    lastTap2 = currentTime;
   });
 
-  // Cancel on mouse up or move
-  document.addEventListener('mouseup', function(e) {
-    clearTimeout(nameEditTimer);
+  // Desktop double-click for editing
+  player1Name.addEventListener('dblclick', function(e) {
+    e.preventDefault();
+    startEditingName(player1Name, 'Player 1');
   });
 
-  document.addEventListener('mousemove', function(e) {
-    clearTimeout(nameEditTimer);
+  player2Name.addEventListener('dblclick', function(e) {
+    e.preventDefault();
+    startEditingName(player2Name, 'Player 2');
   });
 }
 
@@ -1029,12 +1029,21 @@ function startEditingName(nameElement, defaultName) {
     width: 100%;
     outline: none;
     font-family: inherit;
+    -webkit-user-select: text;
+    user-select: text;
   `;
   
-  nameElement.textContent = '';
+  // Clear any existing content and add the input
+  nameElement.innerHTML = '';
   nameElement.appendChild(input);
-  input.focus();
-  input.select();
+  
+  // Force focus and selection on mobile
+  setTimeout(() => {
+    input.focus();
+    input.select();
+    // Force keyboard to appear on mobile
+    input.click();
+  }, 100);
   
   function finishEditing() {
     const newName = input.value.trim() || defaultName;
@@ -1052,6 +1061,11 @@ function startEditingName(nameElement, defaultName) {
       nameElement.classList.remove('editing');
       isEditingName = false;
     }
+  });
+  
+  // Handle mobile keyboard "Done" button
+  input.addEventListener('input', function(e) {
+    // This ensures the input is properly handled on mobile
   });
 }
 
