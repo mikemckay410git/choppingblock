@@ -387,35 +387,33 @@ button:active { transform: translateY(1px) scale(.998); }
        outline: 2px solid var(--accent);
      }
 
-     /* Exit Button Styles */
-     .exit-section {
-       text-align: center;
-       margin-top: 12px;
-     }
+           /* Exit Button Styles */
+      .exit-btn {
+        background: rgba(255,255,255,.04) !important;
+        border: 1px solid rgba(255,255,255,.08) !important;
+        color: var(--muted) !important;
+        font-size: 16px !important;
+        padding: 6px 10px !important;
+        border-radius: 8px !important;
+        opacity: 0.7;
+        transition: opacity 0.2s ease;
+        min-width: auto !important;
+        width: auto !important;
+      }
 
-     .exit-btn {
-       background: rgba(255,255,255,.04) !important;
-       border: 1px solid rgba(255,255,255,.08) !important;
-       color: var(--muted) !important;
-       font-size: 13px !important;
-       padding: 8px 16px !important;
-       opacity: 0.7;
-       transition: opacity 0.2s ease;
-     }
+      .exit-btn:hover {
+        opacity: 1;
+        background: rgba(255,255,255,.08) !important;
+      }
 
-     .exit-btn:hover {
-       opacity: 1;
-       background: rgba(255,255,255,.08) !important;
-     }
-
-                @media (max-width: 520px) {
-       .controls { grid-template-columns: 1fr 1fr; }
-       .category-grid { grid-template-columns: 1fr; }
-       #connDot { display: none; }
-       .progress { display: none; }
-       #toggle { display: none; }
-       .exit-section { margin-top: 8px; }
-     }
+                                 @media (max-width: 520px) {
+        .controls { grid-template-columns: 1fr 1fr; }
+        .category-grid { grid-template-columns: 1fr; }
+        #connDot { display: none; }
+        .progress { display: none; }
+        #toggle { display: none; }
+        .exit-btn { font-size: 14px !important; padding: 4px 8px !important; }
+      }
 </style>
 </head><body>
   <div id=connDot class="bad"></div>
@@ -445,10 +443,11 @@ button:active { transform: translateY(1px) scale(.998); }
 
              <!-- Quiz Display -->
        <div class="quiz-display hidden" id="quizDisplay">
-         <div class="bar">
-           <h1 id="quizTitle">Quick‑Fire Quiz</h1>
-           <div class="pill"><span id="counter">Loading...</span></div>
-         </div>
+                   <div class="bar">
+            <h1 id="quizTitle">Quick‑Fire Quiz</h1>
+            <div class="pill"><span id="counter">Loading...</span></div>
+            <button id="exitBtn" class="exit-btn" title="Exit to Categories">↩</button>
+          </div>
 
                                        <!-- Game Status in Quiz Mode -->
            <div class="game-status" id="gameStatus">
@@ -474,9 +473,7 @@ button:active { transform: translateY(1px) scale(.998); }
             <button id="next" title="Next (→)">Next ▶</button>
           </div>
           
-          <div class="exit-section">
-            <button id="exitBtn" class="exit-btn" title="Exit to Categories">↩ Exit</button>
-          </div>
+          
 
          <div class="progress">
            <div>Shortcuts: <span class="kbd">←/→</span> prev/next, <span class="kbd">Space</span> show</div>
