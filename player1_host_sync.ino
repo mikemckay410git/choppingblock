@@ -366,25 +366,46 @@ button:active { transform: translateY(1px) scale(.998); }
       box-shadow: 0 8px 25px rgba(99,102,241,.3);
     }
 
-       .player-name {
-      font-weight: 600;
-      font-size: 16px;
-      color: var(--ink);
-      text-align: center;
-      cursor: pointer;
-      user-select: none;
-      transition: color 0.2s ease;
-    }
+               .player-name {
+       font-weight: 600;
+       font-size: 16px;
+       color: var(--ink);
+       text-align: center;
+       cursor: pointer;
+       user-select: none;
+       transition: color 0.2s ease;
+     }
 
-    .player-name:hover {
-      color: var(--accent);
-    }
+     .player-name:hover {
+       color: var(--accent);
+     }
 
-         .player-name.editing {
+     .player-name.editing {
        background: rgba(255,255,255,.1);
        border-radius: 4px;
        padding: 2px 6px;
        outline: 2px solid var(--accent);
+     }
+
+     .player-score {
+       font-size: 12px;
+       color: var(--muted);
+       margin-top: 4px;
+       font-weight: 500;
+     }
+
+     .player-tile.scorable {
+       cursor: pointer;
+       transition: all 0.2s ease;
+     }
+
+     .player-tile.scorable:hover {
+       transform: scale(1.05);
+       box-shadow: 0 4px 15px rgba(255,255,255,.1);
+     }
+
+     .player-tile.scorable:active {
+       transform: scale(0.98);
      }
 
            /* Exit Button Styles */
@@ -568,16 +589,18 @@ button:active { transform: translateY(1px) scale(.998); }
           </div>
 
                                        <!-- Game Status in Quiz Mode -->
-           <div class="game-status" id="gameStatus">
-             <div class="player-display">
-               <div class="player-tile" id="player1Tile">
-                 <div class="player-name">Player 1</div>
-               </div>
-               <div class="player-tile" id="player2Tile">
-                 <div class="player-name">Player 2</div>
-               </div>
-             </div>
-           </div>
+                       <div class="game-status" id="gameStatus">
+              <div class="player-display">
+                <div class="player-tile" id="player1Tile">
+                  <div class="player-name">Player 1</div>
+                  <div class="player-score" id="player1Score">0</div>
+                </div>
+                <div class="player-tile" id="player2Tile">
+                  <div class="player-name">Player 2</div>
+                  <div class="player-score" id="player2Score">0</div>
+                </div>
+              </div>
+            </div>
 
          <div class="quiz-card" id="card" aria-live="polite">
            <div class="category-badge hidden" id="categoryBadge"></div>
@@ -655,6 +678,8 @@ const player1Tile = document.getElementById('player1Tile');
 const player2Tile = document.getElementById('player2Tile');
 const player1Name = document.querySelector('#player1Tile .player-name');
 const player2Name = document.querySelector('#player2Tile .player-name');
+const player1ScoreEl = document.getElementById('player1Score');
+const player2ScoreEl = document.getElementById('player2Score');
 
 // Quiz state
 let QA = [];
@@ -670,6 +695,11 @@ let player2NameText = 'Player 2';
 let currentCategory = null;
 let currentQuestionIndex = 0;
 let savedOrder = null; // Store the shuffled order to restore exactly
+
+// Scoring system
+let player1Score = 0;
+let player2Score = 0;
+let roundComplete = false;
 
 // Sample quiz data (you can replace this with your CSV data)
 const sampleQuestions = [
@@ -688,15 +718,22 @@ const sampleQuestions = [
 // Load data from localStorage
 function loadPersistedData() {
   try {
-    // Load player names
-    const savedPlayer1Name = localStorage.getItem('player1Name');
-    const savedPlayer2Name = localStorage.getItem('player2Name');
-    if (savedPlayer1Name) player1NameText = savedPlayer1Name;
-    if (savedPlayer2Name) player2NameText = savedPlayer2Name;
-    
-    // Update player name displays
-    player1Name.textContent = player1NameText;
-    player2Name.textContent = player2NameText;
+         // Load player names
+     const savedPlayer1Name = localStorage.getItem('player1Name');
+     const savedPlayer2Name = localStorage.getItem('player2Name');
+     if (savedPlayer1Name) player1NameText = savedPlayer1Name;
+     if (savedPlayer2Name) player2NameText = savedPlayer2Name;
+     
+     // Load scores
+     const savedPlayer1Score = localStorage.getItem('player1Score');
+     const savedPlayer2Score = localStorage.getItem('player2Score');
+     if (savedPlayer1Score) player1Score = parseInt(savedPlayer1Score);
+     if (savedPlayer2Score) player2Score = parseInt(savedPlayer2Score);
+     
+     // Update player name displays
+     player1Name.textContent = player1NameText;
+     player2Name.textContent = player2NameText;
+     updateScoreDisplay();
     
     // Load categories from localStorage
     const savedCategories = localStorage.getItem('quizCategories');
@@ -749,9 +786,13 @@ function loadPersistedData() {
 // Save data to localStorage
 function savePersistedData() {
   try {
-    // Save player names
-    localStorage.setItem('player1Name', player1NameText);
-    localStorage.setItem('player2Name', player2NameText);
+         // Save player names
+     localStorage.setItem('player1Name', player1NameText);
+     localStorage.setItem('player2Name', player2NameText);
+     
+     // Save scores
+     localStorage.setItem('player1Score', player1Score.toString());
+     localStorage.setItem('player2Score', player2Score.toString());
     
     // Save categories
     localStorage.setItem('quizCategories', JSON.stringify(availableCategories));
@@ -878,6 +919,48 @@ function initQuizMode() {
   // Reset player tiles to default state
   player1Tile.classList.remove('winner');
   player2Tile.classList.remove('winner');
+  updateScoreDisplay();
+}
+
+// Update score display
+function updateScoreDisplay() {
+  player1ScoreEl.textContent = player1Score;
+  player2ScoreEl.textContent = player2Score;
+}
+
+// Add scorable state to player tiles
+function addScorableState() {
+  player1Tile.classList.add('scorable');
+  player2Tile.classList.add('scorable');
+  roundComplete = true;
+}
+
+// Remove scorable state from player tiles
+function removeScorableState() {
+  player1Tile.classList.remove('scorable');
+  player2Tile.classList.remove('scorable');
+  roundComplete = false;
+}
+
+// Award point to player
+function awardPoint(player) {
+  if (!roundComplete) return;
+  
+  if (player === 'Player 1') {
+    player1Score++;
+  } else if (player === 'Player 2') {
+    player2Score++;
+  }
+  
+  updateScoreDisplay();
+  savePersistedData();
+  
+  // Reset game and advance to next question
+  removeScorableState();
+  hideWinner();
+  aEl.classList.remove('show');
+  btnToggle.textContent = 'Show Answer';
+  next();
 }
 
 // Quiz event listeners
@@ -885,6 +968,21 @@ btnNext.addEventListener('click', next);
 btnPrev.addEventListener('click', prev);
 btnToggle.addEventListener('click', toggleAnswer);
 btnExit.addEventListener('click', showExitConfirmation);
+
+// Scoring event listeners
+player1Tile.addEventListener('click', function(e) {
+  if (roundComplete && !isEditingName) {
+    e.preventDefault();
+    awardPoint('Player 1');
+  }
+});
+
+player2Tile.addEventListener('click', function(e) {
+  if (roundComplete && !isEditingName) {
+    e.preventDefault();
+    awardPoint('Player 2');
+  }
+});
 
 // Secret long-press functionality for mobile
 let pressTimer;
@@ -932,11 +1030,17 @@ function showWinner(player) {
   } else if (player === 'Player 2') {
     player2Tile.classList.add('winner');
   }
+  
+  // Enable scoring after a short delay
+  setTimeout(() => {
+    addScorableState();
+  }, 1000);
 }
 
 function hideWinner() {
   player1Tile.classList.remove('winner');
   player2Tile.classList.remove('winner');
+  removeScorableState();
 }
 
 function resetGame() {
@@ -965,6 +1069,15 @@ function exitToCategories() {
   localStorage.removeItem('currentCategory');
   localStorage.removeItem('currentQuestionIndex');
   localStorage.removeItem('savedOrder');
+  
+  // Reset scores
+  player1Score = 0;
+  player2Score = 0;
+  roundComplete = false;
+  localStorage.removeItem('player1Score');
+  localStorage.removeItem('player2Score');
+  updateScoreDisplay();
+  removeScorableState();
   
   // Hide modal
   hideExitConfirmation();
@@ -1264,6 +1377,8 @@ function setupPlayerNameEditing() {
   
   // Player 1 name editing
   player1Name.addEventListener('touchend', function(e) {
+    if (roundComplete) return; // Don't allow editing during scoring phase
+    
     const currentTime = new Date().getTime();
     const tapLength = currentTime - lastTap;
     
@@ -1285,6 +1400,8 @@ function setupPlayerNameEditing() {
   let tapTimer2;
   
   player2Name.addEventListener('touchend', function(e) {
+    if (roundComplete) return; // Don't allow editing during scoring phase
+    
     const currentTime = new Date().getTime();
     const tapLength = currentTime - lastTap2;
     
@@ -1303,11 +1420,13 @@ function setupPlayerNameEditing() {
 
   // Desktop double-click for editing
   player1Name.addEventListener('dblclick', function(e) {
+    if (roundComplete) return; // Don't allow editing during scoring phase
     e.preventDefault();
     startEditingName(player1Name, 'Player 1');
   });
 
   player2Name.addEventListener('dblclick', function(e) {
+    if (roundComplete) return; // Don't allow editing during scoring phase
     e.preventDefault();
     startEditingName(player2Name, 'Player 2');
   });
