@@ -357,14 +357,14 @@ button:active { transform: translateY(1px) scale(.998); }
       transform: scale(0.9);
     }
 
-    .player-tile.winner {
-      background: linear-gradient(135deg, rgba(99,102,241,.25), rgba(139,92,246,.25));
-      border: 1px solid rgba(99,102,241,.35);
-      opacity: 1;
-      filter: grayscale(0);
-      transform: scale(1.0);
-      box-shadow: 0 8px 25px rgba(99,102,241,.3);
-    }
+         .player-tile.winner {
+       background: linear-gradient(135deg, rgba(99,102,241,.25), rgba(139,92,246,.25));
+       border: 1px solid rgba(99,102,241,.35);
+       opacity: 1;
+       filter: grayscale(0);
+       transform: scale(1.05);
+       box-shadow: 0 8px 25px rgba(99,102,241,.3);
+     }
 
                .player-name {
        font-weight: 600;
