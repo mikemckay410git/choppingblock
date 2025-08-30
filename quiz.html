@@ -14,11 +14,23 @@
       --accent-2: #9be1ff;
       --shadow: 0 10px 30px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25);
     }
-    html, body { height: 100%; }
+    html, body { 
+      height: 100%; 
+      touch-action: manipulation;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
     body {
       margin: 0; background: radial-gradient(1200px 800px at 30% -10%, #132240 0%, #0b1220 60%);
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
       color: var(--ink); display: grid; place-items: center; padding: 20px;
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+      text-size-adjust: 100%;
     }
     .app { width: min(900px, 96vw); }
     h1 { font-weight: 700; letter-spacing: .3px; margin: 0 0 14px; font-size: clamp(20px, 3.3vw, 32px); color: var(--accent-2); }
@@ -958,9 +970,39 @@
       });
       updateTotalQuestions();
     });
-    backToSimpleCategories.addEventListener('click', showCategorySelector);
+         backToSimpleCategories.addEventListener('click', showCategorySelector);
 
-    window.addEventListener('keydown', (e) => {
+     // Prevent zooming on mobile devices
+     document.addEventListener('gesturestart', function(e) {
+       e.preventDefault();
+     });
+     
+     document.addEventListener('gesturechange', function(e) {
+       e.preventDefault();
+     });
+     
+     document.addEventListener('gestureend', function(e) {
+       e.preventDefault();
+     });
+     
+     // Prevent double-tap zoom
+     let lastTouchEnd = 0;
+     document.addEventListener('touchend', function(event) {
+       const now = (new Date()).getTime();
+       if (now - lastTouchEnd <= 300) {
+         event.preventDefault();
+       }
+       lastTouchEnd = now;
+     }, false);
+     
+     // Prevent pinch zoom
+     document.addEventListener('touchmove', function(event) {
+       if (event.scale !== 1) {
+         event.preventDefault();
+       }
+     }, { passive: false });
+     
+     window.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
       else if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); toggleAnswer(); }
