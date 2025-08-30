@@ -813,22 +813,22 @@ const sampleQuestions = [
 // Load data from localStorage
 function loadPersistedData() {
   try {
-         // Load player names
-     const savedPlayer1Name = localStorage.getItem('player1Name');
-     const savedPlayer2Name = localStorage.getItem('player2Name');
-     if (savedPlayer1Name) player1NameText = savedPlayer1Name;
-     if (savedPlayer2Name) player2NameText = savedPlayer2Name;
-     
-     // Load scores
-     const savedPlayer1Score = localStorage.getItem('player1Score');
-     const savedPlayer2Score = localStorage.getItem('player2Score');
-     if (savedPlayer1Score) player1Score = parseInt(savedPlayer1Score);
-     if (savedPlayer2Score) player2Score = parseInt(savedPlayer2Score);
-     
-     // Update player name displays
-     player1Name.textContent = player1NameText;
-     player2Name.textContent = player2NameText;
-     updateScoreDisplay();
+    // Load player names
+    const savedPlayer1Name = localStorage.getItem('player1Name');
+    const savedPlayer2Name = localStorage.getItem('player2Name');
+    if (savedPlayer1Name) player1NameText = savedPlayer1Name;
+    if (savedPlayer2Name) player2NameText = savedPlayer2Name;
+    
+    // Load scores
+    const savedPlayer1Score = localStorage.getItem('player1Score');
+    const savedPlayer2Score = localStorage.getItem('player2Score');
+    if (savedPlayer1Score) player1Score = parseInt(savedPlayer1Score);
+    if (savedPlayer2Score) player2Score = parseInt(savedPlayer2Score);
+    
+    // Update player name displays
+    player1Name.textContent = player1NameText;
+    player2Name.textContent = player2NameText;
+    updateScoreDisplay();
     
     // Load categories from localStorage
     const savedCategories = localStorage.getItem('quizCategories');
@@ -878,31 +878,41 @@ function loadPersistedData() {
   createCategoryButtons(availableCategories);
 }
 
-// Save data to localStorage
+// Save data to localStorage with deferred execution for better performance
 function savePersistedData() {
-  try {
-         // Save player names
-     localStorage.setItem('player1Name', player1NameText);
-     localStorage.setItem('player2Name', player2NameText);
-     
-     // Save scores
-     localStorage.setItem('player1Score', player1Score.toString());
-     localStorage.setItem('player2Score', player2Score.toString());
-    
-    // Save categories
-    localStorage.setItem('quizCategories', JSON.stringify(availableCategories));
-    
-    // Save current quiz state
-    if (currentCategory) {
-      localStorage.setItem('currentCategory', currentCategory);
-      localStorage.setItem('currentQuestionIndex', currentQuestionIndex.toString());
-      // Save the current question order to restore exactly
-      if (order.length > 0) {
-        localStorage.setItem('savedOrder', JSON.stringify(order));
+  const saveData = () => {
+    try {
+      // Save player names
+      localStorage.setItem('player1Name', player1NameText);
+      localStorage.setItem('player2Name', player2NameText);
+      
+      // Save scores
+      localStorage.setItem('player1Score', player1Score.toString());
+      localStorage.setItem('player2Score', player2Score.toString());
+      
+      // Save categories
+      localStorage.setItem('quizCategories', JSON.stringify(availableCategories));
+      
+      // Save current quiz state
+      if (currentCategory) {
+        localStorage.setItem('currentCategory', currentCategory);
+        localStorage.setItem('currentQuestionIndex', currentQuestionIndex.toString());
+        // Save the current question order to restore exactly
+        if (order.length > 0) {
+          localStorage.setItem('savedOrder', JSON.stringify(order));
+        }
       }
+    } catch (error) {
+      console.error('Error saving persisted data:', error);
     }
-  } catch (error) {
-    console.error('Error saving persisted data:', error);
+  };
+
+  // Use requestIdleCallback for better performance if available
+  if (window.requestIdleCallback) {
+    requestIdleCallback(saveData);
+  } else {
+    // Fallback for browsers that don't support requestIdleCallback
+    setTimeout(saveData, 0);
   }
 }
 
@@ -928,80 +938,62 @@ function shuffle(arr) {
 function render(hideAnswer = true) {
   if (QA.length === 0) return;
   
-  // Immediately hide answer first to prevent ghosting
+  const qa = QA[order[idx]];
+  
+  // Batch DOM updates for better performance
+  const updates = [
+    { element: qEl, property: 'textContent', value: qa.q },
+    { element: answerText, property: 'textContent', value: qa.a },
+    { element: counterEl, property: 'textContent', value: `${idx+1} / ${QA.length}` }
+  ];
+  
+  // Apply all updates at once
+  updates.forEach(update => {
+    if (update.element && update.property && update.value !== undefined) {
+      update.element[update.property] = update.value;
+    }
+  });
+  
+  // Handle answer visibility efficiently
   if (hideAnswer) {
     aEl.classList.remove('show');
     btnToggle.textContent = 'Show Answer';
-    // Force immediate hiding by adding a temporary class
-    aEl.style.transition = 'none';
-    aEl.style.opacity = '0';
-    aEl.style.visibility = 'hidden';
-    aEl.style.maxHeight = '0';
-    // Force a reflow to ensure the styles are applied immediately
-    aEl.offsetHeight;
-    // Restore transition after a brief delay
-    setTimeout(() => {
-      aEl.style.transition = '';
-      aEl.style.opacity = '';
-      aEl.style.visibility = '';
-      aEl.style.maxHeight = '';
-    }, 50);
   }
   
-  const qa = QA[order[idx]];
-  qEl.textContent = qa.q;
-  answerText.textContent = qa.a;
-  
+  // Handle category badge efficiently
   if (qa.category) {
     categoryBadge.textContent = qa.category;
     categoryBadge.classList.remove('hidden');
   } else {
     categoryBadge.classList.add('hidden');
   }
+}
+
+// Consolidated navigation function
+function navigate(direction) {
+  if (direction === 'next') {
+    idx = idx < order.length - 1 ? idx + 1 : 0;
+  } else {
+    idx = idx > 0 ? idx - 1 : order.length - 1;
+  }
   
-  counterEl.textContent = `${idx+1} / ${QA.length}`;
+  render();
+  currentQuestionIndex = idx;
+  savePersistedData();
+  
+  // Reset game state
+  ws.send(JSON.stringify({action: 'reset'}));
+  hideWinner();
+  aEl.classList.remove('show');
+  btnToggle.textContent = 'Show Answer';
 }
 
 function next() {
-  if (idx < order.length - 1) { 
-    idx++; 
-    render(); 
-  } else {
-    idx = 0; 
-    render(); 
-  }
-  
-  // Update current question index and save
-  currentQuestionIndex = idx;
-  savePersistedData();
-  
-  // Rearm the game when moving to next question
-  ws.send(JSON.stringify({action: 'reset'}));
-  // Hide winner display and answer
-  hideWinner();
-  aEl.classList.remove('show');
-  btnToggle.textContent = 'Show Answer';
+  navigate('next');
 }
 
 function prev() {
-  if (idx > 0) { 
-    idx--; 
-    render(); 
-  } else {
-    idx = order.length - 1; 
-    render(); 
-  }
-  
-  // Update current question index and save
-  currentQuestionIndex = idx;
-  savePersistedData();
-  
-  // Rearm the game when moving to previous question
-  ws.send(JSON.stringify({action: 'reset'}));
-  // Hide winner display and answer
-  hideWinner();
-  aEl.classList.remove('show');
-  btnToggle.textContent = 'Show Answer';
+  navigate('prev');
 }
 
 function toggleAnswer() {
@@ -1046,6 +1038,7 @@ function removeScorableState() {
 function awardPoint(player) {
   if (!roundComplete) return;
   
+  // Update score
   if (player === 'Player 1') {
     player1Score++;
   } else if (player === 'Player 2') {
@@ -1069,22 +1062,19 @@ btnPrev.addEventListener('click', prev);
 btnToggle.addEventListener('click', toggleAnswer);
 btnExit.addEventListener('click', showExitConfirmation);
 
-// Scoring event listeners
-player1Tile.addEventListener('click', function(e) {
-  if (roundComplete && !isEditingName) {
-    e.preventDefault();
-    e.stopPropagation();
-    awardPoint('Player 1');
-  }
-});
+// Consolidated scoring event listener
+function handlePlayerClick(player) {
+  return function(e) {
+    if (roundComplete && !isEditingName) {
+      e.preventDefault();
+      e.stopPropagation();
+      awardPoint(player);
+    }
+  };
+}
 
-player2Tile.addEventListener('click', function(e) {
-  if (roundComplete && !isEditingName) {
-    e.preventDefault();
-    e.stopPropagation();
-    awardPoint('Player 2');
-  }
-});
+player1Tile.addEventListener('click', handlePlayerClick('Player 1'));
+player2Tile.addEventListener('click', handlePlayerClick('Player 2'));
 
 // Secret long-press functionality for mobile
 let pressTimer;
@@ -1269,45 +1259,45 @@ function parseCSV(csv) {
   }
   
   function resetAllDataFunction() {
-    // Clear all localStorage data
-    localStorage.clear();
-    
-    // Reset all variables to default state
-    availableCategories = [];
-    player1Score = 0;
-    player2Score = 0;
-    player1NameText = 'Player 1';
-    player2NameText = 'Player 2';
-    currentCategory = null;
-    currentQuestionIndex = 0;
-    savedOrder = null;
-    QA = [];
-    order = [];
-    idx = 0;
-    roundComplete = false;
-    
-    // Update UI
-    player1Name.textContent = player1NameText;
-    player2Name.textContent = player2NameText;
-    updateScoreDisplay();
-    removeScorableState();
-    
-    // Clear file list
-    fileList.innerHTML = '';
-    loadedFiles.classList.add('hidden');
-    
-    // Show sample questions
-    availableCategories = [{
-      filename: 'sample.csv',
-      name: 'Sample Questions',
-      questions: sampleQuestions
-    }];
-    showCategorySelector();
-    createCategoryButtons(availableCategories);
-    
-         // Hide modal
-     hideResetConfirmation();
-  }
+  // Clear all localStorage data
+  localStorage.clear();
+  
+  // Reset all variables to default state
+  availableCategories = [];
+  player1Score = 0;
+  player2Score = 0;
+  player1NameText = 'Player 1';
+  player2NameText = 'Player 2';
+  currentCategory = null;
+  currentQuestionIndex = 0;
+  savedOrder = null;
+  QA = [];
+  order = [];
+  idx = 0;
+  roundComplete = false;
+  
+  // Update UI
+  player1Name.textContent = player1NameText;
+  player2Name.textContent = player2NameText;
+  updateScoreDisplay();
+  removeScorableState();
+  
+  // Clear file list
+  fileList.innerHTML = '';
+  loadedFiles.classList.add('hidden');
+  
+  // Show sample questions
+  availableCategories = [{
+    filename: 'sample.csv',
+    name: 'Sample Questions',
+    questions: sampleQuestions
+  }];
+  showCategorySelector();
+  createCategoryButtons(availableCategories);
+  
+  // Hide modal
+  hideResetConfirmation();
+}
  
  // === FILE HANDLING ===
  csvFileInput.addEventListener('change', handleFileSelect);
@@ -1323,7 +1313,17 @@ function handleFileSelect(event) {
   let loadedCount = 0;
   const totalFiles = files.length;
 
-  Array.from(files).forEach((file, index) => {
+  // Helper function to finish loading
+  const finishLoading = () => {
+    if (availableCategories.length > 0) {
+      showCategorySelector();
+      createCategoryButtons(availableCategories);
+      savePersistedData();
+    }
+  };
+
+  // Helper function to process file
+  const processFile = (file) => {
     if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
       const reader = new FileReader();
       
@@ -1348,7 +1348,6 @@ function handleFileSelect(event) {
               questions: questions
             });
             
-            // Add success message to file list
             addFileToList(file.name, `${questions.length} questions`, 'success');
           } else {
             addFileToList(file.name, 'No questions', 'error');
@@ -1359,46 +1358,24 @@ function handleFileSelect(event) {
         }
         
         loadedCount++;
-        
-                 // If all files are processed, show category selector
-         if (loadedCount === totalFiles) {
-           if (availableCategories.length > 0) {
-             showCategorySelector();
-             createCategoryButtons(availableCategories);
-             savePersistedData(); // Save the loaded categories
-           }
-         }
+        if (loadedCount === totalFiles) finishLoading();
       };
       
-             reader.onerror = function() {
-         addFileToList(file.name, 'Read failed', 'error');
-         loadedCount++;
-         
-         if (loadedCount === totalFiles) {
-           if (availableCategories.length > 0) {
-             showCategorySelector();
-             createCategoryButtons(availableCategories);
-             savePersistedData(); // Save the loaded categories
-           }
-         }
-       };
+      reader.onerror = function() {
+        addFileToList(file.name, 'Read failed', 'error');
+        loadedCount++;
+        if (loadedCount === totalFiles) finishLoading();
+      };
       
       reader.readAsText(file);
-         } else {
-       addFileToList(file.name, 'Not CSV', 'error');
-       loadedCount++;
-       
-       if (loadedCount === totalFiles) {
-         if (availableCategories.length > 0) {
-           showCategorySelector();
-           createCategoryButtons(availableCategories);
-           savePersistedData(); // Save the loaded categories
-         }
-       }
-     }
-  });
+    } else {
+      addFileToList(file.name, 'Not CSV', 'error');
+      loadedCount++;
+      if (loadedCount === totalFiles) finishLoading();
+    }
+  };
   
-  // Show the loaded files section
+  Array.from(files).forEach(processFile);
   loadedFiles.classList.remove('hidden');
 }
 
@@ -1469,55 +1446,48 @@ function createCategoryButtons(categories) {
   });
 }
 
+// Consolidated category loading function
+function loadCategoryData(categoryData, isCombined = false) {
+  if (isCombined) {
+    // Combine all questions from all categories
+    QA = [];
+    const categoryNames = [];
+    
+    categoryData.forEach(category => {
+      const questionsWithCategory = category.questions.map(qa => ({
+        ...qa,
+        category: category.name
+      }));
+      QA = QA.concat(questionsWithCategory);
+      categoryNames.push(category.name);
+    });
+    
+    quizTitle.textContent = `Mixed: ${categoryNames.join(', ')}`;
+    currentCategory = 'combined';
+  } else {
+    QA = categoryData.questions;
+    quizTitle.textContent = categoryData.name;
+    currentCategory = categoryData.filename;
+  }
+  
+  currentQuestionIndex = 0;
+  showQuizDisplay();
+  setOrder(true);
+  render(true);
+  savePersistedData();
+}
+
 function loadCategory(filename) {
   const category = availableCategories.find(cat => cat.filename === filename);
   if (!category) {
     alert('Category not found');
     return;
   }
-
-  QA = category.questions;
-  quizTitle.textContent = category.name;
-  
-  // Set current category and reset question index
-  currentCategory = filename;
-  currentQuestionIndex = 0;
-  
-  showQuizDisplay();
-  setOrder(true);
-  render(true);
-  
-  // Save current quiz state
-  savePersistedData();
+  loadCategoryData(category);
 }
 
 function loadCombinedCategories(categories) {
-  // Combine all questions from all categories
-  QA = [];
-  const categoryNames = [];
-  
-  categories.forEach(category => {
-    // Add category information to each question
-    const questionsWithCategory = category.questions.map(qa => ({
-      ...qa,
-      category: category.name
-    }));
-    QA = QA.concat(questionsWithCategory);
-    categoryNames.push(category.name);
-  });
-
-  quizTitle.textContent = `Mixed: ${categoryNames.join(', ')}`;
-  
-  // Set current category and reset question index
-  currentCategory = 'combined';
-  currentQuestionIndex = 0;
-  
-  showQuizDisplay();
-  setOrder(true);
-  render(true);
-  
-  // Save current quiz state
-  savePersistedData();
+  loadCategoryData(categories, true);
 }
 
 // Player name editing functionality
@@ -1690,14 +1660,23 @@ function startEditingName(nameElement, defaultName) {
 
 // Restore quiz state to where you left off
 function restoreQuizState() {
+  const restoreOrder = () => {
+    if (savedOrder && savedOrder.length === QA.length) {
+      order = [...savedOrder];
+      idx = currentQuestionIndex;
+    } else {
+      setOrder(true);
+      idx = currentQuestionIndex;
+    }
+    render(true);
+  };
+
   if (currentCategory === 'combined') {
     // Restore combined categories
-    // Combine all questions from all categories
     QA = [];
     const categoryNames = [];
     
     availableCategories.forEach(category => {
-      // Add category information to each question
       const questionsWithCategory = category.questions.map(qa => ({
         ...qa,
         category: category.name
@@ -1708,18 +1687,7 @@ function restoreQuizState() {
 
     quizTitle.textContent = `Mixed: ${categoryNames.join(', ')}`;
     showQuizDisplay();
-    
-    // Restore the exact order if we have it saved
-    if (savedOrder && savedOrder.length === QA.length) {
-      order = [...savedOrder]; // Copy the saved order
-      idx = currentQuestionIndex;
-    } else {
-      // Fallback to normal randomization
-      setOrder(true);
-      idx = currentQuestionIndex;
-    }
-    
-    render(true);
+    restoreOrder();
   } else {
     // Restore specific category
     const category = availableCategories.find(cat => cat.filename === currentCategory);
@@ -1727,18 +1695,7 @@ function restoreQuizState() {
       QA = category.questions;
       quizTitle.textContent = category.name;
       showQuizDisplay();
-      
-      // Restore the exact order if we have it saved
-      if (savedOrder && savedOrder.length === QA.length) {
-        order = [...savedOrder]; // Copy the saved order
-        idx = currentQuestionIndex;
-      } else {
-        // Fallback to normal randomization
-        setOrder(true);
-        idx = currentQuestionIndex;
-      }
-      
-      render(true);
+      restoreOrder();
     }
   }
 }
