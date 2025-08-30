@@ -373,12 +373,13 @@ button:active { transform: translateY(1px) scale(.998); }
      text-align: center;
    }
 
-       @media (max-width: 520px) {
-     .controls { grid-template-columns: 1fr 1fr; }
-     .category-grid { grid-template-columns: 1fr; }
-     #connDot { display: none; }
-     .progress { display: none; }
-   }
+               @media (max-width: 520px) {
+      .controls { grid-template-columns: 1fr 1fr; }
+      .category-grid { grid-template-columns: 1fr; }
+      #connDot { display: none; }
+      .progress { display: none; }
+      #toggle { display: none; }
+    }
 </style>
 </head><body>
   <div id=connDot class="bad"></div>
@@ -610,7 +611,33 @@ function initQuizMode() {
 btnNext.addEventListener('click', next);
 btnPrev.addEventListener('click', prev);
 btnToggle.addEventListener('click', toggleAnswer);
-card.addEventListener('click', toggleAnswer);
+
+// Secret long-press functionality for mobile
+let pressTimer;
+let isLongPress = false;
+
+card.addEventListener('touchstart', function(e) {
+  isLongPress = false;
+  pressTimer = setTimeout(() => {
+    isLongPress = true;
+    toggleAnswer();
+  }, 800); // 800ms long press
+});
+
+card.addEventListener('touchend', function(e) {
+  clearTimeout(pressTimer);
+});
+
+card.addEventListener('touchmove', function(e) {
+  clearTimeout(pressTimer);
+});
+
+// Regular click for desktop
+card.addEventListener('click', function(e) {
+  if (!isLongPress) {
+    toggleAnswer();
+  }
+});
 
 // Keyboard shortcuts
 window.addEventListener('keydown', (e) => {
