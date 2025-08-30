@@ -380,20 +380,42 @@ button:active { transform: translateY(1px) scale(.998); }
       color: var(--accent);
     }
 
-    .player-name.editing {
-      background: rgba(255,255,255,.1);
-      border-radius: 4px;
-      padding: 2px 6px;
-      outline: 2px solid var(--accent);
-    }
+         .player-name.editing {
+       background: rgba(255,255,255,.1);
+       border-radius: 4px;
+       padding: 2px 6px;
+       outline: 2px solid var(--accent);
+     }
 
-               @media (max-width: 520px) {
-      .controls { grid-template-columns: 1fr 1fr; }
-      .category-grid { grid-template-columns: 1fr; }
-      #connDot { display: none; }
-      .progress { display: none; }
-      #toggle { display: none; }
-    }
+     /* Exit Button Styles */
+     .exit-section {
+       text-align: center;
+       margin-top: 12px;
+     }
+
+     .exit-btn {
+       background: rgba(255,255,255,.04) !important;
+       border: 1px solid rgba(255,255,255,.08) !important;
+       color: var(--muted) !important;
+       font-size: 13px !important;
+       padding: 8px 16px !important;
+       opacity: 0.7;
+       transition: opacity 0.2s ease;
+     }
+
+     .exit-btn:hover {
+       opacity: 1;
+       background: rgba(255,255,255,.08) !important;
+     }
+
+                @media (max-width: 520px) {
+       .controls { grid-template-columns: 1fr 1fr; }
+       .category-grid { grid-template-columns: 1fr; }
+       #connDot { display: none; }
+       .progress { display: none; }
+       #toggle { display: none; }
+       .exit-section { margin-top: 8px; }
+     }
 </style>
 </head><body>
   <div id=connDot class="bad"></div>
@@ -446,11 +468,15 @@ button:active { transform: translateY(1px) scale(.998); }
            <p class="a" id="a"><strong>Answer:</strong> <span id="answerText"></span></p>
          </div>
 
-         <div class="controls" aria-label="Controls">
-           <button id="prev" title="Previous (←)">◀ Prev</button>
-           <button id="toggle" class="ghost" title="Show/Hide Answer (Space)">Show Answer</button>
-           <button id="next" title="Next (→)">Next ▶</button>
-         </div>
+                   <div class="controls" aria-label="Controls">
+            <button id="prev" title="Previous (←)">◀ Prev</button>
+            <button id="toggle" class="ghost" title="Show/Hide Answer (Space)">Show Answer</button>
+            <button id="next" title="Next (→)">Next ▶</button>
+          </div>
+          
+          <div class="exit-section">
+            <button id="exitBtn" class="exit-btn" title="Exit to Categories">↩ Exit</button>
+          </div>
 
          <div class="progress">
            <div>Shortcuts: <span class="kbd">←/→</span> prev/next, <span class="kbd">Space</span> show</div>
@@ -484,6 +510,7 @@ const counterEl = document.getElementById('counter');
 const btnPrev = document.getElementById('prev');
 const btnNext = document.getElementById('next');
 const btnToggle = document.getElementById('toggle');
+const btnExit = document.getElementById('exitBtn');
 const card = document.getElementById('card');
 const csvFileInput = document.getElementById('csvFile');
 
@@ -627,6 +654,7 @@ function initQuizMode() {
 btnNext.addEventListener('click', next);
 btnPrev.addEventListener('click', prev);
 btnToggle.addEventListener('click', toggleAnswer);
+btnExit.addEventListener('click', exitToCategories);
 
 // Secret long-press functionality for mobile
 let pressTimer;
@@ -684,6 +712,18 @@ function hideWinner() {
 function resetGame() {
   ws.send(JSON.stringify({action:'reset'}));
   hideWinner();
+}
+
+function exitToCategories() {
+  if (confirm('Are you sure you want to exit this quiz and return to categories?')) {
+    // Reset game state
+    hideWinner();
+    aEl.classList.remove('show');
+    btnToggle.textContent = 'Show Answer';
+    
+    // Return to category selector
+    showCategorySelector();
+  }
 }
 
 // WebSocket event handling
