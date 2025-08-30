@@ -662,6 +662,10 @@ let order = [];
 let idx = 0;
 let availableCategories = [];
 
+// Player names with persistence
+let player1NameText = 'Player 1';
+let player2NameText = 'Player 2';
+
 // Sample quiz data (you can replace this with your CSV data)
 const sampleQuestions = [
   { q: "What is the capital of France?", a: "Paris", category: "Geography" },
@@ -676,9 +680,34 @@ const sampleQuestions = [
   { q: "Who painted the Mona Lisa?", a: "Leonardo da Vinci", category: "Art" }
 ];
 
-// Initialize quiz
-function initQuiz() {
-  // Start with sample questions
+// Load data from localStorage
+function loadPersistedData() {
+  try {
+    // Load player names
+    const savedPlayer1Name = localStorage.getItem('player1Name');
+    const savedPlayer2Name = localStorage.getItem('player2Name');
+    if (savedPlayer1Name) player1NameText = savedPlayer1Name;
+    if (savedPlayer2Name) player2NameText = savedPlayer2Name;
+    
+    // Update player name displays
+    player1Name.textContent = player1NameText;
+    player2Name.textContent = player2NameText;
+    
+    // Load categories from localStorage
+    const savedCategories = localStorage.getItem('quizCategories');
+    if (savedCategories) {
+      availableCategories = JSON.parse(savedCategories);
+      if (availableCategories.length > 0) {
+        showCategorySelector();
+        createCategoryButtons(availableCategories);
+        return; // Don't show sample questions if we have saved categories
+      }
+    }
+  } catch (error) {
+    console.error('Error loading persisted data:', error);
+  }
+  
+  // Fallback to sample questions if no saved data
   availableCategories = [{
     filename: 'sample.csv',
     name: 'Sample Questions',
@@ -686,6 +715,25 @@ function initQuiz() {
   }];
   showCategorySelector();
   createCategoryButtons(availableCategories);
+}
+
+// Save data to localStorage
+function savePersistedData() {
+  try {
+    // Save player names
+    localStorage.setItem('player1Name', player1NameText);
+    localStorage.setItem('player2Name', player2NameText);
+    
+    // Save categories
+    localStorage.setItem('quizCategories', JSON.stringify(availableCategories));
+  } catch (error) {
+    console.error('Error saving persisted data:', error);
+  }
+}
+
+// Initialize quiz
+function initQuiz() {
+  loadPersistedData();
 }
 
 function setOrder(randomize) {
@@ -992,39 +1040,42 @@ function handleFileSelect(event) {
         
         loadedCount++;
         
-        // If all files are processed, show category selector
-        if (loadedCount === totalFiles) {
-          if (availableCategories.length > 0) {
-            showCategorySelector();
-            createCategoryButtons(availableCategories);
-          }
-        }
+                 // If all files are processed, show category selector
+         if (loadedCount === totalFiles) {
+           if (availableCategories.length > 0) {
+             showCategorySelector();
+             createCategoryButtons(availableCategories);
+             savePersistedData(); // Save the loaded categories
+           }
+         }
       };
       
-      reader.onerror = function() {
-        addFileToList(file.name, 'Read failed', 'error');
-        loadedCount++;
-        
-        if (loadedCount === totalFiles) {
-          if (availableCategories.length > 0) {
-            showCategorySelector();
-            createCategoryButtons(availableCategories);
-          }
-        }
-      };
+             reader.onerror = function() {
+         addFileToList(file.name, 'Read failed', 'error');
+         loadedCount++;
+         
+         if (loadedCount === totalFiles) {
+           if (availableCategories.length > 0) {
+             showCategorySelector();
+             createCategoryButtons(availableCategories);
+             savePersistedData(); // Save the loaded categories
+           }
+         }
+       };
       
       reader.readAsText(file);
-    } else {
-      addFileToList(file.name, 'Not CSV', 'error');
-      loadedCount++;
-      
-      if (loadedCount === totalFiles) {
-        if (availableCategories.length > 0) {
-          showCategorySelector();
-          createCategoryButtons(availableCategories);
-        }
-      }
-    }
+         } else {
+       addFileToList(file.name, 'Not CSV', 'error');
+       loadedCount++;
+       
+       if (loadedCount === totalFiles) {
+         if (availableCategories.length > 0) {
+           showCategorySelector();
+           createCategoryButtons(availableCategories);
+           savePersistedData(); // Save the loaded categories
+         }
+       }
+     }
   });
   
   // Show the loaded files section
@@ -1109,6 +1160,9 @@ function loadCategory(filename) {
   showQuizDisplay();
   setOrder(true);
   render(true);
+  
+  // Save current quiz state
+  savePersistedData();
 }
 
 function loadCombinedCategories(categories) {
@@ -1131,6 +1185,9 @@ function loadCombinedCategories(categories) {
   showQuizDisplay();
   setOrder(true);
   render(true);
+  
+  // Save current quiz state
+  savePersistedData();
 }
 
 // Player name editing functionality
@@ -1229,23 +1286,32 @@ function startEditingName(nameElement, defaultName) {
     input.click();
   }, 100);
   
-  function finishEditing() {
-    const newName = input.value.trim() || defaultName;
-    nameElement.textContent = newName;
-    nameElement.classList.remove('editing');
-    isEditingName = false;
-  }
+     function finishEditing() {
+     const newName = input.value.trim() || defaultName;
+     nameElement.textContent = newName;
+     nameElement.classList.remove('editing');
+     isEditingName = false;
+     
+     // Update stored names and save
+     if (nameElement === player1Name) {
+       player1NameText = newName;
+     } else if (nameElement === player2Name) {
+       player2NameText = newName;
+     }
+     savePersistedData();
+   }
   
   input.addEventListener('blur', finishEditing);
-  input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-      finishEditing();
-    } else if (e.key === 'Escape') {
-      nameElement.textContent = currentName;
-      nameElement.classList.remove('editing');
-      isEditingName = false;
-    }
-  });
+     input.addEventListener('keydown', function(e) {
+     if (e.key === 'Enter') {
+       finishEditing();
+     } else if (e.key === 'Escape') {
+       // Restore original name without saving
+       nameElement.textContent = currentName;
+       nameElement.classList.remove('editing');
+       isEditingName = false;
+     }
+   });
   
   // Handle mobile keyboard "Done" button
   input.addEventListener('input', function(e) {
