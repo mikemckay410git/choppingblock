@@ -1457,19 +1457,22 @@ function startEditingName(nameElement, defaultName) {
   const input = document.createElement('input');
   input.type = 'text';
   input.value = currentName;
-  input.style.cssText = `
-    background: transparent;
-    border: none;
-    color: var(--ink);
-    font-weight: 600;
-    font-size: 16px;
-    text-align: center;
-    width: 100%;
-    outline: none;
-    font-family: inherit;
-    -webkit-user-select: text;
-    user-select: text;
-  `;
+     input.style.cssText = `
+     background: transparent;
+     border: none;
+     color: var(--ink);
+     font-weight: 600;
+     font-size: 16px;
+     text-align: center;
+     width: 100%;
+     outline: none;
+     font-family: inherit;
+     -webkit-user-select: text;
+     user-select: text;
+     margin: 0;
+     padding: 0;
+     box-sizing: border-box;
+   `;
   
   // Clear any existing content and add the input
   nameElement.innerHTML = '';
