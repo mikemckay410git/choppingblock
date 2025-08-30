@@ -1051,10 +1051,8 @@ function showWinner(player) {
     player2Tile.classList.add('winner');
   }
   
-  // Enable scoring after a short delay
-  setTimeout(() => {
-    addScorableState();
-  }, 1000);
+  // Enable scoring immediately
+  addScorableState();
 }
 
 function hideWinner() {
