@@ -351,7 +351,7 @@ button:active { transform: translateY(1px) scale(.998); }
        border-radius: 12px;
        padding: 12px 18px;
        min-width: 100px;
-       /* No transitions */
+       transition: all 0.3s ease;
        opacity: 0.4;
        filter: grayscale(1);
        transform: scale(0.9);
@@ -373,7 +373,7 @@ button:active { transform: translateY(1px) scale(.998); }
        text-align: center;
        cursor: pointer;
        user-select: none;
-       /* No transitions */
+       transition: color 0.2s ease;
      }
 
      .player-name:hover {
@@ -400,7 +400,6 @@ button:active { transform: translateY(1px) scale(.998); }
 
            .player-tile.scorable {
         cursor: pointer;
-        /* No transitions */
         /* No size changes - only winner class should change size */
       }
 
