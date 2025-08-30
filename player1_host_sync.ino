@@ -514,20 +514,24 @@ button:active { transform: translateY(1px) scale(.998); }
          transform: translateY(-1px);
        }
 
-       @media (max-width: 520px) {
-         .modal-dialog {
-           width: 95vw;
-           margin: 20px;
+                @media (max-width: 520px) {
+           .modal-dialog {
+             width: 95vw;
+             margin: 20px;
+           }
+           
+           .modal-actions {
+             flex-direction: column;
+           }
+           
+           .modal-btn {
+             width: 100%;
+           }
+           
+           .file-input .hint {
+             display: none;
+           }
          }
-         
-         .modal-actions {
-           flex-direction: column;
-         }
-         
-         .modal-btn {
-           width: 100%;
-         }
-       }
  </style>
 </head><body>
   <div id=connDot class="bad"></div>
