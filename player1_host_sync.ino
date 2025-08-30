@@ -362,7 +362,7 @@ button:active { transform: translateY(1px) scale(.998); }
        border: 1px solid rgba(99,102,241,.35);
        opacity: 1;
        filter: grayscale(0);
-       transform: scale(1.05);
+       transform: scale(1.05) !important;
        box-shadow: 0 8px 25px rgba(99,102,241,.3);
      }
 
@@ -401,6 +401,7 @@ button:active { transform: translateY(1px) scale(.998); }
            .player-tile.scorable {
         cursor: pointer;
         /* No transitions */
+        /* No size changes - only winner class should change size */
       }
 
              .player-tile.scorable:hover {
@@ -413,11 +414,16 @@ button:active { transform: translateY(1px) scale(.998); }
 
       .player-tile:not(.scorable) {
         cursor: default;
+        transform: scale(0.9) !important;
       }
 
              .player-tile:not(.scorable):hover {
-         transform: none !important;
+         transform: scale(0.9) !important;
          box-shadow: none !important;
+       }
+
+       .player-tile:not(.scorable):active {
+         transform: scale(0.9) !important;
        }
 
        .player-tile:not(.scorable) .player-name:hover {
