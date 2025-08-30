@@ -203,18 +203,50 @@ button:active { transform: translateY(1px) scale(.998); }
 
 
 
-/* File Upload Styles */
-.file-input {
-  background: rgba(255,255,255,.02);
-  border: 1px solid rgba(255,255,255,.06);
-  border-radius: 12px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
+ /* Reset Button Styles */
+ .reset-section {
+   background: rgba(255,255,255,.02);
+   border: 1px solid rgba(255,255,255,.06);
+   border-radius: 12px;
+   padding: 12px 16px;
+   margin-bottom: 16px;
+   text-align: center;
+ }
+
+ .reset-btn {
+   background: linear-gradient(180deg, rgba(239,68,68,.25), rgba(239,68,68,.15)) !important;
+   border: 1px solid rgba(239,68,68,.3) !important;
+   color: #fca5a5 !important;
+   font-size: 14px !important;
+   padding: 8px 16px !important;
+   border-radius: 8px !important;
+   margin-bottom: 8px;
+   transition: all 0.2s ease;
+ }
+
+ .reset-btn:hover {
+   background: linear-gradient(180deg, rgba(239,68,68,.35), rgba(239,68,68,.25)) !important;
+   transform: translateY(-1px);
+ }
+
+ .reset-hint {
+   font-size: 11px;
+   color: var(--muted);
+   opacity: 0.8;
+ }
+
+ /* File Upload Styles */
+ .file-input {
+   background: rgba(255,255,255,.02);
+   border: 1px solid rgba(255,255,255,.06);
+   border-radius: 12px;
+   padding: 12px 16px;
+   margin-bottom: 16px;
+   display: flex;
+   align-items: center;
+   gap: 12px;
+   flex-wrap: wrap;
+ }
 
 .file-input input[type="file"] {
   display: none;
@@ -581,17 +613,23 @@ button:active { transform: translateY(1px) scale(.998); }
      <div class="app">
      <!-- Quiz Interface -->
      <div id="quizInterface">
-      <!-- File Upload Section -->
-      <div class="file-input" id="fileInputSection">
-        <label for="csvFile">📁 Load CSV Files</label>
-        <input type="file" id="csvFile" accept=".csv" multiple>
-        <div class="hint">Hold Ctrl/Cmd for multiple files</div>
-        
-        <div class="loaded-files hidden" id="loadedFiles">
-          <h3>Loaded Files:</h3>
-          <ul class="file-list" id="fileList"></ul>
-        </div>
-      </div>
+             <!-- Reset Button -->
+       <div class="reset-section">
+         <button id="resetAllData" class="reset-btn">🗑️ Reset All Data</button>
+         <div class="reset-hint">This will clear all loaded categories, scores, and player names</div>
+       </div>
+
+       <!-- File Upload Section -->
+       <div class="file-input" id="fileInputSection">
+         <label for="csvFile">📁 Load CSV Files</label>
+         <input type="file" id="csvFile" accept=".csv" multiple>
+         <div class="hint">Hold Ctrl/Cmd for multiple files</div>
+         
+         <div class="loaded-files hidden" id="loadedFiles">
+           <h3>Loaded Files:</h3>
+           <ul class="file-list" id="fileList"></ul>
+         </div>
+       </div>
 
       <!-- Category Selector -->
       <div class="category-selector hidden" id="categorySelector">
@@ -667,11 +705,12 @@ button:active { transform: translateY(1px) scale(.998); }
 const ws=new WebSocket('ws://'+location.hostname+':81');
 const connDot=document.getElementById('connDot');
 
-// Quiz elements
-const quizInterface = document.getElementById('quizInterface');
-const fileInputSection = document.getElementById('fileInputSection');
-const loadedFiles = document.getElementById('loadedFiles');
-const fileList = document.getElementById('fileList');
+ // Quiz elements
+ const quizInterface = document.getElementById('quizInterface');
+ const resetAllData = document.getElementById('resetAllData');
+ const fileInputSection = document.getElementById('fileInputSection');
+ const loadedFiles = document.getElementById('loadedFiles');
+ const fileList = document.getElementById('fileList');
 const categorySelector = document.getElementById('categorySelector');
 const categoryGrid = document.getElementById('categoryGrid');
 const quizDisplay = document.getElementById('quizDisplay');
@@ -1183,8 +1222,54 @@ function parseCSV(csv) {
   return data;
 }
 
-// === FILE HANDLING ===
-csvFileInput.addEventListener('change', handleFileSelect);
+ // === RESET FUNCTIONALITY ===
+ resetAllData.addEventListener('click', resetAllDataFunction);
+ 
+ function resetAllDataFunction() {
+   if (confirm('Are you sure you want to reset all data? This will clear:\n• All loaded categories\n• Player scores\n• Player names\n• Current quiz progress\n\nThis action cannot be undone.')) {
+     // Clear all localStorage data
+     localStorage.clear();
+     
+     // Reset all variables to default state
+     availableCategories = [];
+     player1Score = 0;
+     player2Score = 0;
+     player1NameText = 'Player 1';
+     player2NameText = 'Player 2';
+     currentCategory = null;
+     currentQuestionIndex = 0;
+     savedOrder = null;
+     QA = [];
+     order = [];
+     idx = 0;
+     roundComplete = false;
+     
+     // Update UI
+     player1Name.textContent = player1NameText;
+     player2Name.textContent = player2NameText;
+     updateScoreDisplay();
+     removeScorableState();
+     
+     // Clear file list
+     fileList.innerHTML = '';
+     loadedFiles.classList.add('hidden');
+     
+     // Show sample questions
+     availableCategories = [{
+       filename: 'sample.csv',
+       name: 'Sample Questions',
+       questions: sampleQuestions
+     }];
+     showCategorySelector();
+     createCategoryButtons(availableCategories);
+     
+     // Show confirmation
+     alert('All data has been reset successfully!');
+   }
+ }
+ 
+ // === FILE HANDLING ===
+ csvFileInput.addEventListener('change', handleFileSelect);
 
 function handleFileSelect(event) {
   const files = event.target.files;
@@ -1284,17 +1369,19 @@ function addFileToList(filename, message, status) {
 }
 
 // === CATEGORY SELECTION ===
-function showCategorySelector() {
-  categorySelector.classList.remove('hidden');
-  quizDisplay.classList.add('hidden');
-  fileInputSection.classList.remove('hidden');
-}
+ function showCategorySelector() {
+   categorySelector.classList.remove('hidden');
+   quizDisplay.classList.add('hidden');
+   fileInputSection.classList.remove('hidden');
+   resetAllData.parentElement.classList.remove('hidden');
+ }
 
-function showQuizDisplay() {
-  categorySelector.classList.add('hidden');
-  quizDisplay.classList.remove('hidden');
-  fileInputSection.classList.add('hidden');
-}
+ function showQuizDisplay() {
+   categorySelector.classList.add('hidden');
+   quizDisplay.classList.remove('hidden');
+   fileInputSection.classList.add('hidden');
+   resetAllData.parentElement.classList.add('hidden');
+ }
 
 function createCategoryButtons(categories) {
   if (categories.length === 0) {
