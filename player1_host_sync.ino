@@ -943,8 +943,13 @@ function updateScoreDisplay() {
 
 // Add scorable state to player tiles
 function addScorableState() {
-  player1Tile.classList.add('scorable');
-  player2Tile.classList.add('scorable');
+  // Only add scorable class if the tile is not already a winner
+  if (!player1Tile.classList.contains('winner')) {
+    player1Tile.classList.add('scorable');
+  }
+  if (!player2Tile.classList.contains('winner')) {
+    player2Tile.classList.add('scorable');
+  }
   roundComplete = true;
 }
 
