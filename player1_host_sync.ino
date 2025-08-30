@@ -1305,11 +1305,8 @@ function parseCSV(csv) {
     showCategorySelector();
     createCategoryButtons(availableCategories);
     
-    // Hide modal
-    hideResetConfirmation();
-    
-    // Show success message
-    alert('All data has been reset successfully!');
+         // Hide modal
+     hideResetConfirmation();
   }
  
  // === FILE HANDLING ===
