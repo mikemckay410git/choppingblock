@@ -366,12 +366,26 @@ button:active { transform: translateY(1px) scale(.998); }
       box-shadow: 0 8px 25px rgba(99,102,241,.3);
     }
 
-   .player-name {
-     font-weight: 600;
-     font-size: 16px;
-     color: var(--ink);
-     text-align: center;
-   }
+       .player-name {
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--ink);
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+      transition: color 0.2s ease;
+    }
+
+    .player-name:hover {
+      color: var(--accent);
+    }
+
+    .player-name.editing {
+      background: rgba(255,255,255,.1);
+      border-radius: 4px;
+      padding: 2px 6px;
+      outline: 2px solid var(--accent);
+    }
 
                @media (max-width: 520px) {
       .controls { grid-template-columns: 1fr 1fr; }
@@ -477,6 +491,8 @@ const csvFileInput = document.getElementById('csvFile');
 const gameStatus = document.getElementById('gameStatus');
 const player1Tile = document.getElementById('player1Tile');
 const player2Tile = document.getElementById('player2Tile');
+const player1Name = document.querySelector('#player1Tile .player-name');
+const player2Name = document.querySelector('#player2Tile .player-name');
 
 // Quiz state
 let QA = [];
@@ -933,10 +949,117 @@ function loadCombinedCategories(categories) {
   render(true);
 }
 
+// Player name editing functionality
+let nameEditTimer;
+let isEditingName = false;
+
+function setupPlayerNameEditing() {
+  // Player 1 name editing
+  let player1PressTimer;
+  player1Name.addEventListener('touchstart', function(e) {
+    player1PressTimer = setTimeout(() => {
+      startEditingName(player1Name, 'Player 1');
+    }, 800);
+  });
+
+  player1Name.addEventListener('touchend', function(e) {
+    clearTimeout(player1PressTimer);
+  });
+
+  player1Name.addEventListener('touchmove', function(e) {
+    clearTimeout(player1PressTimer);
+  });
+
+  // Player 2 name editing
+  let player2PressTimer;
+  player2Name.addEventListener('touchstart', function(e) {
+    player2PressTimer = setTimeout(() => {
+      startEditingName(player2Name, 'Player 2');
+    }, 800);
+  });
+
+  player2Name.addEventListener('touchend', function(e) {
+    clearTimeout(player2PressTimer);
+  });
+
+  player2Name.addEventListener('touchmove', function(e) {
+    clearTimeout(player2PressTimer);
+  });
+
+  // Desktop long press simulation
+  player1Name.addEventListener('mousedown', function(e) {
+    nameEditTimer = setTimeout(() => {
+      startEditingName(player1Name, 'Player 1');
+    }, 800);
+  });
+
+  player2Name.addEventListener('mousedown', function(e) {
+    nameEditTimer = setTimeout(() => {
+      startEditingName(player2Name, 'Player 2');
+    }, 800);
+  });
+
+  // Cancel on mouse up or move
+  document.addEventListener('mouseup', function(e) {
+    clearTimeout(nameEditTimer);
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    clearTimeout(nameEditTimer);
+  });
+}
+
+function startEditingName(nameElement, defaultName) {
+  if (isEditingName) return;
+  
+  isEditingName = true;
+  nameElement.classList.add('editing');
+  
+  const currentName = nameElement.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentName;
+  input.style.cssText = `
+    background: transparent;
+    border: none;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 16px;
+    text-align: center;
+    width: 100%;
+    outline: none;
+    font-family: inherit;
+  `;
+  
+  nameElement.textContent = '';
+  nameElement.appendChild(input);
+  input.focus();
+  input.select();
+  
+  function finishEditing() {
+    const newName = input.value.trim() || defaultName;
+    nameElement.textContent = newName;
+    nameElement.classList.remove('editing');
+    isEditingName = false;
+  }
+  
+  input.addEventListener('blur', finishEditing);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      finishEditing();
+    } else if (e.key === 'Escape') {
+      nameElement.textContent = currentName;
+      nameElement.classList.remove('editing');
+      isEditingName = false;
+    }
+  });
+}
+
 // Initialize quiz on load
 document.addEventListener('DOMContentLoaded', function() {
   initQuiz();
   initQuizMode();
+  setupPlayerNameEditing();
 });
 </script>
 </body></html>
