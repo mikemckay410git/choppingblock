@@ -403,14 +403,13 @@ button:active { transform: translateY(1px) scale(.998); }
         transition: all 0.2s ease;
       }
 
-      .player-tile.scorable:hover {
-        transform: scale(1.05);
-        box-shadow: 0 4px 15px rgba(255,255,255,.1);
-      }
+             .player-tile.scorable:hover {
+         /* No hover effects - tiles stay at their current size */
+       }
 
-      .player-tile.scorable:active {
-        transform: scale(0.98);
-      }
+       .player-tile.scorable:active {
+         /* No active effects */
+       }
 
       .player-tile:not(.scorable) {
         cursor: default;
