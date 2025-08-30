@@ -380,6 +380,10 @@ button:active { transform: translateY(1px) scale(.998); }
        color: var(--accent);
      }
 
+     .player-tile:not(.scorable) .player-name:hover {
+       color: var(--ink);
+     }
+
      .player-name.editing {
        background: rgba(255,255,255,.1);
        border-radius: 4px;
