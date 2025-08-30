@@ -691,21 +691,44 @@ button:active { transform: translateY(1px) scale(.998); }
         </div>
      </div>
 
-     <!-- Custom Confirmation Dialog -->
-     <div class="modal-overlay hidden" id="confirmModal">
-       <div class="modal-dialog">
-         <div class="modal-header">
-           <h3>Exit Quiz?</h3>
-         </div>
-         <div class="modal-content">
-           <p>Are you sure you want to exit this quiz and return to categories?</p>
-         </div>
-         <div class="modal-actions">
-           <button class="modal-btn cancel" id="cancelExit">Cancel</button>
-           <button class="modal-btn confirm" id="confirmExit">Exit</button>
-         </div>
-       </div>
-     </div>
+           <!-- Exit Confirmation Dialog -->
+      <div class="modal-overlay hidden" id="confirmModal">
+        <div class="modal-dialog">
+          <div class="modal-header">
+            <h3>Exit Quiz?</h3>
+          </div>
+          <div class="modal-content">
+            <p>Are you sure you want to exit this quiz and return to categories?</p>
+          </div>
+          <div class="modal-actions">
+            <button class="modal-btn cancel" id="cancelExit">Cancel</button>
+            <button class="modal-btn confirm" id="confirmExit">Exit</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reset Data Confirmation Dialog -->
+      <div class="modal-overlay hidden" id="resetModal">
+        <div class="modal-dialog">
+          <div class="modal-header">
+            <h3>Reset All Data?</h3>
+          </div>
+          <div class="modal-content">
+            <p>Are you sure you want to reset all data? This will clear:</p>
+            <ul style="margin: 12px 0; padding-left: 20px; color: var(--muted);">
+              <li>All loaded categories</li>
+              <li>Player scores</li>
+              <li>Player names</li>
+              <li>Current quiz progress</li>
+            </ul>
+            <p style="color: #fca5a5; font-weight: 600;">This action cannot be undone.</p>
+          </div>
+          <div class="modal-actions">
+            <button class="modal-btn cancel" id="cancelReset">Cancel</button>
+            <button class="modal-btn confirm" id="confirmReset">Reset All Data</button>
+          </div>
+        </div>
+      </div>
      
    </div>
 
@@ -736,10 +759,13 @@ const btnExit = document.getElementById('exitBtn');
 const card = document.getElementById('card');
 const csvFileInput = document.getElementById('csvFile');
 
-// Modal elements
-const confirmModal = document.getElementById('confirmModal');
-const cancelExit = document.getElementById('cancelExit');
-const confirmExit = document.getElementById('confirmExit');
+ // Modal elements
+ const confirmModal = document.getElementById('confirmModal');
+ const cancelExit = document.getElementById('cancelExit');
+ const confirmExit = document.getElementById('confirmExit');
+ const resetModal = document.getElementById('resetModal');
+ const cancelReset = document.getElementById('cancelReset');
+ const confirmReset = document.getElementById('confirmReset');
 
 // Game status elements in quiz mode
 const gameStatus = document.getElementById('gameStatus');
@@ -1231,51 +1257,60 @@ function parseCSV(csv) {
   return data;
 }
 
- // === RESET FUNCTIONALITY ===
- resetAllData.addEventListener('click', resetAllDataFunction);
- 
- function resetAllDataFunction() {
-   if (confirm('Are you sure you want to reset all data? This will clear:\n• All loaded categories\n• Player scores\n• Player names\n• Current quiz progress\n\nThis action cannot be undone.')) {
-     // Clear all localStorage data
-     localStorage.clear();
-     
-     // Reset all variables to default state
-     availableCategories = [];
-     player1Score = 0;
-     player2Score = 0;
-     player1NameText = 'Player 1';
-     player2NameText = 'Player 2';
-     currentCategory = null;
-     currentQuestionIndex = 0;
-     savedOrder = null;
-     QA = [];
-     order = [];
-     idx = 0;
-     roundComplete = false;
-     
-     // Update UI
-     player1Name.textContent = player1NameText;
-     player2Name.textContent = player2NameText;
-     updateScoreDisplay();
-     removeScorableState();
-     
-     // Clear file list
-     fileList.innerHTML = '';
-     loadedFiles.classList.add('hidden');
-     
-     // Show sample questions
-     availableCategories = [{
-       filename: 'sample.csv',
-       name: 'Sample Questions',
-       questions: sampleQuestions
-     }];
-     showCategorySelector();
-     createCategoryButtons(availableCategories);
-     
-     // Show confirmation
-     alert('All data has been reset successfully!');
-   }
- }
+   // === RESET FUNCTIONALITY ===
+  resetAllData.addEventListener('click', showResetConfirmation);
+  
+  function showResetConfirmation() {
+    resetModal.classList.remove('hidden');
+  }
+  
+  function hideResetConfirmation() {
+    resetModal.classList.add('hidden');
+  }
+  
+  function resetAllDataFunction() {
+    // Clear all localStorage data
+    localStorage.clear();
+    
+    // Reset all variables to default state
+    availableCategories = [];
+    player1Score = 0;
+    player2Score = 0;
+    player1NameText = 'Player 1';
+    player2NameText = 'Player 2';
+    currentCategory = null;
+    currentQuestionIndex = 0;
+    savedOrder = null;
+    QA = [];
+    order = [];
+    idx = 0;
+    roundComplete = false;
+    
+    // Update UI
+    player1Name.textContent = player1NameText;
+    player2Name.textContent = player2NameText;
+    updateScoreDisplay();
+    removeScorableState();
+    
+    // Clear file list
+    fileList.innerHTML = '';
+    loadedFiles.classList.add('hidden');
+    
+    // Show sample questions
+    availableCategories = [{
+      filename: 'sample.csv',
+      name: 'Sample Questions',
+      questions: sampleQuestions
+    }];
+    showCategorySelector();
+    createCategoryButtons(availableCategories);
+    
+    // Hide modal
+    hideResetConfirmation();
+    
+    // Show success message
+    alert('All data has been reset successfully!');
+  }
  
  // === FILE HANDLING ===
  csvFileInput.addEventListener('change', handleFileSelect);
@@ -1626,23 +1661,35 @@ function startEditingName(nameElement, defaultName) {
   });
 }
 
-// Modal event listeners
-cancelExit.addEventListener('click', hideExitConfirmation);
-confirmExit.addEventListener('click', exitToCategories);
-
-// Close modal when clicking overlay
-confirmModal.addEventListener('click', function(e) {
-  if (e.target === confirmModal) {
-    hideExitConfirmation();
-  }
-});
-
-// Close modal with Escape key
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape' && !confirmModal.classList.contains('hidden')) {
-    hideExitConfirmation();
-  }
-});
+ // Modal event listeners
+ cancelExit.addEventListener('click', hideExitConfirmation);
+ confirmExit.addEventListener('click', exitToCategories);
+ cancelReset.addEventListener('click', hideResetConfirmation);
+ confirmReset.addEventListener('click', resetAllDataFunction);
+ 
+ // Close modals when clicking overlay
+ confirmModal.addEventListener('click', function(e) {
+   if (e.target === confirmModal) {
+     hideExitConfirmation();
+   }
+ });
+ 
+ resetModal.addEventListener('click', function(e) {
+   if (e.target === resetModal) {
+     hideResetConfirmation();
+   }
+ });
+ 
+ // Close modals with Escape key
+ document.addEventListener('keydown', function(e) {
+   if (e.key === 'Escape') {
+     if (!confirmModal.classList.contains('hidden')) {
+       hideExitConfirmation();
+     } else if (!resetModal.classList.contains('hidden')) {
+       hideResetConfirmation();
+     }
+   }
+ });
 
 // Restore quiz state to where you left off
 function restoreQuizState() {
