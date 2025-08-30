@@ -210,7 +210,10 @@ button:active { transform: translateY(1px) scale(.998); }
    border-radius: 12px;
    padding: 12px 16px;
    margin-bottom: 16px;
-   text-align: center;
+   display: flex;
+   align-items: center;
+   gap: 12px;
+   flex-wrap: wrap;
  }
 
  .reset-btn {
@@ -218,10 +221,12 @@ button:active { transform: translateY(1px) scale(.998); }
    border: 1px solid rgba(239,68,68,.3) !important;
    color: #fca5a5 !important;
    font-size: 14px !important;
-   padding: 8px 16px !important;
+   padding: 6px 12px !important;
    border-radius: 8px !important;
-   margin-bottom: 8px;
    transition: all 0.2s ease;
+   display: flex;
+   align-items: center;
+   gap: 6px;
  }
 
  .reset-btn:hover {
@@ -602,9 +607,13 @@ button:active { transform: translateY(1px) scale(.998); }
              width: 100%;
            }
            
-           .file-input .hint {
-             display: none;
-           }
+                        .file-input .hint {
+               display: none;
+             }
+             
+             .reset-hint {
+               display: none;
+             }
          }
  </style>
 </head><body>
