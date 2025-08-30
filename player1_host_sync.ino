@@ -373,10 +373,12 @@ button:active { transform: translateY(1px) scale(.998); }
      text-align: center;
    }
 
-   @media (max-width: 520px) {
-    .controls { grid-template-columns: 1fr; }
-    .category-grid { grid-template-columns: 1fr; }
-  }
+       @media (max-width: 520px) {
+     .controls { grid-template-columns: 1fr 1fr; }
+     .category-grid { grid-template-columns: 1fr; }
+     #connDot { display: none; }
+     .progress { display: none; }
+   }
 </style>
 </head><body>
   <div id=connDot class="bad"></div>
