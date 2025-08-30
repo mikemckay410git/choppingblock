@@ -2212,33 +2212,7 @@ void loop(){
 
       // Record Player 1 hit
   if (r.valid) {
-    // Determine hit location for quiz controls
-    String quizAction = "";
-    if (r.x < 0.2f && r.y < 0.2f) {
-      // Top-left: Previous question
-      quizAction = "prev";
-      Serial.println("Quiz: Previous question");
-    } else if (r.x > 0.2f && r.y < 0.2f) {
-      // Top-right: Next question
-      quizAction = "next";
-      Serial.println("Quiz: Next question");
-    } else if (r.x < 0.2f && r.y > 0.2f) {
-      // Bottom-left: Toggle answer
-      quizAction = "toggle";
-      Serial.println("Quiz: Toggle answer");
-    } else if (r.x > 0.2f && r.y > 0.2f) {
-      // Bottom-right: Show answer
-      quizAction = "toggle";
-      Serial.println("Quiz: Show answer");
-    }
-    
-    // Send quiz action to web interface
-    if (quizAction != "") {
-      String quizMsg = "{\"quizAction\":\"" + quizAction + "\"}";
-      ws.broadcastTXT(quizMsg);
-    }
-    
-    // Handle game mode if active
+    // Handle game mode FIRST if active (priority over quiz controls)
     if (gameActive) {
       player1HitTime = r.hitTime;
       Serial.printf("Player 1 hit detected at %lu with strength %d\n", player1HitTime, r.hitStrength);
@@ -2255,6 +2229,32 @@ void loop(){
       String winMsg = "{\"winner\":\"" + winner + "\"}";
       ws.broadcastTXT(winMsg);
       Serial.println("Winner declared: Player 1");
+    } else {
+      // Only process quiz controls if game is NOT active
+      String quizAction = "";
+      if (r.x < 0.2f && r.y < 0.2f) {
+        // Top-left: Previous question
+        quizAction = "prev";
+        Serial.println("Quiz: Previous question");
+      } else if (r.x > 0.2f && r.y < 0.2f) {
+        // Top-right: Next question
+        quizAction = "next";
+        Serial.println("Quiz: Next question");
+      } else if (r.x < 0.2f && r.y > 0.2f) {
+        // Bottom-left: Toggle answer
+        quizAction = "toggle";
+        Serial.println("Quiz: Toggle answer");
+      } else if (r.x > 0.2f && r.y > 0.2f) {
+        // Bottom-right: Show answer
+        quizAction = "toggle";
+        Serial.println("Quiz: Show answer");
+      }
+      
+      // Send quiz action to web interface
+      if (quizAction != "") {
+        String quizMsg = "{\"quizAction\":\"" + quizAction + "\"}";
+        ws.broadcastTXT(quizMsg);
+      }
     }
   } else {
     // Debug output to see what's happening
