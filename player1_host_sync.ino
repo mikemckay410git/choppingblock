@@ -412,9 +412,123 @@ button:active { transform: translateY(1px) scale(.998); }
         #connDot { display: none; }
         .progress { display: none; }
         #toggle { display: none; }
-        .exit-btn { font-size: 14px !important; padding: 4px 8px !important; }
-      }
-</style>
+                 .exit-btn { font-size: 14px !important; padding: 4px 8px !important; }
+       }
+
+       /* Modal Dialog Styles */
+       .modal-overlay {
+         position: fixed;
+         top: 0;
+         left: 0;
+         right: 0;
+         bottom: 0;
+         background: rgba(0, 0, 0, 0.7);
+         display: flex;
+         align-items: center;
+         justify-content: center;
+         z-index: 1000;
+         backdrop-filter: blur(4px);
+         transition: opacity 0.3s ease;
+       }
+
+       .modal-overlay.hidden {
+         opacity: 0;
+         pointer-events: none;
+       }
+
+       .modal-dialog {
+         background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+         border: 1px solid rgba(255,255,255,.12);
+         border-radius: 16px;
+         padding: 0;
+         max-width: 400px;
+         width: 90vw;
+         box-shadow: 0 20px 60px rgba(0,0,0,.5), 0 8px 25px rgba(0,0,0,.3);
+         transform: scale(0.9);
+         transition: transform 0.3s ease;
+       }
+
+       .modal-overlay:not(.hidden) .modal-dialog {
+         transform: scale(1);
+       }
+
+       .modal-header {
+         padding: 20px 24px 16px;
+         border-bottom: 1px solid rgba(255,255,255,.08);
+       }
+
+       .modal-header h3 {
+         margin: 0;
+         font-size: 18px;
+         font-weight: 600;
+         color: var(--accent);
+       }
+
+       .modal-content {
+         padding: 20px 24px;
+       }
+
+       .modal-content p {
+         margin: 0;
+         font-size: 15px;
+         line-height: 1.4;
+         color: var(--text);
+       }
+
+       .modal-actions {
+         padding: 16px 24px 20px;
+         display: flex;
+         gap: 12px;
+         justify-content: flex-end;
+       }
+
+       .modal-btn {
+         padding: 10px 20px;
+         border-radius: 10px;
+         font-size: 14px;
+         font-weight: 600;
+         border: 1px solid rgba(255,255,255,.14);
+         cursor: pointer;
+         transition: all 0.2s ease;
+         min-width: 80px;
+       }
+
+       .modal-btn.cancel {
+         background: rgba(255,255,255,.06);
+         color: var(--muted);
+       }
+
+       .modal-btn.cancel:hover {
+         background: rgba(255,255,255,.1);
+         color: var(--text);
+       }
+
+       .modal-btn.confirm {
+         background: linear-gradient(180deg, rgba(239,68,68,.25), rgba(239,68,68,.15));
+         color: #fca5a5;
+         border-color: rgba(239,68,68,.3);
+       }
+
+       .modal-btn.confirm:hover {
+         background: linear-gradient(180deg, rgba(239,68,68,.35), rgba(239,68,68,.25));
+         transform: translateY(-1px);
+       }
+
+       @media (max-width: 520px) {
+         .modal-dialog {
+           width: 95vw;
+           margin: 20px;
+         }
+         
+         .modal-actions {
+           flex-direction: column;
+         }
+         
+         .modal-btn {
+           width: 100%;
+         }
+       }
+ </style>
 </head><body>
   <div id=connDot class="bad"></div>
   
@@ -475,15 +589,30 @@ button:active { transform: translateY(1px) scale(.998); }
           
           
 
-         <div class="progress">
-           <div>Shortcuts: <span class="kbd">←/→</span> prev/next, <span class="kbd">Space</span> show</div>
-           <div class="kbd">Tip: Click the card to toggle the answer.</div>
+                   <div class="progress">
+            <div>Shortcuts: <span class="kbd">←/→</span> prev/next, <span class="kbd">Space</span> show</div>
+            <div class="kbd">Tip: Click the card to toggle the answer.</div>
+          </div>
+        </div>
+     </div>
+
+     <!-- Custom Confirmation Dialog -->
+     <div class="modal-overlay hidden" id="confirmModal">
+       <div class="modal-dialog">
+         <div class="modal-header">
+           <h3>Exit Quiz?</h3>
+         </div>
+         <div class="modal-content">
+           <p>Are you sure you want to exit this quiz and return to categories?</p>
+         </div>
+         <div class="modal-actions">
+           <button class="modal-btn cancel" id="cancelExit">Cancel</button>
+           <button class="modal-btn confirm" id="confirmExit">Exit</button>
          </div>
        </div>
-    </div>
-
-    
-  </div>
+     </div>
+     
+   </div>
 
 <script>
 // WebSocket connection
@@ -510,6 +639,11 @@ const btnToggle = document.getElementById('toggle');
 const btnExit = document.getElementById('exitBtn');
 const card = document.getElementById('card');
 const csvFileInput = document.getElementById('csvFile');
+
+// Modal elements
+const confirmModal = document.getElementById('confirmModal');
+const cancelExit = document.getElementById('cancelExit');
+const confirmExit = document.getElementById('confirmExit');
 
 // Game status elements in quiz mode
 const gameStatus = document.getElementById('gameStatus');
@@ -651,7 +785,7 @@ function initQuizMode() {
 btnNext.addEventListener('click', next);
 btnPrev.addEventListener('click', prev);
 btnToggle.addEventListener('click', toggleAnswer);
-btnExit.addEventListener('click', exitToCategories);
+btnExit.addEventListener('click', showExitConfirmation);
 
 // Secret long-press functionality for mobile
 let pressTimer;
@@ -711,16 +845,25 @@ function resetGame() {
   hideWinner();
 }
 
+function showExitConfirmation() {
+  confirmModal.classList.remove('hidden');
+}
+
+function hideExitConfirmation() {
+  confirmModal.classList.add('hidden');
+}
+
 function exitToCategories() {
-  if (confirm('Are you sure you want to exit this quiz and return to categories?')) {
-    // Reset game state
-    hideWinner();
-    aEl.classList.remove('show');
-    btnToggle.textContent = 'Show Answer';
-    
-    // Return to category selector
-    showCategorySelector();
-  }
+  // Reset game state
+  hideWinner();
+  aEl.classList.remove('show');
+  btnToggle.textContent = 'Show Answer';
+  
+  // Hide modal
+  hideExitConfirmation();
+  
+  // Return to category selector
+  showCategorySelector();
 }
 
 // WebSocket event handling
@@ -1105,6 +1248,24 @@ function startEditingName(nameElement, defaultName) {
     // This ensures the input is properly handled on mobile
   });
 }
+
+// Modal event listeners
+cancelExit.addEventListener('click', hideExitConfirmation);
+confirmExit.addEventListener('click', exitToCategories);
+
+// Close modal when clicking overlay
+confirmModal.addEventListener('click', function(e) {
+  if (e.target === confirmModal) {
+    hideExitConfirmation();
+  }
+});
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && !confirmModal.classList.contains('hidden')) {
+    hideExitConfirmation();
+  }
+});
 
 // Initialize quiz on load
 document.addEventListener('DOMContentLoaded', function() {
