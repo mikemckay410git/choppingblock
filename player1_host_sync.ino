@@ -113,6 +113,10 @@ bool gameActive = true;  // Start with game active
 String winner = "none";
 uint32_t player1HitTime = 0;
 uint32_t player2HitTime = 0;
+
+// Quiz action debouncing
+unsigned long lastQuizActionTime = 0;
+const unsigned long QUIZ_ACTION_DEBOUNCE_MS = 500; // 500ms debounce period
 // =======================================================
 
 // ===================== UI =====================
@@ -2233,29 +2237,36 @@ void loop(){
       Serial.println("Winner declared: Player 1");
     } else {
       // Only process quiz controls if game is NOT active
-      String quizAction = "";
-      if (r.x < 0.2f && r.y < 0.2f) {
-        // Top-left: Previous question
-        quizAction = "prev";
-        Serial.println("Quiz: Previous question");
-      } else if (r.x > 0.2f && r.y < 0.2f) {
-        // Top-right: Next question
-        quizAction = "next";
-        Serial.println("Quiz: Next question");
-      } else if (r.x < 0.2f && r.y > 0.2f) {
-        // Bottom-left: Toggle answer
-        quizAction = "toggle";
-        Serial.println("Quiz: Toggle answer");
-      } else if (r.x > 0.2f && r.y > 0.2f) {
-        // Bottom-right: Show answer
-        quizAction = "toggle";
-        Serial.println("Quiz: Show answer");
-      }
-      
-      // Send quiz action to web interface
-      if (quizAction != "") {
-        String quizMsg = "{\"quizAction\":\"" + quizAction + "\"}";
-        ws.broadcastTXT(quizMsg);
+      // Check debouncing to prevent multiple rapid actions
+      unsigned long currentTime = millis();
+      if (currentTime - lastQuizActionTime >= QUIZ_ACTION_DEBOUNCE_MS) {
+        String quizAction = "";
+        if (r.x < 0.2f && r.y < 0.2f) {
+          // Top-left: Previous question
+          quizAction = "prev";
+          Serial.println("Quiz: Previous question");
+        } else if (r.x > 0.2f && r.y < 0.2f) {
+          // Top-right: Next question
+          quizAction = "next";
+          Serial.println("Quiz: Next question");
+        } else if (r.x < 0.2f && r.y > 0.2f) {
+          // Bottom-left: Toggle answer
+          quizAction = "toggle";
+          Serial.println("Quiz: Toggle answer");
+        } else if (r.x > 0.2f && r.y > 0.2f) {
+          // Bottom-right: Show answer
+          quizAction = "toggle";
+          Serial.println("Quiz: Show answer");
+        }
+        
+        // Send quiz action to web interface
+        if (quizAction != "") {
+          lastQuizActionTime = currentTime; // Update debounce timer
+          String quizMsg = "{\"quizAction\":\"" + quizAction + "\"}";
+          ws.broadcastTXT(quizMsg);
+        }
+      } else {
+        Serial.println("Quiz action ignored due to debouncing");
       }
     }
   } else {
