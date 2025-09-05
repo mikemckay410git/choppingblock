@@ -2236,38 +2236,8 @@ void loop(){
       ws.broadcastTXT(winMsg);
       Serial.println("Winner declared: Player 1");
     } else {
-      // Only process quiz controls if game is NOT active
-      // Check debouncing to prevent multiple rapid actions
-      unsigned long currentTime = millis();
-      if (currentTime - lastQuizActionTime >= QUIZ_ACTION_DEBOUNCE_MS) {
-        String quizAction = "";
-        if (r.x < 0.2f && r.y < 0.2f) {
-          // Top-left: Previous question
-          quizAction = "prev";
-          Serial.println("Quiz: Previous question");
-        } else if (r.x > 0.2f && r.y < 0.2f) {
-          // Top-right: Next question
-          quizAction = "next";
-          Serial.println("Quiz: Next question");
-        } else if (r.x < 0.2f && r.y > 0.2f) {
-          // Bottom-left: Toggle answer
-          quizAction = "toggle";
-          Serial.println("Quiz: Toggle answer");
-        } else if (r.x > 0.2f && r.y > 0.2f) {
-          // Bottom-right: Show answer
-          quizAction = "toggle";
-          Serial.println("Quiz: Show answer");
-        }
-        
-        // Send quiz action to web interface
-        if (quizAction != "") {
-          lastQuizActionTime = currentTime; // Update debounce timer
-          String quizMsg = "{\"quizAction\":\"" + quizAction + "\"}";
-          ws.broadcastTXT(quizMsg);
-        }
-      } else {
-        Serial.println("Quiz action ignored due to debouncing");
-      }
+      // Do not map toolboard hits to quiz actions.
+      // Questions should advance only via UI button or when a point is awarded.
     }
   } else {
     // Debug output to see what's happening
