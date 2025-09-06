@@ -315,7 +315,6 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       // Heartbeat - just update connection status
       Serial.println("Player 1 heartbeat received");
     } else if (player1Data.action == 2) {
-
       // Game state update
       gameMode = player1Data.gameMode;
       p1ColorIndex = player1Data.p1ColorIndex;
@@ -326,24 +325,20 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       tugBoundary = player1Data.tugBoundary;
       p1RacePos = player1Data.p1RacePos;
       p2RacePos = player1Data.p2RacePos;
-
-      // Only trigger celebration when explicitly requested and with a valid winner
-      if (player1Data.celebrating && (player1Data.winner == 1 || player1Data.winner == 2)) {
-        startCelebration(player1Data.winner == 1);
-        celebrating = true;
+      celebrating = player1Data.celebrating;
+      
+      // Handle winner celebration (only when explicitly celebrating)
+      if (player1Data.celebrating && player1Data.winner == 1) {
+        startCelebration(true); celebrating = true; // Player 1 wins
+      } else if (player1Data.celebrating && player1Data.winner == 2) {
+        startCelebration(false); celebrating = true; // Player 2 wins
       }
-
-      Serial.printf("Game state update: mode=%d, p1Pos=%d, p2Pos=%d, winner=%d\n",
-                    gameMode, p1Pos, p2Pos, player1Data.winner);
-
-      // Only repaint if not celebrating
-      if (!(celActive || celebrating)) {
-        paintProgress();
-      }
-
-}
- else if (player1Data.action == 3) {
-
+      
+      Serial.printf("Game state update: mode=%d, p1Pos=%d, p2Pos=%d, winner=%d\n", 
+                   gameMode, p1Pos, p2Pos, player1Data.winner);
+      if (!(celActive || celebrating)) { paintProgress(); }
+      
+    } else if (player1Data.action == 3) {
       // Score update
       Serial.println("Score update received");
       // Update position variables from received data
@@ -353,17 +348,16 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       tugBoundary = player1Data.tugBoundary;
       p1RacePos = player1Data.p1RacePos;
       p2RacePos = player1Data.p2RacePos;
-
+      // Do NOT update celebrating or winner for score updates - these are just position changes
+      Serial.printf("Updated positions: p1Pos=%d, p2Pos=%d, nextLedPos=%d, tugBoundary=%d, p1RacePos=%d, p2RacePos=%d\n",
+                   p1Pos, p2Pos, nextLedPosition, tugBoundary, p1RacePos, p2RacePos);
+      Serial.printf("Current game state: mode=%d, celebrating=%s\n", gameMode, celebrating ? "true" : "false");
+      if (!(celActive || celebrating)) { paintProgress(); }
+      
       // Update the last score update time to prevent connection status from interfering
       lastScoreUpdate = millis();
-
-      // Only repaint if not celebrating
-      if (!(celActive || celebrating)) {
-        paintProgress();
-      }
-
-}
- else if (player1Data.action == 4) {
+      
+    } else if (player1Data.action == 4) {
       // Mode change
       gameMode = player1Data.gameMode;
       p1ColorIndex = player1Data.p1ColorIndex;
@@ -563,10 +557,7 @@ void loop(){
       paintProgress();
     }
   }
-  
-}
-  }
-  
+
   // Run demo mode when not connected
   runDemoMode();
 
@@ -575,7 +566,7 @@ void loop(){
     player1Connected = false;
     player1MacLearned = false; // Reset MAC learning to force rediscovery
     Serial.println("Player 1 connection lost - resetting discovery");
-    // keep last shown LEDs; do not clear on disconnect
+    // keep last shown LEDs; status blink will overlay on the corners
   }
 
   // Send heartbeat to Player 1 (only if we have learned the MAC address)
@@ -595,7 +586,8 @@ void loop(){
   if (!player1Connected) {
     // Show connection status with a slow blink - but don't interfere with recent updates
     static unsigned long lastBlink = 0;
-// Only show connection status if we haven't had a recent score update
+    
+    // Only show connection status if we haven't had a recent score update and no celebration
     if ((millis() - lastScoreUpdate > 5000) && !(celActive || celebrating)) { // 5 second grace period
       if (millis() - lastBlink >= 1000) {
         static bool blinkState = false;
