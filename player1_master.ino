@@ -2,6 +2,7 @@
 #include <WebServer.h>
 #include <WebSocketsServer.h>
 #include <esp_now.h>
+#include <esp_wifi.h>
 #include <Preferences.h>
 #include <ArduinoJson.h>
 
@@ -2279,9 +2280,11 @@ void setup(){
   // Add Lightboard peer with known MAC address
   esp_now_peer_info_t lightboardPeerInfo = {};
   memcpy(lightboardPeerInfo.peer_addr, lightboardAddress, 6);
-  lightboardPeerInfo.channel = 0; // follow current channel
+  lightboardPeerInfo.channel = 1; // follow current channel
   lightboardPeerInfo.encrypt = false;
-  if (esp_now_add_peer(&lightboardPeerInfo) == ESP_OK) {
+  
+  lightboardPeerInfo.ifidx = WIFI_IF_AP;
+if (esp_now_add_peer(&lightboardPeerInfo) == ESP_OK) {
     Serial.println("Lightboard peer added successfully");
     lightboardMacLearned = true; // We already know the MAC address
   } else {

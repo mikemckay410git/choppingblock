@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <esp_now.h>
+#include <esp_wifi.h>
 #include <Adafruit_NeoPixel.h>
 
 // ---- LED strip config ----
@@ -13,8 +14,16 @@ const int CENTER_LEFT  = (NUM_LEDS / 2) - 1; // 18
 const int CENTER_RIGHT = (NUM_LEDS / 2);     // 19
 
 // ===================== ESP-NOW Configuration =====================
+
+// Force STA interface to a specific channel so ESP-NOW matches the host AP
+static void forceStaChannel(uint8_t ch){
+  esp_wifi_set_promiscuous(true);
+  esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
+  esp_wifi_set_promiscuous(false);
+}
+
 // Player 1 MAC address (hardcoded for reliability)
-uint8_t player1Address[] = {0x78, 0x1C, 0x3C, 0xB8, 0xD5, 0xA8}; // Player 1 STA MAC
+uint8_t player1Address[] = {0x78, 0x1C, 0x3C, 0xB8, 0xD5, 0xA9}; // Player 1 AP MAC
 
 typedef struct struct_lightboard_message {
   uint8_t  deviceId;     // 3=Lightboard
@@ -79,6 +88,12 @@ const int NUM_COLORS = sizeof(availableColors) / sizeof(availableColors[0]);
 // Current player colors (indices into availableColors array)
 int p1ColorIndex = 0; // Red (default)
 int p2ColorIndex = 1; // Blue (default)
+
+// Prototypes to placate Arduino preprocessor with custom return types
+PlayerColor getP1Color();
+PlayerColor getP2Color();
+uint32_t getP1ColorValue();
+uint32_t getP2ColorValue();
 
 // ==================== Celebration Manager ====================
 enum CelebrationType : uint8_t {
@@ -274,7 +289,7 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       esp_now_del_peer(player1Address);
       esp_now_peer_info_t p = {};
       memcpy(p.peer_addr, player1Address, 6);
-      p.channel = 0;
+      p.channel = 1;
       p.encrypt = false;
       if (esp_now_add_peer(&p) == ESP_OK) {
         player1MacLearned = true;
@@ -347,7 +362,9 @@ void setup(){
   
   // Display MAC address FIRST and prominently
   WiFi.mode(WIFI_STA);
-  delay(100);
+  delay(50);
+  forceStaChannel(1);
+  Serial.println("Forced STA channel to 1");
   String macStr = WiFi.macAddress();
   Serial.println();
   Serial.println("*** LIGHTBOARD MAC ADDRESS ***");
@@ -380,13 +397,7 @@ void setup(){
   WiFi.disconnect(); // Ensure clean state
   delay(100);
   
-  // Set WiFi channel to match Player 1 (channel 1)
-  WiFi.begin("", ""); // Connect to empty SSID to set channel
-  WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
-  WiFi.setChannel(1); // Set to channel 1 to match Player 1 AP
-  delay(100);
-  WiFi.disconnect();
-  
+    // (removed) rely on forceStaChannel(1) before esp_now_init
   Serial.printf("WiFi Channel set to: %d\r\n", WiFi.channel());
 
   // ESP-NOW setup
@@ -401,11 +412,16 @@ void setup(){
   // Add Player 1 peer with known MAC address
   esp_now_peer_info_t peerInfo = {};
   memcpy(peerInfo.peer_addr, player1Address, 6);
-  peerInfo.channel = 0; // follow current channel
+  peerInfo.channel = 1; // follow current channel
   peerInfo.encrypt = false;
-  if (esp_now_add_peer(&peerInfo) == ESP_OK) {
+  
+  peerInfo.ifidx = WIFI_IF_STA;
+if (esp_now_add_peer(&peerInfo) == ESP_OK) {
     Serial.println("Player 1 peer added successfully");
-  } else {
+  
+    player1MacLearned = true;
+    Serial.println("Connection established! Heartbeats will now be sent.");
+} else {
     Serial.println("Failed to add Player 1 peer");
   }
 
