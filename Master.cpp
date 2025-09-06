@@ -25,7 +25,11 @@ int p1Pos = -1;
 int p2Pos = NUM_LEDS;
 bool celebrating = false;
 
-// Game modes: 1=Head to Head, 2=Race to the End, 3=Get Home
+// Mode 4: Score Order tracking
+int nextLedPosition = 0;  // Next LED position to fill (0 to NUM_LEDS-1)
+int scoringSequence[NUM_LEDS]; // Array to track who scored at each position (1=Player1, 2=Player2)
+
+// Game modes: 1=Territory, 2=Race to the End, 3=Get Home, 4=Score Order
 int gameMode = 1;
 
 // ---- HTML page ----
@@ -53,9 +57,10 @@ const char INDEX_HTML[] PROGMEM = R"HTML(
 <body>
   <div class="mode-selector">
     <select id="gameMode">
-      <option value="1">Head to Head</option>
+      <option value="1">Territory</option>
       <option value="2">Race to the End</option>
       <option value="3">Get Home</option>
+      <option value="4">Score Order</option>
     </select>
   </div>
   <div class="wrap">
@@ -131,8 +136,18 @@ void paintProgress() {
         strip.setPixelColor(i, col(0,80,255));
       }
     }
+  } else if (gameMode == 4) {
+    // Score Order: fill LEDs left to right based on exact scoring sequence
+    // Player 1 LEDs are red, Player 2 LEDs are blue
+    for (int i = 0; i < nextLedPosition; i++) {
+      if (scoringSequence[i] == 1) {
+        strip.setPixelColor(i, col(255,0,0)); // Red for Player 1
+      } else if (scoringSequence[i] == 2) {
+        strip.setPixelColor(i, col(0,80,255)); // Blue for Player 2
+      }
+    }
   } else {
-    // Head to Head trails
+    // Territory trails
     for (int i=0;i<=p1Pos && i<NUM_LEDS; i++) strip.setPixelColor(i, col(255,0,0));
     for (int i=NUM_LEDS-1; i>=p2Pos && i>=0; i--) strip.setPixelColor(i, col(0,80,255));
   }
@@ -141,7 +156,7 @@ void paintProgress() {
 
 void resetGame() {
   switch(gameMode) {
-    case 1: // Head to Head
+    case 1: // Territory
     case 2: // Race
       p1Pos = -1;
       p2Pos = NUM_LEDS;
@@ -149,6 +164,12 @@ void resetGame() {
     case 3: // Get Home
       p1Pos = CENTER_LEFT + 1;  // 19 → first click moves to 18
       p2Pos = CENTER_RIGHT - 1; // 18 → first click moves to 19
+      break;
+    case 4: // Score Order
+      nextLedPosition = 0;
+      for (int i = 0; i < NUM_LEDS; i++) {
+        scoringSequence[i] = 0; // 0 = empty, 1 = Player 1, 2 = Player 2
+      }
       break;
   }
   clearStrip();
@@ -200,6 +221,18 @@ void checkWinConditions() {
       if (p1Pos <= 0)            { gameOver = true; player1Wins = true; }
       else if (p2Pos >= NUM_LEDS - 1) { gameOver = true; player1Wins = false; }
       break;
+    case 4:
+      if (nextLedPosition >= NUM_LEDS) {
+        gameOver = true;
+        // Count actual scores from the sequence
+        int p1Count = 0, p2Count = 0;
+        for (int i = 0; i < NUM_LEDS; i++) {
+          if (scoringSequence[i] == 1) p1Count++;
+          else if (scoringSequence[i] == 2) p2Count++;
+        }
+        player1Wins = (p1Count > p2Count);
+      }
+      break;
   }
   if (gameOver) celebrate(player1Wins);
 }
@@ -214,11 +247,25 @@ void handleP1() {
     else if (p1Pos < NUM_LEDS-1) p1Pos++;
   } else if (gameMode == 3) {
     if (p1Pos > 0) p1Pos--;
+  } else if (gameMode == 4) {
+    if (nextLedPosition < NUM_LEDS) {
+      scoringSequence[nextLedPosition] = 1; // Record Player 1 scored at this position
+      nextLedPosition++;
+    }
   } else {
     if (p1Pos < NUM_LEDS-1) p1Pos++;
   }
   paintProgress(); checkWinConditions();
-  server.send(200, "text/plain", String("P1 at ") + p1Pos);
+  if (gameMode == 4) {
+    // Count Player 1's current score
+    int p1Count = 0;
+    for (int i = 0; i < nextLedPosition; i++) {
+      if (scoringSequence[i] == 1) p1Count++;
+    }
+    server.send(200, "text/plain", String("P1 scored! Total: ") + p1Count);
+  } else {
+    server.send(200, "text/plain", String("P1 at ") + p1Pos);
+  }
 }
 
 void handleP2() {
@@ -228,17 +275,31 @@ void handleP2() {
     else if (p2Pos > 0) p2Pos--;
   } else if (gameMode == 3) {
     if (p2Pos < NUM_LEDS-1) p2Pos++;
+  } else if (gameMode == 4) {
+    if (nextLedPosition < NUM_LEDS) {
+      scoringSequence[nextLedPosition] = 2; // Record Player 2 scored at this position
+      nextLedPosition++;
+    }
   } else {
     if (p2Pos > 0) p2Pos--;
   }
   paintProgress(); checkWinConditions();
-  server.send(200, "text/plain", String("P2 at ") + p2Pos);
+  if (gameMode == 4) {
+    // Count Player 2's current score
+    int p2Count = 0;
+    for (int i = 0; i < nextLedPosition; i++) {
+      if (scoringSequence[i] == 2) p2Count++;
+    }
+    server.send(200, "text/plain", String("P2 scored! Total: ") + p2Count);
+  } else {
+    server.send(200, "text/plain", String("P2 at ") + p2Pos);
+  }
 }
 
 void handleMode() {
   if (server.hasArg("mode")) {
     int newMode = server.arg("mode").toInt();
-    if (newMode >= 1 && newMode <= 3) {
+    if (newMode >= 1 && newMode <= 4) {
       gameMode = newMode;
       resetGame();
       server.send(200, "text/plain", "Mode " + String(gameMode) + " set");
