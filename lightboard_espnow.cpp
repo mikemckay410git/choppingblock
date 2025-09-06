@@ -259,6 +259,7 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 }
 
 void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
+  Serial.printf("ESP-NOW message received: len=%d, expected=%d\n", len, sizeof(struct_lightboard_message));
   if (len != sizeof(struct_lightboard_message)) return;
   
   memcpy(&player1Data, data, sizeof(player1Data));
@@ -278,6 +279,7 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       if (esp_now_add_peer(&p) == ESP_OK) {
         player1MacLearned = true;
         Serial.println("Player 1 peer added after discovery");
+        Serial.println("Connection established! Heartbeats will now be sent.");
       } else {
         Serial.println("Failed to add discovered Player 1 peer");
       }
@@ -336,9 +338,36 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
 // ===================== Setup =====================
 void setup(){
   Serial.begin(115200);
-  delay(50);
+  delay(1000); // Give serial time to initialize
+  
   Serial.println();
-  Serial.println(F("=== Lightboard ESP-NOW Module ==="));
+  Serial.println("==========================================");
+  Serial.println("=== LIGHTBOARD ESP-NOW MODULE ===");
+  Serial.println("==========================================");
+  
+  // Display MAC address FIRST and prominently
+  WiFi.mode(WIFI_STA);
+  delay(100);
+  String macStr = WiFi.macAddress();
+  Serial.println();
+  Serial.println("*** LIGHTBOARD MAC ADDRESS ***");
+  Serial.printf("STA MAC: %s\r\n", macStr.c_str());
+  Serial.printf("WiFi Channel: %d\r\n", WiFi.channel());
+  Serial.println("===============================");
+  
+  // Convert MAC address to proper format for player1_host_sync.ino
+  macStr.replace(":", "");
+  Serial.println("COPY THIS LINE TO player1_host_sync.ino:");
+  Serial.print("uint8_t lightboardAddress[] = {");
+  for (int i = 0; i < 6; i++) {
+    String byteStr = macStr.substring(i * 2, i * 2 + 2);
+    Serial.print("0x" + byteStr);
+    if (i < 5) Serial.print(", ");
+  }
+  Serial.println("}; // Lightboard STA MAC");
+  Serial.println("===============================");
+  Serial.println();
+  
   Serial.printf("LED Strip: %d LEDs on pin %d\r\n", NUM_LEDS, LED_PIN);
 
   // Initialize LED strip
@@ -348,12 +377,17 @@ void setup(){
   randomSeed((uint32_t)esp_timer_get_time());
 
   // Wi-Fi setup for ESP-NOW
-  WiFi.mode(WIFI_STA);
   WiFi.disconnect(); // Ensure clean state
-  Serial.printf("STA MAC: %s\r\n", WiFi.macAddress().c_str());
-  Serial.println("=== Lightboard MAC Addresses ===");
-  Serial.printf("STA MAC: %s\r\n", WiFi.macAddress().c_str());
-  Serial.println("==================================");
+  delay(100);
+  
+  // Set WiFi channel to match Player 1 (channel 1)
+  WiFi.begin("", ""); // Connect to empty SSID to set channel
+  WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
+  WiFi.setChannel(1); // Set to channel 1 to match Player 1 AP
+  delay(100);
+  WiFi.disconnect();
+  
+  Serial.printf("WiFi Channel set to: %d\r\n", WiFi.channel());
 
   // ESP-NOW setup
   if (esp_now_init() != ESP_OK) {
@@ -381,6 +415,8 @@ void setup(){
   resetGame();
   
   Serial.println("Lightboard ready - waiting for Player 1 connection");
+  Serial.println("Make sure Player 1 is running and has the correct lightboard MAC address");
+  Serial.println("The lightboard will automatically discover Player 1 when it sends a message");
 }
 
 // ===================== Demo Mode =====================
@@ -493,12 +529,16 @@ void loop(){
     clearStrip(); // Clear LEDs when disconnected
   }
 
-  // Send heartbeat to Player 1
+  // Send heartbeat to Player 1 (only if we have learned the MAC address)
   static unsigned long lastHeartbeatSend = 0;
   if (millis() - lastHeartbeatSend >= 1000) {
-    myData.action = 1; // heartbeat
-    esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
-    Serial.println("Sent heartbeat to Player 1");
+    if (player1MacLearned) {
+      myData.action = 1; // heartbeat
+      esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
+      Serial.println("Sent heartbeat to Player 1");
+    } else {
+      Serial.println("Waiting for Player 1 connection...");
+    }
     lastHeartbeatSend = millis();
   }
 

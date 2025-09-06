@@ -46,7 +46,7 @@ static const char* AP_PASS = "12345678";
 // Player 2 MAC address (hardcoded for reliability)
 uint8_t player2Address[] = {0x6C, 0xC8, 0x40, 0x4E, 0xEC, 0x2C}; // Player 2 STA MAC
 // Lightboard MAC address (will be learned dynamically)
-uint8_t lightboardAddress[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; // Placeholder
+uint8_t lightboardAddress[] = {0x80, 0xF3, 0xDA, 0x5E, 0x14, 0xC8}; // Lightboard STA MAC
 const uint8_t ESPNOW_BROADCAST_ADDR[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
 typedef struct struct_message {
@@ -106,6 +106,8 @@ int32_t g_activeWsClient = -1; // enforce single WebSocket client
 void resetGame();
 void determineWinner();
 void syncClock();
+void sendLightboardUpdate(uint8_t action);
+void updateLightboardGameState();
 
 volatile unsigned long g_firstTime[SENSOR_COUNT]; // first arrival micros() per sensor
 volatile uint32_t      g_hitMask = 0;             // bit i set when sensor i latched first arrival
