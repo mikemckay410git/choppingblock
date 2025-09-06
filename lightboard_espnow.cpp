@@ -332,6 +332,15 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
     } else if (player1Data.action == 3) {
       // Score update
       Serial.println("Score update received");
+      // Update position variables from received data
+      p1Pos = player1Data.p1Pos;
+      p2Pos = player1Data.p2Pos;
+      nextLedPosition = player1Data.nextLedPos;
+      tugBoundary = player1Data.tugBoundary;
+      p1RacePos = player1Data.p1RacePos;
+      p2RacePos = player1Data.p2RacePos;
+      Serial.printf("Updated positions: p1Pos=%d, p2Pos=%d, nextLedPos=%d, tugBoundary=%d, p1RacePos=%d, p2RacePos=%d\n",
+                   p1Pos, p2Pos, nextLedPosition, tugBoundary, p1RacePos, p2RacePos);
       paintProgress();
       
     } else if (player1Data.action == 4) {

@@ -2067,7 +2067,8 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
 
 // ===================== Lightboard Communication =====================
 void sendLightboardUpdate(uint8_t action) {
-  if (!lightboardConnected) return;
+  // Always try to send updates - connection status might not be accurate
+  // The lightboard will respond if it's connected
   
   lightboardData.deviceId = 1; // Player 1
   lightboardData.action = action;
@@ -2083,8 +2084,9 @@ void sendLightboardUpdate(uint8_t action) {
   lightboardData.celebrating = lightboardCelebrating;
   lightboardData.winner = lightboardWinner;
   
-  esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
-  Serial.printf("Sent lightboard update: action=%d, mode=%d\n", action, lightboardGameMode);
+  esp_err_t result = esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
+  Serial.printf("Sent lightboard update: action=%d, mode=%d, result=%s\n", 
+                action, lightboardGameMode, (result == ESP_OK) ? "SUCCESS" : "FAILED");
 }
 
 void updateLightboardGameState() {
@@ -2145,8 +2147,10 @@ void updateLightboardScores(int p1Score, int p2Score) {
   }
   
   // Send score update to lightboard
+  Serial.printf("Sending score update to lightboard: P1=%d, P2=%d, mode=%d, connected=%s\n", 
+                p1Score, p2Score, lightboardGameMode, lightboardConnected ? "true" : "false");
   sendLightboardUpdate(3); // score-update action
-  Serial.printf("Updated lightboard scores: P1=%d, P2=%d, mode=%d\n", p1Score, p2Score, lightboardGameMode);
+  Serial.printf("Score update sent to lightboard\n");
 }
 
 // ===================== Game Logic =====================
@@ -2264,6 +2268,7 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
           }
         } else if (message.indexOf("scoreUpdate") != -1) {
           // Handle score update from web interface
+          Serial.printf("Received scoreUpdate message: %s\n", message.c_str());
           DynamicJsonDocument doc(1024);
           deserializeJson(doc, message);
           if (doc.containsKey("player1Score") && doc.containsKey("player2Score")) {
@@ -2271,6 +2276,8 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
             int p2Score = doc["player2Score"];
             Serial.printf("Score update received: P1=%d, P2=%d\n", p1Score, p2Score);
             updateLightboardScores(p1Score, p2Score);
+          } else {
+            Serial.println("Score update message missing required fields");
           }
         } else if (message.indexOf("mode") != -1) {
           // Handle mode change from web interface
