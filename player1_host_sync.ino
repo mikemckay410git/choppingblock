@@ -3,6 +3,7 @@
 #include <WebSocketsServer.h>
 #include <esp_now.h>
 #include <Preferences.h>
+#include <ArduinoJson.h>
 
 #define LED_PIN 2
 
@@ -44,6 +45,8 @@ static const char* AP_PASS = "12345678";
 // ===================== ESP-NOW Configuration =====================
 // Player 2 MAC address (hardcoded for reliability)
 uint8_t player2Address[] = {0x6C, 0xC8, 0x40, 0x4E, 0xEC, 0x2C}; // Player 2 STA MAC
+// Lightboard MAC address (will be learned dynamically)
+uint8_t lightboardAddress[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; // Placeholder
 const uint8_t ESPNOW_BROADCAST_ADDR[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
 typedef struct struct_message {
@@ -55,14 +58,36 @@ typedef struct struct_message {
   uint32_t roundTripTime; // for latency measurement
 } struct_message;
 
+typedef struct struct_lightboard_message {
+  uint8_t  deviceId;     // 1=Player1, 3=Lightboard
+  uint8_t  action;       // 1=heartbeat, 2=game-state, 3=score-update, 4=mode-change, 5=reset
+  uint8_t  gameMode;     // 1-6 (Territory, Swap Sides, Split Scoring, Score Order, Race, Tug O War)
+  uint8_t  p1ColorIndex; // Player 1 color index
+  uint8_t  p2ColorIndex; // Player 2 color index
+  int8_t   p1Pos;        // Player 1 position (-1 to NUM_LEDS)
+  int8_t   p2Pos;        // Player 2 position (-1 to NUM_LEDS)
+  uint8_t  nextLedPos;   // For Score Order mode
+  uint8_t  tugBoundary;  // For Tug O War mode
+  uint8_t  p1RacePos;    // For Race mode
+  uint8_t  p2RacePos;    // For Race mode
+  uint8_t  celebrating;  // Celebration state
+  uint8_t  winner;       // 0=none, 1=Player1, 2=Player2
+} struct_lightboard_message;
+
 struct_message myData;
 struct_message player2Data;
+struct_lightboard_message lightboardData;
 
 // Connection tracking
 bool player2Connected = false;
 unsigned long lastHeartbeat = 0;
 const unsigned long heartbeatTimeout = 2000; // 2 seconds
 bool player2MacLearned = false;
+
+// Lightboard connection tracking
+bool lightboardConnected = false;
+unsigned long lastLightboardHeartbeat = 0;
+bool lightboardMacLearned = false;
 
 // Clock synchronization
 bool clockSynced = false;
@@ -113,6 +138,19 @@ bool gameActive = true;  // Start with game active
 String winner = "none";
 uint32_t player1HitTime = 0;
 uint32_t player2HitTime = 0;
+
+// Lightboard game state (for LED strip display)
+int lightboardGameMode = 1; // Default to Territory mode
+int lightboardP1ColorIndex = 0; // Red
+int lightboardP2ColorIndex = 1; // Blue
+int lightboardP1Pos = -1;
+int lightboardP2Pos = 38; // NUM_LEDS
+int lightboardNextLedPos = 0;
+int lightboardTugBoundary = 18; // CENTER_LEFT
+int lightboardP1RacePos = -1;
+int lightboardP2RacePos = -1;
+bool lightboardCelebrating = false;
+uint8_t lightboardWinner = 0; // 0=none, 1=Player1, 2=Player2
 
 // Quiz action debouncing
 unsigned long lastQuizActionTime = 0;
@@ -632,6 +670,20 @@ button:active { transform: translateY(1px) scale(.998); }
          <div class="reset-hint">This will clear all loaded categories, scores, and player names</div>
        </div>
 
+       <!-- Lightboard Game Mode Selector -->
+       <div class="file-input" id="lightboardModeSection">
+         <label for="lightboardMode">🎮 Lightboard Game Mode</label>
+         <select id="lightboardMode" style="margin-left: 8px;">
+           <option value="1">Territory</option>
+           <option value="2">Swap Sides</option>
+           <option value="3">Split Scoring</option>
+           <option value="4">Score Order</option>
+           <option value="5">Race</option>
+           <option value="6">Tug O War</option>
+         </select>
+         <div class="hint">Select game mode for lightboard display</div>
+       </div>
+
        <!-- File Upload Section -->
        <div class="file-input" id="fileInputSection">
          <label for="csvFile">📁 Load CSV Files</label>
@@ -779,6 +831,9 @@ const player1Name = document.querySelector('#player1Tile .player-name');
 const player2Name = document.querySelector('#player2Tile .player-name');
 const player1ScoreEl = document.getElementById('player1Score');
 const player2ScoreEl = document.getElementById('player2Score');
+
+// Lightboard elements
+const lightboardModeSelect = document.getElementById('lightboardMode');
 
 // Quiz state
 let QA = [];
@@ -1190,6 +1245,10 @@ ws.onmessage=e=>{
       connDot.className='bad';
       hideWinner();
     }
+  }
+  if(d.lightboardConnected!==undefined){
+    // Update lightboard connection status in UI if needed
+    console.log('Lightboard connected:', d.lightboardConnected);
   }
      if(d.winner!==undefined){
      if(d.winner&&d.winner!=='none'){
@@ -1706,6 +1765,18 @@ function restoreQuizState() {
   }
 }
 
+// Lightboard mode change handler
+lightboardModeSelect.addEventListener('change', function() {
+  const mode = parseInt(lightboardModeSelect.value);
+  console.log('Lightboard mode changed to:', mode);
+  
+  // Send mode change to server via WebSocket
+  ws.send(JSON.stringify({
+    action: 'lightboardMode',
+    mode: mode
+  }));
+});
+
 // Initialize quiz on load
 document.addEventListener('DOMContentLoaded', function() {
   initQuiz();
@@ -1883,11 +1954,12 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 }
 
 void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
-  if (len != sizeof(struct_message)) return;
-  
-  memcpy(&player2Data, data, sizeof(player2Data));
-
-  if (player2Data.playerId == 2) {
+  // Handle different message types based on length
+  if (len == sizeof(struct_message)) {
+    // Player 2 message
+    memcpy(&player2Data, data, sizeof(player2Data));
+    
+    if (player2Data.playerId == 2) {
     // Learn Player 2 MAC dynamically to avoid manual entry issues
     if (info && !player2MacLearned) {
       memcpy(player2Address, info->src_addr, 6);
@@ -1927,6 +1999,9 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
         String j = "{\"winner\":\"" + winner + "\"}";
         ws.broadcastTXT(j);
         Serial.println("Winner declared: Player 2");
+        
+        // Update lightboard
+        updateLightboardGameState();
       }
     } else if (player2Data.action == 3) {
       // Reset request from Player 2
@@ -1944,7 +2019,78 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       
       Serial.printf("Clock sync: offset=%ld us, roundTrip=%lu us\n", clockOffset, roundTrip);
     }
+    }
+  } else if (len == sizeof(struct_lightboard_message)) {
+    // Lightboard message
+    memcpy(&lightboardData, data, sizeof(lightboardData));
+    
+    if (lightboardData.deviceId == 3) { // Lightboard
+      // Learn Lightboard MAC dynamically
+      if (info && !lightboardMacLearned) {
+        memcpy(lightboardAddress, info->src_addr, 6);
+        char macStr[18];
+        sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", lightboardAddress[0],lightboardAddress[1],lightboardAddress[2],lightboardAddress[3],lightboardAddress[4],lightboardAddress[5]);
+        Serial.printf("Discovered Lightboard MAC: %s\r\n", macStr);
+        esp_now_del_peer(lightboardAddress);
+        esp_now_peer_info_t p = {};
+        memcpy(p.peer_addr, lightboardAddress, 6);
+        p.channel = 0;
+        p.encrypt = false;
+        if (esp_now_add_peer(&p) == ESP_OK) {
+          lightboardMacLearned = true;
+          Serial.println("Lightboard peer added after discovery");
+        } else {
+          Serial.println("Failed to add discovered Lightboard peer");
+        }
+      }
+      lightboardConnected = true;
+      lastLightboardHeartbeat = millis();
+
+      if (lightboardData.action == 1) {
+        // Heartbeat - just update connection status
+        Serial.println("Lightboard heartbeat received");
+      }
+    }
   }
+}
+
+// ===================== Lightboard Communication =====================
+void sendLightboardUpdate(uint8_t action) {
+  if (!lightboardConnected) return;
+  
+  lightboardData.deviceId = 1; // Player 1
+  lightboardData.action = action;
+  lightboardData.gameMode = lightboardGameMode;
+  lightboardData.p1ColorIndex = lightboardP1ColorIndex;
+  lightboardData.p2ColorIndex = lightboardP2ColorIndex;
+  lightboardData.p1Pos = lightboardP1Pos;
+  lightboardData.p2Pos = lightboardP2Pos;
+  lightboardData.nextLedPos = lightboardNextLedPos;
+  lightboardData.tugBoundary = lightboardTugBoundary;
+  lightboardData.p1RacePos = lightboardP1RacePos;
+  lightboardData.p2RacePos = lightboardP2RacePos;
+  lightboardData.celebrating = lightboardCelebrating;
+  lightboardData.winner = lightboardWinner;
+  
+  esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
+  Serial.printf("Sent lightboard update: action=%d, mode=%d\n", action, lightboardGameMode);
+}
+
+void updateLightboardGameState() {
+  // Update lightboard state based on current game state
+  if (winner == "Player 1") {
+    lightboardWinner = 1;
+    lightboardCelebrating = true;
+  } else if (winner == "Player 2") {
+    lightboardWinner = 2;
+    lightboardCelebrating = true;
+  } else {
+    lightboardWinner = 0;
+    lightboardCelebrating = false;
+  }
+  
+  // Send game state update to lightboard
+  sendLightboardUpdate(2); // game-state action
 }
 
 // ===================== Game Logic =====================
@@ -1967,6 +2113,9 @@ void determineWinner() {
     // Broadcast winner to web interface
     String j = "{\"winner\":\"" + winner + "\"}";
     ws.broadcastTXT(j);
+    
+    // Update lightboard
+    updateLightboardGameState();
   }
 }
 
@@ -1976,9 +2125,22 @@ void resetGame() {
   player2HitTime = 0;
   gameActive = true;
   
+  // Reset lightboard state
+  lightboardWinner = 0;
+  lightboardCelebrating = false;
+  lightboardP1Pos = -1;
+  lightboardP2Pos = 38;
+  lightboardNextLedPos = 0;
+  lightboardTugBoundary = 18;
+  lightboardP1RacePos = -1;
+  lightboardP2RacePos = -1;
+  
   // Send reset to Player 2
   myData.action = 3; // reset request
   esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
+  
+  // Send reset to lightboard
+  sendLightboardUpdate(5); // reset action
   
   // Broadcast reset to web interface
   String j = "{\"winner\":\"none\"}";
@@ -2022,6 +2184,7 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
       // Send initial state to new client
       j = "{";
       j += "\"connected\":" + String(player2Connected ? "true" : "false") + ",";
+      j += "\"lightboardConnected\":" + String(lightboardConnected ? "true" : "false") + ",";
       j += "\"winner\":\"" + winner + "\"";
       j += "}";
       ws.sendTXT(num, j);
@@ -2031,6 +2194,18 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
         String message = String((char*)payload);
         if (message.indexOf("reset") != -1) {
           resetGame();
+        } else if (message.indexOf("lightboardMode") != -1) {
+          // Handle lightboard mode change from web interface
+          DynamicJsonDocument doc(1024);
+          deserializeJson(doc, message);
+          if (doc.containsKey("mode")) {
+            int newMode = doc["mode"];
+            if (newMode >= 1 && newMode <= 6) {
+              lightboardGameMode = newMode;
+              Serial.printf("Lightboard mode changed to: %d\n", newMode);
+              sendLightboardUpdate(4); // mode-change action
+            }
+          }
         } else if (message.indexOf("mode") != -1) {
           // Handle mode change from web interface
           // This could be used to switch between quiz and game modes
@@ -2235,6 +2410,9 @@ void loop(){
       String winMsg = "{\"winner\":\"" + winner + "\"}";
       ws.broadcastTXT(winMsg);
       Serial.println("Winner declared: Player 1");
+      
+      // Update lightboard
+      updateLightboardGameState();
     } else {
       // Do not map toolboard hits to quiz actions.
       // Questions should advance only via UI button or when a point is awarded.
@@ -2270,6 +2448,7 @@ void loop(){
   // Periodic status broadcast
   if (nowMs - g_lastBroadcastMs >= BROADCAST_INTERVAL_MS){
     String j = "{\"connected\":" + String(player2Connected ? "true" : "false") + 
+               ",\"lightboardConnected\":" + String(lightboardConnected ? "true" : "false") + 
                ",\"clockSynced\":" + String(clockSynced ? "true" : "false") + "}";
     ws.broadcastTXT(j);
     g_lastBroadcastMs = nowMs;
@@ -2282,6 +2461,13 @@ void loop(){
     player2MacLearned = false; // Reset MAC learning to force rediscovery
     Serial.println("Player 2 connection lost - resetting discovery");
   }
+  
+  // Check for lightboard connection timeout
+  if (lightboardConnected && (millis() - lastLightboardHeartbeat > heartbeatTimeout)) {
+    lightboardConnected = false;
+    lightboardMacLearned = false; // Reset MAC learning to force rediscovery
+    Serial.println("Lightboard connection lost - resetting discovery");
+  }
 
   // Send heartbeat to Player 2
   static unsigned long lastHeartbeatSend = 0;
@@ -2290,5 +2476,13 @@ void loop(){
     esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
     Serial.println("Sent heartbeat to Player 2");
     lastHeartbeatSend = millis();
+  }
+  
+  // Send heartbeat to lightboard
+  static unsigned long lastLightboardHeartbeatSend = 0;
+  if (millis() - lastLightboardHeartbeatSend >= 1000) {
+    sendLightboardUpdate(1); // heartbeat action
+    Serial.println("Sent heartbeat to lightboard");
+    lastLightboardHeartbeatSend = millis();
   }
 }
