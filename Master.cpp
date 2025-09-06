@@ -16,7 +16,6 @@ const char* password = "muffin4444";
 WebServer server(80);
 
 // ---- Center indices ----
-// For 38 LEDs (0–37), center is between 18 and 19
 const int CENTER_LEFT  = (NUM_LEDS / 2) - 1; // 18
 const int CENTER_RIGHT = (NUM_LEDS / 2);     // 19
 
@@ -26,10 +25,15 @@ int p2Pos = NUM_LEDS;
 bool celebrating = false;
 
 // Mode 4: Score Order tracking
-int nextLedPosition = 0;  // Next LED position to fill (0 to NUM_LEDS-1)
-int scoringSequence[NUM_LEDS]; // Array to track who scored at each position (1=Player1, 2=Player2)
+int nextLedPosition = 0;
+int scoringSequence[NUM_LEDS]; // 0=empty, 1=Player1, 2=Player2
 
-// Game modes: 1=Territory, 2=Race to the End, 3=Get Home, 4=Score Order
+// Mode 5: Race tracking
+int p1RacePos = -1; // off-board until first score
+int p2RacePos = -1;
+
+// Game modes: 
+// 1=Territory, 2=Swap Sides, 3=Split Scoring, 4=Score Order, 5=Race
 int gameMode = 1;
 
 // ---- HTML page ----
@@ -58,9 +62,10 @@ const char INDEX_HTML[] PROGMEM = R"HTML(
   <div class="mode-selector">
     <select id="gameMode">
       <option value="1">Territory</option>
-      <option value="2">Race to the End</option>
-      <option value="3">Get Home</option>
+      <option value="2">Swap Sides</option>
+      <option value="3">Split Scoring</option>
       <option value="4">Score Order</option>
+      <option value="5">Race</option>
     </select>
   </div>
   <div class="wrap">
@@ -121,11 +126,11 @@ void paintProgress() {
   for (int i=0;i<NUM_LEDS;i++) strip.setPixelColor(i, 0);
 
   if (gameMode == 2) {
-    // Race to the End: single dots
+    // Swap Sides
     if (p1Pos >= 0 && p1Pos < NUM_LEDS) strip.setPixelColor(p1Pos, col(255,0,0));
     if (p2Pos >= 0 && p2Pos < NUM_LEDS) strip.setPixelColor(p2Pos, col(0,80,255));
   } else if (gameMode == 3) {
-    // Get Home trails
+    // Split Scoring
     if (p1Pos <= CENTER_LEFT) {
       for (int i = CENTER_LEFT; i >= p1Pos && i >= 0; --i) {
         strip.setPixelColor(i, col(255,0,0));
@@ -137,17 +142,23 @@ void paintProgress() {
       }
     }
   } else if (gameMode == 4) {
-    // Score Order: fill LEDs left to right based on exact scoring sequence
-    // Player 1 LEDs are red, Player 2 LEDs are blue
+    // Score Order
     for (int i = 0; i < nextLedPosition; i++) {
-      if (scoringSequence[i] == 1) {
-        strip.setPixelColor(i, col(255,0,0)); // Red for Player 1
-      } else if (scoringSequence[i] == 2) {
-        strip.setPixelColor(i, col(0,80,255)); // Blue for Player 2
-      }
+      if (scoringSequence[i] == 1) strip.setPixelColor(i, col(255,0,0));
+      else if (scoringSequence[i] == 2) strip.setPixelColor(i, col(0,80,255));
+    }
+  } else if (gameMode == 5) {
+    // Race
+    bool p1On = (p1RacePos >= 0);
+    bool p2On = (p2RacePos >= 0);
+    if (p1On && p2On && p1RacePos == p2RacePos) {
+      strip.setPixelColor(p1RacePos, col(180,0,180)); // purple on overlap
+    } else {
+      if (p1On) strip.setPixelColor(p1RacePos, col(255,0,0));
+      if (p2On) strip.setPixelColor(p2RacePos, col(0,80,255));
     }
   } else {
-    // Territory trails
+    // Territory
     for (int i=0;i<=p1Pos && i<NUM_LEDS; i++) strip.setPixelColor(i, col(255,0,0));
     for (int i=NUM_LEDS-1; i>=p2Pos && i>=0; i--) strip.setPixelColor(i, col(0,80,255));
   }
@@ -157,19 +168,21 @@ void paintProgress() {
 void resetGame() {
   switch(gameMode) {
     case 1: // Territory
-    case 2: // Race
+    case 2: // Swap Sides
       p1Pos = -1;
       p2Pos = NUM_LEDS;
       break;
-    case 3: // Get Home
-      p1Pos = CENTER_LEFT + 1;  // 19 → first click moves to 18
-      p2Pos = CENTER_RIGHT - 1; // 18 → first click moves to 19
+    case 3: // Split Scoring
+      p1Pos = CENTER_LEFT + 1;
+      p2Pos = CENTER_RIGHT - 1;
       break;
     case 4: // Score Order
       nextLedPosition = 0;
-      for (int i = 0; i < NUM_LEDS; i++) {
-        scoringSequence[i] = 0; // 0 = empty, 1 = Player 1, 2 = Player 2
-      }
+      for (int i = 0; i < NUM_LEDS; i++) scoringSequence[i] = 0;
+      break;
+    case 5: // Race
+      p1RacePos = -1; // off-board until first score
+      p2RacePos = -1;
       break;
   }
   clearStrip();
@@ -205,7 +218,7 @@ void celebrate(bool player1Wins) {
 void checkWinConditions() {
   bool gameOver = false, player1Wins = false;
   switch(gameMode) {
-    case 1:
+    case 1: // Territory
       if (p1Pos >= p2Pos) {
         int p1Leds = p1Pos + 1;
         int p2Leds = NUM_LEDS - p2Pos;
@@ -213,18 +226,17 @@ void checkWinConditions() {
         player1Wins = (p1Leds >= p2Leds);
       }
       break;
-    case 2:
+    case 2: // Swap Sides
       if (p1Pos >= NUM_LEDS - 1) { gameOver = true; player1Wins = true; }
       else if (p2Pos <= 0)       { gameOver = true; player1Wins = false; }
       break;
-    case 3:
+    case 3: // Split Scoring
       if (p1Pos <= 0)            { gameOver = true; player1Wins = true; }
       else if (p2Pos >= NUM_LEDS - 1) { gameOver = true; player1Wins = false; }
       break;
-    case 4:
+    case 4: // Score Order
       if (nextLedPosition >= NUM_LEDS) {
         gameOver = true;
-        // Count actual scores from the sequence
         int p1Count = 0, p2Count = 0;
         for (int i = 0; i < NUM_LEDS; i++) {
           if (scoringSequence[i] == 1) p1Count++;
@@ -232,6 +244,10 @@ void checkWinConditions() {
         }
         player1Wins = (p1Count > p2Count);
       }
+      break;
+    case 5: // Race
+      if (p1RacePos >= NUM_LEDS - 1) { gameOver = true; player1Wins = true; }
+      else if (p2RacePos >= NUM_LEDS - 1) { gameOver = true; player1Wins = false; }
       break;
   }
   if (gameOver) celebrate(player1Wins);
@@ -249,23 +265,17 @@ void handleP1() {
     if (p1Pos > 0) p1Pos--;
   } else if (gameMode == 4) {
     if (nextLedPosition < NUM_LEDS) {
-      scoringSequence[nextLedPosition] = 1; // Record Player 1 scored at this position
+      scoringSequence[nextLedPosition] = 1;
       nextLedPosition++;
     }
+  } else if (gameMode == 5) {
+    if (p1RacePos < 0) p1RacePos = 0;                 // appear at LED 0
+    else if (p1RacePos < NUM_LEDS - 1) p1RacePos++;   // move right
   } else {
     if (p1Pos < NUM_LEDS-1) p1Pos++;
   }
   paintProgress(); checkWinConditions();
-  if (gameMode == 4) {
-    // Count Player 1's current score
-    int p1Count = 0;
-    for (int i = 0; i < nextLedPosition; i++) {
-      if (scoringSequence[i] == 1) p1Count++;
-    }
-    server.send(200, "text/plain", String("P1 scored! Total: ") + p1Count);
-  } else {
-    server.send(200, "text/plain", String("P1 at ") + p1Pos);
-  }
+  server.send(200, "text/plain", "P1 moved");
 }
 
 void handleP2() {
@@ -277,29 +287,23 @@ void handleP2() {
     if (p2Pos < NUM_LEDS-1) p2Pos++;
   } else if (gameMode == 4) {
     if (nextLedPosition < NUM_LEDS) {
-      scoringSequence[nextLedPosition] = 2; // Record Player 2 scored at this position
+      scoringSequence[nextLedPosition] = 2;
       nextLedPosition++;
     }
+  } else if (gameMode == 5) {
+    if (p2RacePos < 0) p2RacePos = 0;                 // appear at LED 0
+    else if (p2RacePos < NUM_LEDS - 1) p2RacePos++;   // move right
   } else {
     if (p2Pos > 0) p2Pos--;
   }
   paintProgress(); checkWinConditions();
-  if (gameMode == 4) {
-    // Count Player 2's current score
-    int p2Count = 0;
-    for (int i = 0; i < nextLedPosition; i++) {
-      if (scoringSequence[i] == 2) p2Count++;
-    }
-    server.send(200, "text/plain", String("P2 scored! Total: ") + p2Count);
-  } else {
-    server.send(200, "text/plain", String("P2 at ") + p2Pos);
-  }
+  server.send(200, "text/plain", "P2 moved");
 }
 
 void handleMode() {
   if (server.hasArg("mode")) {
     int newMode = server.arg("mode").toInt();
-    if (newMode >= 1 && newMode <= 4) {
+    if (newMode >= 1 && newMode <= 5) {
       gameMode = newMode;
       resetGame();
       server.send(200, "text/plain", "Mode " + String(gameMode) + " set");
