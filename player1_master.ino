@@ -170,7 +170,7 @@ html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
 html,body{height:100%}
 body{ margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; color:var(--text);
   background:radial-gradient(1200px 600px at 50% -20%, #1e293b 0%, #0b1220 60%, #070b13 100%);
-  display:flex; align-items:center; justify-content:center; padding:24px; }
+  min-height:100vh; padding:24px; }
 .card{ background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
   border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:28px 22px;
   box-shadow:0 10px 30px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04); text-align:center; width:min(520px, 92vw) }
@@ -181,7 +181,7 @@ body{ margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; color:var(--text);
 .bad{background:var(--bad); box-shadow:0 0 0 2px rgba(255,255,255,0.15), 0 0 14px rgba(239,68,68,.45)}
 
 /* Quiz Styles */
-.app { width: min(900px, 96vw); }
+.app { width: min(900px, 96vw); margin: 0 auto; }
 h1 { font-weight: 700; letter-spacing: .3px; margin: 0 0 14px; font-size: clamp(20px, 3.3vw, 32px); color: var(--accent2); }
 .bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; }
 .pill { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); color: var(--muted); padding: 8px 12px; border-radius: 999px; font-size: 13px; }
@@ -673,6 +673,18 @@ button:active { transform: translateY(1px) scale(.998); }
          <div class="reset-hint">This will clear all loaded categories, scores, and player names</div>
        </div>
 
+       <!-- File Upload Section -->
+       <div class="file-input" id="fileInputSection">
+         <label for="csvFile">📁 Load CSV Files</label>
+         <input type="file" id="csvFile" accept=".csv" multiple>
+         <div class="hint">Hold Ctrl/Cmd for multiple files</div>
+         
+         <div class="loaded-files hidden" id="loadedFiles">
+           <h3>Loaded Files:</h3>
+           <ul class="file-list" id="fileList"></ul>
+         </div>
+       </div>
+
        <!-- Lightboard Game Mode Selector -->
        <div class="file-input" id="lightboardModeSection">
          <label for="lightboardMode">🎮 Lightboard Game Mode</label>
@@ -685,18 +697,6 @@ button:active { transform: translateY(1px) scale(.998); }
            <option value="6">Tug O War</option>
          </select>
          <div class="hint">Select game mode for lightboard display</div>
-       </div>
-
-       <!-- File Upload Section -->
-       <div class="file-input" id="fileInputSection">
-         <label for="csvFile">📁 Load CSV Files</label>
-         <input type="file" id="csvFile" accept=".csv" multiple>
-         <div class="hint">Hold Ctrl/Cmd for multiple files</div>
-         
-         <div class="loaded-files hidden" id="loadedFiles">
-           <h3>Loaded Files:</h3>
-           <ul class="file-list" id="fileList"></ul>
-         </div>
        </div>
 
       <!-- Category Selector -->
@@ -1460,6 +1460,7 @@ function addFileToList(filename, message, status) {
    quizDisplay.classList.add('hidden');
    fileInputSection.classList.remove('hidden');
    resetAllData.parentElement.classList.remove('hidden');
+   document.getElementById('lightboardModeSection').classList.remove('hidden');
  }
 
  function showQuizDisplay() {
@@ -1467,6 +1468,7 @@ function addFileToList(filename, message, status) {
    quizDisplay.classList.remove('hidden');
    fileInputSection.classList.add('hidden');
    resetAllData.parentElement.classList.add('hidden');
+   document.getElementById('lightboardModeSection').classList.add('hidden');
  }
 
 function createCategoryButtons(categories) {
