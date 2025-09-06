@@ -47,8 +47,9 @@ struct_lightboard_message player1Data;
 // Connection tracking
 bool player1Connected = false;
 unsigned long lastHeartbeat = 0;
-const unsigned long heartbeatTimeout = 2000; // 2 seconds
+const unsigned long heartbeatTimeout = 8000; // 2 seconds
 bool player1MacLearned = false;
+unsigned long lastScoreUpdate = 0; // Track last score update to prevent connection status interference
 
 // ---- Game state ----
 int p1Pos = -1;
@@ -243,9 +244,15 @@ uint32_t getP2ColorValue() {
   return col(c.r, c.g, c.b); 
 }
 
-void clearStrip(){ for (int i=0;i<NUM_LEDS;i++) strip.setPixelColor(i,0); strip.show(); }
+void clearStrip(){ 
+  Serial.printf("clearStrip called - this will clear all LEDs!\n");
+  for (int i=0;i<NUM_LEDS;i++) strip.setPixelColor(i,0); 
+  strip.show(); 
+}
 
 void paintProgress() {
+  Serial.printf("paintProgress called: mode=%d, p1Pos=%d, p2Pos=%d, celebrating=%s\n", 
+                gameMode, p1Pos, p2Pos, celebrating ? "true" : "false");
   for (int i=0;i<NUM_LEDS;i++) strip.setPixelColor(i,0);
   if (gameMode==2) { if(p1Pos>=0&&p1Pos<NUM_LEDS) strip.setPixelColor(p1Pos,getP1ColorValue()); if(p2Pos>=0&&p2Pos<NUM_LEDS) strip.setPixelColor(p2Pos,getP2ColorValue()); }
   else if (gameMode==3) { if(p1Pos<=CENTER_LEFT) for(int i=CENTER_LEFT;i>=p1Pos&&i>=0;i--) strip.setPixelColor(i,getP1ColorValue()); if(p2Pos>=CENTER_RIGHT) for(int i=CENTER_RIGHT;i<=p2Pos&&i<NUM_LEDS;i++) strip.setPixelColor(i,getP2ColorValue()); }
@@ -254,9 +261,11 @@ void paintProgress() {
   else if (gameMode==6) { for(int i=0;i<=tugBoundary&&i<NUM_LEDS;i++) strip.setPixelColor(i,getP1ColorValue()); for(int i=tugBoundary+1;i<NUM_LEDS;i++) strip.setPixelColor(i,getP2ColorValue()); }
   else { for(int i=0;i<=p1Pos&&i<NUM_LEDS;i++) strip.setPixelColor(i,getP1ColorValue()); for(int i=NUM_LEDS-1;i>=p2Pos&&i>=0;i--) strip.setPixelColor(i,getP2ColorValue()); }
   strip.show();
+  Serial.printf("paintProgress completed\n");
 }
 
 void resetGame(){ 
+  Serial.printf("resetGame called - this will reset positions and clear LEDs!\n");
   switch(gameMode){
     case 1:case 2:p1Pos=-1;p2Pos=NUM_LEDS;break;
     case 3:p1Pos=CENTER_LEFT+1;p2Pos=CENTER_RIGHT-1;break;
@@ -306,6 +315,7 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       // Heartbeat - just update connection status
       Serial.println("Player 1 heartbeat received");
     } else if (player1Data.action == 2) {
+
       // Game state update
       gameMode = player1Data.gameMode;
       p1ColorIndex = player1Data.p1ColorIndex;
@@ -316,20 +326,24 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       tugBoundary = player1Data.tugBoundary;
       p1RacePos = player1Data.p1RacePos;
       p2RacePos = player1Data.p2RacePos;
-      celebrating = player1Data.celebrating;
-      
-      // Handle winner celebration
-      if (player1Data.winner == 1) {
-        startCelebration(true); // Player 1 wins
-      } else if (player1Data.winner == 2) {
-        startCelebration(false); // Player 2 wins
+
+      // Only trigger celebration when explicitly requested and with a valid winner
+      if (player1Data.celebrating && (player1Data.winner == 1 || player1Data.winner == 2)) {
+        startCelebration(player1Data.winner == 1);
+        celebrating = true;
       }
-      
-      Serial.printf("Game state update: mode=%d, p1Pos=%d, p2Pos=%d, winner=%d\n", 
-                   gameMode, p1Pos, p2Pos, player1Data.winner);
-      paintProgress();
-      
-    } else if (player1Data.action == 3) {
+
+      Serial.printf("Game state update: mode=%d, p1Pos=%d, p2Pos=%d, winner=%d\n",
+                    gameMode, p1Pos, p2Pos, player1Data.winner);
+
+      // Only repaint if not celebrating
+      if (!(celActive || celebrating)) {
+        paintProgress();
+      }
+
+}
+ else if (player1Data.action == 3) {
+
       // Score update
       Serial.println("Score update received");
       // Update position variables from received data
@@ -339,11 +353,17 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       tugBoundary = player1Data.tugBoundary;
       p1RacePos = player1Data.p1RacePos;
       p2RacePos = player1Data.p2RacePos;
-      Serial.printf("Updated positions: p1Pos=%d, p2Pos=%d, nextLedPos=%d, tugBoundary=%d, p1RacePos=%d, p2RacePos=%d\n",
-                   p1Pos, p2Pos, nextLedPosition, tugBoundary, p1RacePos, p2RacePos);
-      paintProgress();
-      
-    } else if (player1Data.action == 4) {
+
+      // Update the last score update time to prevent connection status from interfering
+      lastScoreUpdate = millis();
+
+      // Only repaint if not celebrating
+      if (!(celActive || celebrating)) {
+        paintProgress();
+      }
+
+}
+ else if (player1Data.action == 4) {
       // Mode change
       gameMode = player1Data.gameMode;
       p1ColorIndex = player1Data.p1ColorIndex;
@@ -535,12 +555,16 @@ void loop(){
   const unsigned long nowMs = millis();
 
   // Handle celebration animation
-  if (celebrating) {
+  if (celActive || celebrating) {
     if (!updateCelebration()) {
+      celActive = false;
       celebrating = false;
-      resetGame();
+      Serial.println("Celebration ended, restoring last game state");
       paintProgress();
     }
+  }
+  
+}
   }
   
   // Run demo mode when not connected
@@ -551,7 +575,7 @@ void loop(){
     player1Connected = false;
     player1MacLearned = false; // Reset MAC learning to force rediscovery
     Serial.println("Player 1 connection lost - resetting discovery");
-    clearStrip(); // Clear LEDs when disconnected
+    // keep last shown LEDs; do not clear on disconnect
   }
 
   // Send heartbeat to Player 1 (only if we have learned the MAC address)
@@ -567,22 +591,25 @@ void loop(){
     lastHeartbeatSend = millis();
   }
 
-  // Update LED based on connection status
+  // Update LED based on connection status - only show status if truly disconnected
   if (!player1Connected) {
-    // Show connection status with a slow blink
+    // Show connection status with a slow blink - but don't interfere with recent updates
     static unsigned long lastBlink = 0;
-    if (millis() - lastBlink >= 1000) {
-      static bool blinkState = false;
-      blinkState = !blinkState;
-      if (blinkState) {
-        strip.setPixelColor(0, strip.Color(255, 0, 0)); // Red for disconnected
-        strip.setPixelColor(NUM_LEDS-1, strip.Color(255, 0, 0));
-      } else {
-        strip.setPixelColor(0, 0);
-        strip.setPixelColor(NUM_LEDS-1, 0);
+// Only show connection status if we haven't had a recent score update
+    if ((millis() - lastScoreUpdate > 5000) && !(celActive || celebrating)) { // 5 second grace period
+      if (millis() - lastBlink >= 1000) {
+        static bool blinkState = false;
+        blinkState = !blinkState;
+        if (blinkState) {
+          strip.setPixelColor(0, strip.Color(255, 0, 0)); // Red for disconnected
+          strip.setPixelColor(NUM_LEDS-1, strip.Color(255, 0, 0));
+        } else {
+          strip.setPixelColor(0, 0);
+          strip.setPixelColor(NUM_LEDS-1, 0);
+        }
+        strip.show();
+        lastBlink = millis();
       }
-      strip.show();
-      lastBlink = millis();
     }
   }
 }

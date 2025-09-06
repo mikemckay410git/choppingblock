@@ -2081,8 +2081,15 @@ void sendLightboardUpdate(uint8_t action) {
   lightboardData.tugBoundary = lightboardTugBoundary;
   lightboardData.p1RacePos = lightboardP1RacePos;
   lightboardData.p2RacePos = lightboardP2RacePos;
-  lightboardData.celebrating = lightboardCelebrating;
-  lightboardData.winner = lightboardWinner;
+  
+  // Only send celebration data for game state updates, not score updates
+  if (action == 2) {
+    lightboardData.celebrating = lightboardCelebrating;
+    lightboardData.winner = lightboardWinner;
+  } else {
+    lightboardData.celebrating = 0; // No celebration for score updates
+    lightboardData.winner = 0;      // No winner for score updates
+  }
   
   esp_err_t result = esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
   Serial.printf("Sent lightboard update: action=%d, mode=%d, result=%s\n", 
@@ -2108,36 +2115,37 @@ void updateLightboardGameState() {
 
 void updateLightboardScores(int p1Score, int p2Score) {
   // Update lightboard positions based on scores for different game modes
+  // Map quiz scores (0, 1, 2, 3...) to LED positions (0-37)
   switch (lightboardGameMode) {
-    case 1: // Territory mode
-      lightboardP1Pos = (p1Score >= 0 && p1Score <= 38) ? p1Score : -1;
-      lightboardP2Pos = (p2Score >= 0 && p2Score <= 38) ? 38 - p2Score : 38;
+    case 1: // Territory mode - P1 advances from left, P2 from right
+      lightboardP1Pos = (p1Score > 0) ? min(p1Score, 37) : -1;
+      lightboardP2Pos = (p2Score > 0) ? max(37 - p2Score, 0) : 38;
       break;
-    case 2: // Swap Sides mode
-      lightboardP1Pos = (p1Score >= 0 && p1Score <= 38) ? 38 - p1Score : 38;
-      lightboardP2Pos = (p2Score >= 0 && p2Score <= 38) ? p2Score : -1;
+    case 2: // Swap Sides mode - P1 from right, P2 from left
+      lightboardP1Pos = (p1Score > 0) ? max(37 - p1Score, 0) : 38;
+      lightboardP2Pos = (p2Score > 0) ? min(p2Score, 37) : -1;
       break;
-    case 3: // Split Scoring mode
-      lightboardP1Pos = (p1Score >= 0 && p1Score <= 19) ? p1Score : -1;
-      lightboardP2Pos = (p2Score >= 0 && p2Score <= 19) ? 38 - p2Score : 38;
+    case 3: // Split Scoring mode - each player uses half the strip
+      lightboardP1Pos = (p1Score > 0) ? min(p1Score, 18) : -1;
+      lightboardP2Pos = (p2Score > 0) ? max(37 - p2Score, 19) : 38;
       break;
-    case 4: // Score Order mode
+    case 4: // Score Order mode - sequential LED lighting
       lightboardNextLedPos = (p1Score + p2Score) % 38;
       lightboardP1Pos = -1;
       lightboardP2Pos = 38;
       break;
-    case 5: // Race mode
-      lightboardP1RacePos = (p1Score >= 0 && p1Score <= 38) ? p1Score : -1;
-      lightboardP2RacePos = (p2Score >= 0 && p2Score <= 38) ? p2Score : -1;
+    case 5: // Race mode - both players race from start to finish
+      lightboardP1RacePos = (p1Score > 0) ? min(p1Score, 37) : -1;
+      lightboardP2RacePos = (p2Score > 0) ? min(p2Score, 37) : -1;
       lightboardP1Pos = -1;
       lightboardP2Pos = 38;
       break;
-    case 6: // Tug O War mode
+    case 6: // Tug O War mode - boundary moves based on score difference
       int totalScore = p1Score + p2Score;
       if (totalScore > 0) {
-        lightboardTugBoundary = 18 + (p1Score - p2Score) * 2; // Center at 18, move by score difference
+        lightboardTugBoundary = 18 + (p1Score - p2Score); // Center at 18, move by score difference
         if (lightboardTugBoundary < 0) lightboardTugBoundary = 0;
-        if (lightboardTugBoundary > 38) lightboardTugBoundary = 38;
+        if (lightboardTugBoundary > 37) lightboardTugBoundary = 37;
       } else {
         lightboardTugBoundary = 18; // Center
       }
@@ -2149,6 +2157,8 @@ void updateLightboardScores(int p1Score, int p2Score) {
   // Send score update to lightboard
   Serial.printf("Sending score update to lightboard: P1=%d, P2=%d, mode=%d, connected=%s\n", 
                 p1Score, p2Score, lightboardGameMode, lightboardConnected ? "true" : "false");
+  Serial.printf("Calculated positions: p1Pos=%d, p2Pos=%d, nextLedPos=%d, tugBoundary=%d, p1RacePos=%d, p2RacePos=%d\n",
+                lightboardP1Pos, lightboardP2Pos, lightboardNextLedPos, lightboardTugBoundary, lightboardP1RacePos, lightboardP2RacePos);
   sendLightboardUpdate(3); // score-update action
   Serial.printf("Score update sent to lightboard\n");
 }
