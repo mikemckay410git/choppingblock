@@ -109,6 +109,7 @@ void determineWinner();
 void syncClock();
 void sendLightboardUpdate(uint8_t action);
 void updateLightboardGameState();
+void updateLightboardScores(int p1Score, int p2Score);
 
 volatile unsigned long g_firstTime[SENSOR_COUNT]; // first arrival micros() per sensor
 volatile uint32_t      g_hitMask = 0;             // bit i set when sensor i latched first arrival
@@ -1110,6 +1111,13 @@ function awardPoint(player) {
   updateScoreDisplay();
   savePersistedData();
   
+  // Send score update to lightboard via WebSocket
+  ws.send(JSON.stringify({
+    action: 'scoreUpdate',
+    player1Score: player1Score,
+    player2Score: player2Score
+  }));
+  
   // Reset game and advance to next question
   removeScorableState();
   hideWinner();
@@ -1545,6 +1553,13 @@ function loadCategoryData(categoryData, isCombined = false) {
   setOrder(true);
   render(true);
   savePersistedData();
+  
+  // Send initial scores to lightboard
+  ws.send(JSON.stringify({
+    action: 'scoreUpdate',
+    player1Score: player1Score,
+    player2Score: player2Score
+  }));
 }
 
 function loadCategory(filename) {
@@ -1768,6 +1783,13 @@ function restoreQuizState() {
       restoreOrder();
     }
   }
+  
+  // Send current scores to lightboard when restoring quiz state
+  ws.send(JSON.stringify({
+    action: 'scoreUpdate',
+    player1Score: player1Score,
+    player2Score: player2Score
+  }));
 }
 
 // Lightboard mode change handler
@@ -2082,6 +2104,51 @@ void updateLightboardGameState() {
   sendLightboardUpdate(2); // game-state action
 }
 
+void updateLightboardScores(int p1Score, int p2Score) {
+  // Update lightboard positions based on scores for different game modes
+  switch (lightboardGameMode) {
+    case 1: // Territory mode
+      lightboardP1Pos = (p1Score >= 0 && p1Score <= 38) ? p1Score : -1;
+      lightboardP2Pos = (p2Score >= 0 && p2Score <= 38) ? 38 - p2Score : 38;
+      break;
+    case 2: // Swap Sides mode
+      lightboardP1Pos = (p1Score >= 0 && p1Score <= 38) ? 38 - p1Score : 38;
+      lightboardP2Pos = (p2Score >= 0 && p2Score <= 38) ? p2Score : -1;
+      break;
+    case 3: // Split Scoring mode
+      lightboardP1Pos = (p1Score >= 0 && p1Score <= 19) ? p1Score : -1;
+      lightboardP2Pos = (p2Score >= 0 && p2Score <= 19) ? 38 - p2Score : 38;
+      break;
+    case 4: // Score Order mode
+      lightboardNextLedPos = (p1Score + p2Score) % 38;
+      lightboardP1Pos = -1;
+      lightboardP2Pos = 38;
+      break;
+    case 5: // Race mode
+      lightboardP1RacePos = (p1Score >= 0 && p1Score <= 38) ? p1Score : -1;
+      lightboardP2RacePos = (p2Score >= 0 && p2Score <= 38) ? p2Score : -1;
+      lightboardP1Pos = -1;
+      lightboardP2Pos = 38;
+      break;
+    case 6: // Tug O War mode
+      int totalScore = p1Score + p2Score;
+      if (totalScore > 0) {
+        lightboardTugBoundary = 18 + (p1Score - p2Score) * 2; // Center at 18, move by score difference
+        if (lightboardTugBoundary < 0) lightboardTugBoundary = 0;
+        if (lightboardTugBoundary > 38) lightboardTugBoundary = 38;
+      } else {
+        lightboardTugBoundary = 18; // Center
+      }
+      lightboardP1Pos = -1;
+      lightboardP2Pos = 38;
+      break;
+  }
+  
+  // Send score update to lightboard
+  sendLightboardUpdate(3); // score-update action
+  Serial.printf("Updated lightboard scores: P1=%d, P2=%d, mode=%d\n", p1Score, p2Score, lightboardGameMode);
+}
+
 // ===================== Game Logic =====================
 void determineWinner() {
   if (player1HitTime > 0 && player2HitTime > 0) {
@@ -2194,6 +2261,16 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
               Serial.printf("Lightboard mode changed to: %d\n", newMode);
               sendLightboardUpdate(4); // mode-change action
             }
+          }
+        } else if (message.indexOf("scoreUpdate") != -1) {
+          // Handle score update from web interface
+          DynamicJsonDocument doc(1024);
+          deserializeJson(doc, message);
+          if (doc.containsKey("player1Score") && doc.containsKey("player2Score")) {
+            int p1Score = doc["player1Score"];
+            int p2Score = doc["player2Score"];
+            Serial.printf("Score update received: P1=%d, P2=%d\n", p1Score, p2Score);
+            updateLightboardScores(p1Score, p2Score);
           }
         } else if (message.indexOf("mode") != -1) {
           // Handle mode change from web interface
