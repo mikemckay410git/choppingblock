@@ -1107,10 +1107,12 @@ function awardPoint(player) {
   // Update score
   if (player === 'Player 1') {
     player1Score++;
-    awardPointToPlayer(1);
+    // Send message to ESP32 to award point to Player 1
+    ws.send(JSON.stringify({action: 'awardPoint', player: 1}));
   } else if (player === 'Player 2') {
     player2Score++;
-    awardPointToPlayer(2);
+    // Send message to ESP32 to award point to Player 2
+    ws.send(JSON.stringify({action: 'awardPoint', player: 2}));
   }
   
   updateScoreDisplay();
@@ -2236,6 +2238,16 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
         String message = String((char*)payload);
         if (message.indexOf("reset") != -1) {
           resetGame();
+        } else if (message.indexOf("awardPoint") != -1) {
+          // Handle point award from web interface
+          DynamicJsonDocument doc(1024);
+          deserializeJson(doc, message);
+          if (doc.containsKey("player")) {
+            int player = doc["player"];
+            if (player == 1 || player == 2) {
+              awardPointToPlayer(player);
+            }
+          }
         } else if (message.indexOf("lightboardMode") != -1) {
           // Handle lightboard mode change from web interface
           DynamicJsonDocument doc(1024);
