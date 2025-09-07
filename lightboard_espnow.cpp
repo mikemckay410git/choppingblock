@@ -315,17 +315,10 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       // Heartbeat - just update connection status
       Serial.println("Player 1 heartbeat received");
     } else if (player1Data.action == 2) {
-      // Game state update
+      // Game state update - only update essential settings, run our own logic
       gameMode = player1Data.gameMode;
       p1ColorIndex = player1Data.p1ColorIndex;
       p2ColorIndex = player1Data.p2ColorIndex;
-      p1Pos = player1Data.p1Pos;
-      p2Pos = player1Data.p2Pos;
-      nextLedPosition = player1Data.nextLedPos;
-      tugBoundary = player1Data.tugBoundary;
-      p1RacePos = player1Data.p1RacePos;
-      p2RacePos = player1Data.p2RacePos;
-      celebrating = player1Data.celebrating;
       
       // Handle winner celebration
       if (player1Data.winner == 1) {
@@ -334,14 +327,14 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
         startCelebration(false); // Player 2 wins
       }
       
-      Serial.printf("Game state update: mode=%d, p1Pos=%d, p2Pos=%d, winner=%d\n", 
-                   gameMode, p1Pos, p2Pos, player1Data.winner);
+      Serial.printf("Game state update: mode=%d, winner=%d\n", 
+                   gameMode, player1Data.winner);
       paintProgress();
       
     } else if (player1Data.action == 3) {
-      // Score update
-      Serial.println("Score update received");
-      paintProgress();
+      // Point update - run our own game logic
+      Serial.println("Point update received - running lightboard game logic");
+      handlePointUpdate();
       
     } else if (player1Data.action == 4) {
       // Mode change
@@ -353,7 +346,7 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       
     } else if (player1Data.action == 5) {
       // Reset
-      Serial.println("Reset received");
+      Serial.println("Reset received - resetting lightboard game state");
       resetGame();
     }
   }
@@ -458,6 +451,114 @@ uint32_t wheel(byte WheelPos) {
   }
   WheelPos -= 170;
   return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
+
+// ===================== Lightboard Game Logic =====================
+void handlePointUpdate() {
+  // This function runs the lightboard's own game logic based on point updates
+  // The lightboard determines how to update positions based on the current game mode
+  
+  switch (gameMode) {
+    case 1: // Territory
+      // Move both players toward center
+      if (p1Pos < NUM_LEDS - 1) p1Pos++;
+      if (p2Pos > 0) p2Pos--;
+      break;
+      
+    case 2: // Swap Sides
+      // Move both players toward center, then swap when they meet
+      if (p1Pos < NUM_LEDS - 1) p1Pos++;
+      if (p2Pos > 0) p2Pos--;
+      
+      // Check if they've met in the middle
+      if (p1Pos >= CENTER_LEFT && p2Pos <= CENTER_RIGHT) {
+        // Swap positions
+        int temp = p1Pos;
+        p1Pos = p2Pos;
+        p2Pos = temp;
+      }
+      break;
+      
+    case 3: // Split Scoring
+      // Move players away from center
+      if (p1Pos > 0) p1Pos--;
+      if (p2Pos < NUM_LEDS - 1) p2Pos++;
+      break;
+      
+    case 4: // Score Order
+      // Fill LEDs in sequence
+      if (nextLedPosition < NUM_LEDS) {
+        // Alternate between players for each LED
+        scoringSequence[nextLedPosition] = (nextLedPosition % 2) + 1;
+        nextLedPosition++;
+      }
+      break;
+      
+    case 5: // Race
+      // Both players race to the end
+      if (p1RacePos < NUM_LEDS - 1) p1RacePos++;
+      if (p2RacePos < NUM_LEDS - 1) p2RacePos++;
+      break;
+      
+    case 6: // Tug O War
+      // Move boundary back and forth
+      if (tugBoundary < NUM_LEDS - 1) {
+        tugBoundary++;
+      } else {
+        tugBoundary = 0; // Reset to start
+      }
+      break;
+  }
+  
+  // Check for win conditions
+  checkWinConditions();
+  
+  // Update display
+  paintProgress();
+}
+
+void checkWinConditions() {
+  bool p1Wins = false;
+  bool p2Wins = false;
+  
+  switch (gameMode) {
+    case 1: // Territory
+      p1Wins = (p1Pos >= NUM_LEDS - 1);
+      p2Wins = (p2Pos <= 0);
+      break;
+      
+    case 2: // Swap Sides
+      p1Wins = (p1Pos >= NUM_LEDS - 1);
+      p2Wins = (p2Pos <= 0);
+      break;
+      
+    case 3: // Split Scoring
+      p1Wins = (p1Pos <= 0);
+      p2Wins = (p2Pos >= NUM_LEDS - 1);
+      break;
+      
+    case 4: // Score Order
+      p1Wins = (nextLedPosition >= NUM_LEDS);
+      break;
+      
+    case 5: // Race
+      p1Wins = (p1RacePos >= NUM_LEDS - 1);
+      p2Wins = (p2RacePos >= NUM_LEDS - 1);
+      break;
+      
+    case 6: // Tug O War
+      p1Wins = (tugBoundary >= NUM_LEDS - 1);
+      p2Wins = (tugBoundary <= 0);
+      break;
+  }
+  
+  if (p1Wins && !p2Wins) {
+    startCelebration(true); // Player 1 wins
+    Serial.println("Lightboard: Player 1 wins!");
+  } else if (p2Wins && !p1Wins) {
+    startCelebration(false); // Player 2 wins
+    Serial.println("Lightboard: Player 2 wins!");
+  }
 }
 
 // ===================== Demo Mode =====================
