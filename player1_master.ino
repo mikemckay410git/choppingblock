@@ -105,6 +105,7 @@ int32_t g_activeWsClient = -1; // enforce single WebSocket client
 
 // Function declarations
 void resetGame();
+void resetGameForQuiz();
 void determineWinner();
 void syncClock();
 void sendLightboardUpdate(uint8_t action);
@@ -1047,8 +1048,8 @@ function navigate(direction) {
   currentQuestionIndex = idx;
   savePersistedData();
   
-  // Reset game state
-  ws.send(JSON.stringify({action: 'reset'}));
+  // Reset game state for quiz navigation (doesn't reset lightboard)
+  ws.send(JSON.stringify({action: 'reset', quizNav: true}));
   hideWinner();
   aEl.classList.remove('show');
   btnToggle.textContent = 'Show Answer';
@@ -2193,6 +2194,20 @@ void resetGame() {
   Serial.println("Game reset");
 }
 
+void resetGameForQuiz() {
+  // Light version of reset for quiz navigation - doesn't reset lightboard state
+  winner = "none";
+  player1HitTime = 0;
+  player2HitTime = 0;
+  gameActive = true;
+  
+  // Broadcast reset to web interface
+  String j = "{\"winner\":\"none\"}";
+  ws.broadcastTXT(j);
+  
+  Serial.println("Game reset for quiz navigation");
+}
+
 // ===================== Clock Synchronization =====================
 void syncClock() {
   if (player2Connected && (millis() - lastSyncTime >= SYNC_INTERVAL)) {
@@ -2237,7 +2252,12 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
       if (length > 0) {
         String message = String((char*)payload);
         if (message.indexOf("reset") != -1) {
-          resetGame();
+          // Check if this is a quiz navigation reset or a full game reset
+          if (message.indexOf("quizNav") != -1) {
+            resetGameForQuiz();
+          } else {
+            resetGame();
+          }
         } else if (message.indexOf("awardPoint") != -1) {
           // Handle point award from web interface
           DynamicJsonDocument doc(1024);
