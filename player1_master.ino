@@ -1113,16 +1113,6 @@ function awardPoint(player) {
   updateScoreDisplay();
   savePersistedData();
   
-  // Send point update to lightboard
-  if (player === 'Player 1') {
-    sendLightboardPointUpdate(1); // Player 1 scored
-  } else if (player === 'Player 2') {
-    sendLightboardPointUpdate(2); // Player 2 scored
-  }
-  
-  // Update lightboard
-  updateLightboardGameState();
-  
   // Reset game and advance to next question
   removeScorableState();
   hideWinner();
@@ -2017,6 +2007,12 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
         String j = "{\"winner\":\"" + winner + "\"}";
         ws.broadcastTXT(j);
         Serial.println("Winner declared: Player 2");
+        
+        // Send point update to lightboard
+        sendLightboardPointUpdate(2); // Player 2 scored
+        
+        // Update lightboard
+        updateLightboardGameState();
       }
     } else if (player2Data.action == 3) {
       // Reset request from Player 2
@@ -2112,9 +2108,15 @@ void determineWinner() {
       winner = "Player 2";
       Serial.printf("Player 2 wins! Time diff: %ld us\n", -timeDiff);
       
+      // Send point update to lightboard
+      sendLightboardPointUpdate(2); // Player 2 scored
+      
     } else if (timeDiff > 100) { // Player 1 hit first (with 100us tolerance)
       winner = "Player 1";
       Serial.printf("Player 1 wins! Time diff: %ld us\n", timeDiff);
+      
+      // Send point update to lightboard
+      sendLightboardPointUpdate(1); // Player 1 scored
       
     } else {
       winner = "Tie";
@@ -2124,6 +2126,9 @@ void determineWinner() {
     // Broadcast winner to web interface
     String j = "{\"winner\":\"" + winner + "\"}";
     ws.broadcastTXT(j);
+    
+    // Update lightboard
+    updateLightboardGameState();
   }
 }
 
@@ -2432,6 +2437,12 @@ void loop(){
       String winMsg = "{\"winner\":\"" + winner + "\"}";
       ws.broadcastTXT(winMsg);
       Serial.println("Winner declared: Player 1");
+      
+      // Send point update to lightboard
+      sendLightboardPointUpdate(1); // Player 1 scored
+      
+      // Update lightboard
+      updateLightboardGameState();
     } else {
       // Do not map toolboard hits to quiz actions.
       // Questions should advance only via UI button or when a point is awarded.
