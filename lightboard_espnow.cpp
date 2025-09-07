@@ -463,19 +463,19 @@ void handlePointUpdate(uint8_t scoringPlayer) {
       break;
       
     case 2: // Swap Sides
-      // Move the scoring player toward center
-      if (scoringPlayer == 1 && p1Pos < NUM_LEDS - 1) {
-        p1Pos++;
-      } else if (scoringPlayer == 2 && p2Pos > 0) {
-        p2Pos--;
-      }
-      
-      // Check if they've met in the middle
-      if (p1Pos >= CENTER_LEFT && p2Pos <= CENTER_RIGHT) {
-        // Swap positions
-        int temp = p1Pos;
-        p1Pos = p2Pos;
-        p2Pos = temp;
+      // Move the scoring player toward center, but avoid collision
+      if (scoringPlayer == 1) {
+        if (p1Pos + 1 == p2Pos) {
+          p1Pos = p2Pos + 1; // Jump over if about to collide
+        } else if (p1Pos < NUM_LEDS - 1) {
+          p1Pos++;
+        }
+      } else if (scoringPlayer == 2) {
+        if (p2Pos - 1 == p1Pos) {
+          p2Pos = p1Pos - 1; // Jump over if about to collide
+        } else if (p2Pos > 0) {
+          p2Pos--;
+        }
       }
       break;
       
@@ -509,7 +509,7 @@ void handlePointUpdate(uint8_t scoringPlayer) {
       // Move boundary based on who scored
       if (scoringPlayer == 1 && tugBoundary < NUM_LEDS - 1) {
         tugBoundary++;
-      } else if (scoringPlayer == 2 && tugBoundary > 0) {
+      } else if (scoringPlayer == 2 && tugBoundary >= 0) {
         tugBoundary--;
       }
       break;
@@ -528,8 +528,10 @@ void checkWinConditions() {
   
   switch (gameMode) {
     case 1: // Territory
-      p1Wins = (p1Pos >= NUM_LEDS - 1);
-      p2Wins = (p2Pos <= 0);
+      if (p1Pos >= p2Pos) {
+        p1Wins = (p1Pos + 1 >= NUM_LEDS - p2Pos);
+        p2Wins = !p1Wins;
+      }
       break;
       
     case 2: // Swap Sides
@@ -543,7 +545,15 @@ void checkWinConditions() {
       break;
       
     case 4: // Score Order
-      p1Wins = (nextLedPosition >= NUM_LEDS);
+      if (nextLedPosition >= NUM_LEDS) {
+        int p1Count = 0, p2Count = 0;
+        for (int i = 0; i < NUM_LEDS; i++) {
+          if (scoringSequence[i] == 1) p1Count++;
+          else if (scoringSequence[i] == 2) p2Count++;
+        }
+        p1Wins = (p1Count > p2Count);
+        p2Wins = !p1Wins;
+      }
       break;
       
     case 5: // Race
@@ -553,7 +563,7 @@ void checkWinConditions() {
       
     case 6: // Tug O War
       p1Wins = (tugBoundary >= NUM_LEDS - 1);
-      p2Wins = (tugBoundary <= 0);
+      p2Wins = (tugBoundary < 0);
       break;
   }
   
