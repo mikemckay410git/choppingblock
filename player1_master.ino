@@ -1107,8 +1107,10 @@ function awardPoint(player) {
   // Update score
   if (player === 'Player 1') {
     player1Score++;
+    awardPointToPlayer(1);
   } else if (player === 'Player 2') {
     player2Score++;
+    awardPointToPlayer(2);
   }
   
   updateScoreDisplay();
@@ -2008,12 +2010,6 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
         String j = "{\"winner\":\"" + winner + "\"}";
         ws.broadcastTXT(j);
         Serial.println("Winner declared: Player 2");
-        
-        // Send point update to lightboard
-        sendLightboardPointUpdate(2); // Player 2 scored
-        
-        // Update lightboard
-        updateLightboardGameState();
       }
     } else if (player2Data.action == 3) {
       // Reset request from Player 2
@@ -2145,15 +2141,11 @@ void determineWinner() {
       winner = "Player 2";
       Serial.printf("Player 2 wins! Time diff: %ld us\n", -timeDiff);
       
-      // Send point update to lightboard
-      sendLightboardPointUpdate(2); // Player 2 scored
       
     } else if (timeDiff > 100) { // Player 1 hit first (with 100us tolerance)
       winner = "Player 1";
       Serial.printf("Player 1 wins! Time diff: %ld us\n", timeDiff);
       
-      // Send point update to lightboard
-      sendLightboardPointUpdate(1); // Player 1 scored
       
     } else {
       winner = "Tie";
@@ -2475,11 +2467,6 @@ void loop(){
       ws.broadcastTXT(winMsg);
       Serial.println("Winner declared: Player 1");
       
-      // Send point update to lightboard
-      sendLightboardPointUpdate(1); // Player 1 scored
-      
-      // Update lightboard
-      updateLightboardGameState();
     } else {
       // Do not map toolboard hits to quiz actions.
       // Questions should advance only via UI button or when a point is awarded.
