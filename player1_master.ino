@@ -110,6 +110,7 @@ void syncClock();
 void sendLightboardUpdate(uint8_t action);
 void updateLightboardGameState();
 void sendLightboardPointUpdate(uint8_t scoringPlayer);
+void awardPointToPlayer(uint8_t playerId);
 
 volatile unsigned long g_firstTime[SENSOR_COUNT]; // first arrival micros() per sensor
 volatile uint32_t      g_hitMask = 0;             // bit i set when sensor i latched first arrival
@@ -2096,6 +2097,42 @@ void sendLightboardPointUpdate(uint8_t scoringPlayer) {
   
   esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
   Serial.printf("Sent lightboard point update: Player %d scored\n", scoringPlayer);
+}
+
+void awardPointToPlayer(uint8_t playerId) {
+  // Award a point to the specified player on the lightboard
+  // playerId: 1 = Player 1, 2 = Player 2
+  
+  if (playerId != 1 && playerId != 2) {
+    Serial.printf("Invalid player ID: %d. Must be 1 or 2.\n", playerId);
+    return;
+  }
+  
+  if (!lightboardConnected) {
+    Serial.println("Lightboard not connected - cannot award point");
+    return;
+  }
+  
+  // Send point update to lightboard
+  sendLightboardPointUpdate(playerId);
+  
+  // Update local game state
+  if (playerId == 1) {
+    winner = "Player 1";
+    player1HitTime = micros(); // Use current time as hit time
+  } else {
+    winner = "Player 2";
+    player2HitTime = micros(); // Use current time as hit time
+  }
+  
+  // Broadcast winner to web interface
+  String j = "{\"winner\":\"" + winner + "\"}";
+  ws.broadcastTXT(j);
+  
+  // Update lightboard game state
+  updateLightboardGameState();
+  
+  Serial.printf("Awarded point to Player %d\n", playerId);
 }
 
 // ===================== Game Logic =====================
