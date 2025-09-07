@@ -109,7 +109,7 @@ void determineWinner();
 void syncClock();
 void sendLightboardUpdate(uint8_t action);
 void updateLightboardGameState();
-void sendPointUpdateToLightboard(String player);
+void sendLightboardPointUpdate(uint8_t scoringPlayer);
 
 volatile unsigned long g_firstTime[SENSOR_COUNT]; // first arrival micros() per sensor
 volatile uint32_t      g_hitMask = 0;             // bit i set when sensor i latched first arrival
@@ -1113,9 +1113,6 @@ function awardPoint(player) {
   updateScoreDisplay();
   savePersistedData();
   
-  // Send point update to lightboard
-  sendPointUpdateToLightboard(player);
-  
   // Reset game and advance to next question
   removeScorableState();
   hideWinner();
@@ -2011,6 +2008,9 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
         ws.broadcastTXT(j);
         Serial.println("Winner declared: Player 2");
         
+        // Send point update to lightboard
+        sendLightboardPointUpdate(2); // Player 2 scored
+        
         // Update lightboard
         updateLightboardGameState();
       }
@@ -2088,27 +2088,16 @@ void updateLightboardGameState() {
   sendLightboardUpdate(2); // game-state action
 }
 
-void sendPointUpdateToLightboard(String player) {
-  // Send point update to lightboard so it can run its own game logic
+void sendLightboardPointUpdate(uint8_t scoringPlayer) {
+  // Send point update to lightboard with which player scored
   if (!lightboardConnected) return;
   
   lightboardData.deviceId = 1; // Player 1
-  lightboardData.action = 3; // point update action
-  lightboardData.gameMode = lightboardGameMode;
-  lightboardData.p1ColorIndex = lightboardP1ColorIndex;
-  lightboardData.p2ColorIndex = lightboardP2ColorIndex;
-  
-  // Set winner based on who got the point
-  if (player == "Player 1") {
-    lightboardData.winner = 1;
-  } else if (player == "Player 2") {
-    lightboardData.winner = 2;
-  } else {
-    lightboardData.winner = 0;
-  }
+  lightboardData.action = 3; // point update
+  lightboardData.winner = scoringPlayer; // Which player scored the point
   
   esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
-  Serial.printf("Sent point update to lightboard: %s\n", player.c_str());
+  Serial.printf("Sent lightboard point update: Player %d scored\n", scoringPlayer);
 }
 
 // ===================== Game Logic =====================
@@ -2120,9 +2109,17 @@ void determineWinner() {
     if (timeDiff < -100) { // Player 2 hit first (with 100us tolerance)
       winner = "Player 2";
       Serial.printf("Player 2 wins! Time diff: %ld us\n", -timeDiff);
+      
+      // Send point update to lightboard
+      sendLightboardPointUpdate(2); // Player 2 scored
+      
     } else if (timeDiff > 100) { // Player 1 hit first (with 100us tolerance)
       winner = "Player 1";
       Serial.printf("Player 1 wins! Time diff: %ld us\n", timeDiff);
+      
+      // Send point update to lightboard
+      sendLightboardPointUpdate(1); // Player 1 scored
+      
     } else {
       winner = "Tie";
       Serial.printf("It's a tie! Time diff: %ld us\n", timeDiff);
@@ -2442,6 +2439,9 @@ void loop(){
       String winMsg = "{\"winner\":\"" + winner + "\"}";
       ws.broadcastTXT(winMsg);
       Serial.println("Winner declared: Player 1");
+      
+      // Send point update to lightboard
+      sendLightboardPointUpdate(1); // Player 1 scored
       
       // Update lightboard
       updateLightboardGameState();
