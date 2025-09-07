@@ -49,7 +49,6 @@ bool player1Connected = false;
 unsigned long lastHeartbeat = 0;
 const unsigned long heartbeatTimeout = 2000; // 2 seconds
 bool player1MacLearned = false;
-static bool wasConnected = false; // Track if we've been connected before
 
 // ---- Game state ----
 int p1Pos = -1;
@@ -303,12 +302,9 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
     player1Connected = true;
     lastHeartbeat = millis();
     
-    // Clear demo mode and go black when first connected
-    if (!wasConnected) {
-      clearStrip();
-      Serial.println("Connection established - demo mode cleared");
-      wasConnected = true;
-    }
+    // Clear demo mode and go black when connected
+    clearStrip();
+    Serial.println("Connection established - demo mode cleared");
 
     if (player1Data.action == 1) {
       // Heartbeat - just update connection status
@@ -443,6 +439,22 @@ if (esp_now_add_peer(&peerInfo) == ESP_OK) {
   Serial.println("The lightboard will automatically discover Player 1 when it sends a message");
 }
 
+// ===================== Helper Functions =====================
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t wheel(byte WheelPos) {
+  WheelPos = 255 - WheelPos;
+  if(WheelPos < 85) {
+    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  }
+  if(WheelPos < 170) {
+    WheelPos -= 85;
+    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
+  WheelPos -= 170;
+  return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
+
 // ===================== Demo Mode =====================
 void runDemoMode() {
   static unsigned long lastDemoUpdate = 0;
@@ -465,11 +477,10 @@ void runDemoMode() {
         strip.setPixelColor(i, 0);
       }
       
-      // Create rainbow chase
+      // Create rainbow chase using wheel function
       for (int i = 0; i < NUM_LEDS; i++) {
         int hue = (rainbowOffset + (i * 256 / NUM_LEDS)) % 256;
-        uint32_t color = strip.gamma32(strip.ColorHSV(hue, 255, 128));
-        strip.setPixelColor(i, color);
+        strip.setPixelColor(i, wheel(hue));
       }
       
       // Add fireworks every 2-4 seconds
@@ -568,7 +579,6 @@ void loop(){
   if (player1Connected && (millis() - lastHeartbeat > heartbeatTimeout)) {
     player1Connected = false;
     player1MacLearned = false; // Reset MAC learning to force rediscovery
-    wasConnected = false; // Reset connection flag to allow demo mode again
     Serial.println("Player 1 connection lost - resetting discovery");
     clearStrip(); // Clear LEDs when disconnected
   }
