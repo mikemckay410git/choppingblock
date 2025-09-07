@@ -526,22 +526,5 @@ void loop(){
     lastHeartbeatSend = millis();
   }
 
-  // Update LED based on connection status
-  if (!player1Connected) {
-    // Show connection status with a slow blink
-    static unsigned long lastBlink = 0;
-    if (millis() - lastBlink >= 1000) {
-      static bool blinkState = false;
-      blinkState = !blinkState;
-      if (blinkState) {
-        strip.setPixelColor(0, strip.Color(255, 0, 0)); // Red for disconnected
-        strip.setPixelColor(NUM_LEDS-1, strip.Color(255, 0, 0));
-      } else {
-        strip.setPixelColor(0, 0);
-        strip.setPixelColor(NUM_LEDS-1, 0);
-      }
-      strip.show();
-      lastBlink = millis();
-    }
-  }
+  // Demo mode handles LED display when not connected
 }
