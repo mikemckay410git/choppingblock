@@ -326,11 +326,64 @@ button:active { transform: translateY(1px) scale(.998); }
   transform: translateY(-1px);
 }
 
-.file-input .hint {
-  font-size: 11px;
-  color: var(--muted);
-  opacity: 0.8;
-}
+ .file-input .hint {
+   font-size: 11px;
+   color: var(--muted);
+   opacity: 0.8;
+ }
+
+ /* Lightboard Settings Button */
+ .lightboard-settings-btn {
+   background: linear-gradient(180deg, rgba(99,102,241,.25), rgba(139,92,246,.15)) !important;
+   border: 1px solid rgba(99,102,241,.3) !important;
+   color: #a5b4fc !important;
+   font-size: 15px !important;
+   padding: 12px 18px !important;
+   border-radius: 12px !important;
+   transition: all 0.2s ease;
+   display: flex;
+   align-items: center;
+   gap: 8px;
+   font-weight: 600;
+ }
+
+ .lightboard-settings-btn:hover {
+   background: linear-gradient(180deg, rgba(99,102,241,.35), rgba(139,92,246,.25)) !important;
+   transform: translateY(-1px);
+   box-shadow: 0 8px 25px rgba(99,102,241,.3);
+ }
+
+ /* Settings Modal Styles */
+ .settings-section {
+   margin-bottom: 20px;
+ }
+
+ .settings-section label {
+   display: block;
+   font-weight: 600;
+   color: var(--accent);
+   margin-bottom: 8px;
+   font-size: 14px;
+ }
+
+ .settings-select {
+   width: 100%;
+   padding: 10px 12px;
+   border: 1px solid rgba(255,255,255,.14);
+   border-radius: 8px;
+   background: rgba(255,255,255,.06);
+   color: var(--ink);
+   font-size: 14px;
+   font-weight: 500;
+   transition: all 0.2s ease;
+ }
+
+ .settings-select:focus {
+   outline: none;
+   border-color: var(--accent);
+   background: rgba(255,255,255,.1);
+   box-shadow: 0 0 0 2px rgba(99,102,241,.2);
+ }
 
 .loaded-files {
   margin-left: auto;
@@ -677,18 +730,12 @@ button:active { transform: translateY(1px) scale(.998); }
          <div class="reset-hint">This will clear all loaded categories, scores, and player names</div>
        </div>
 
-       <!-- Lightboard Game Mode Selector -->
+       <!-- Lightboard Settings Button -->
        <div class="file-input" id="lightboardModeSection">
-         <label for="lightboardMode">🎮 Lightboard Game Mode</label>
-         <select id="lightboardMode" style="margin-left: 8px;">
-           <option value="1">Territory</option>
-           <option value="2">Swap Sides</option>
-           <option value="3">Split Scoring</option>
-           <option value="4">Score Order</option>
-           <option value="5">Race</option>
-           <option value="6">Tug O War</option>
-         </select>
-         <div class="hint">Select game mode for lightboard display</div>
+         <button id="lightboardSettingsBtn" class="lightboard-settings-btn">
+           🎮 Lightboard Settings
+         </button>
+         <div class="hint">Configure game mode and player colors</div>
        </div>
 
        <!-- File Upload Section -->
@@ -792,6 +839,54 @@ button:active { transform: translateY(1px) scale(.998); }
           </div>
         </div>
       </div>
+
+      <!-- Lightboard Settings Dialog -->
+      <div class="modal-overlay hidden" id="lightboardModal">
+        <div class="modal-dialog">
+          <div class="modal-header">
+            <h3>🎮 Lightboard Settings</h3>
+          </div>
+          <div class="modal-content">
+            <div class="settings-section">
+              <label for="lightboardMode">Game Mode:</label>
+              <select id="lightboardMode" class="settings-select">
+                <option value="1">Territory</option>
+                <option value="2">Swap Sides</option>
+                <option value="3">Split Scoring</option>
+                <option value="4">Score Order</option>
+                <option value="5">Race</option>
+                <option value="6">Tug O War</option>
+              </select>
+            </div>
+            
+            <div class="settings-section">
+              <label for="lightboardP1Color">Player 1 Color:</label>
+              <select id="lightboardP1Color" class="settings-select">
+                <option value="0">Red</option>
+                <option value="1">Blue</option>
+                <option value="2">Green</option>
+                <option value="3">Magenta</option>
+                <option value="4">Orange</option>
+              </select>
+            </div>
+            
+            <div class="settings-section">
+              <label for="lightboardP2Color">Player 2 Color:</label>
+              <select id="lightboardP2Color" class="settings-select">
+                <option value="0">Red</option>
+                <option value="1">Blue</option>
+                <option value="2">Green</option>
+                <option value="3">Magenta</option>
+                <option value="4">Orange</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="modal-btn cancel" id="cancelLightboard">Cancel</button>
+            <button class="modal-btn confirm" id="confirmLightboard">Apply Settings</button>
+          </div>
+        </div>
+      </div>
      
    </div>
 
@@ -830,6 +925,10 @@ const csvFileInput = document.getElementById('csvFile');
  const resetModal = document.getElementById('resetModal');
  const cancelReset = document.getElementById('cancelReset');
  const confirmReset = document.getElementById('confirmReset');
+ const lightboardModal = document.getElementById('lightboardModal');
+ const lightboardSettingsBtn = document.getElementById('lightboardSettingsBtn');
+ const cancelLightboard = document.getElementById('cancelLightboard');
+ const confirmLightboard = document.getElementById('confirmLightboard');
 
 // Game status elements in quiz mode
 const gameStatus = document.getElementById('gameStatus');
@@ -840,8 +939,10 @@ const player2Name = document.querySelector('#player2Tile .player-name');
 const player1ScoreEl = document.getElementById('player1Score');
 const player2ScoreEl = document.getElementById('player2Score');
 
-// Lightboard elements
-const lightboardModeSelect = document.getElementById('lightboardMode');
+// Lightboard elements (moved to modal)
+let lightboardGameMode = 1; // Default to Territory mode
+let lightboardP1ColorIndex = 0; // Red
+let lightboardP2ColorIndex = 1; // Blue
 
 // Quiz state
 let QA = [];
@@ -1332,6 +1433,40 @@ function parseCSV(csv) {
   function hideResetConfirmation() {
     resetModal.classList.add('hidden');
   }
+
+  // Lightboard modal functions
+  function showLightboardSettings() {
+    // Set current values
+    document.getElementById('lightboardMode').value = lightboardGameMode;
+    document.getElementById('lightboardP1Color').value = lightboardP1ColorIndex;
+    document.getElementById('lightboardP2Color').value = lightboardP2ColorIndex;
+    lightboardModal.classList.remove('hidden');
+  }
+
+  function hideLightboardSettings() {
+    lightboardModal.classList.add('hidden');
+  }
+
+  function applyLightboardSettings() {
+    const newMode = parseInt(document.getElementById('lightboardMode').value);
+    const newP1Color = parseInt(document.getElementById('lightboardP1Color').value);
+    const newP2Color = parseInt(document.getElementById('lightboardP2Color').value);
+    
+    // Update local variables
+    lightboardGameMode = newMode;
+    lightboardP1ColorIndex = newP1Color;
+    lightboardP2ColorIndex = newP2Color;
+    
+    // Send settings to server
+    ws.send(JSON.stringify({
+      action: 'lightboardSettings',
+      mode: newMode,
+      p1Color: newP1Color,
+      p2Color: newP2Color
+    }));
+    
+    hideLightboardSettings();
+  }
   
   function resetAllDataFunction() {
   // Clear all localStorage data
@@ -1715,6 +1850,9 @@ function startEditingName(nameElement, defaultName) {
  confirmExit.addEventListener('click', exitToCategories);
  cancelReset.addEventListener('click', hideResetConfirmation);
  confirmReset.addEventListener('click', resetAllDataFunction);
+ lightboardSettingsBtn.addEventListener('click', showLightboardSettings);
+ cancelLightboard.addEventListener('click', hideLightboardSettings);
+ confirmLightboard.addEventListener('click', applyLightboardSettings);
  
  // Close modals when clicking overlay
  confirmModal.addEventListener('click', function(e) {
@@ -1728,6 +1866,12 @@ function startEditingName(nameElement, defaultName) {
      hideResetConfirmation();
    }
  });
+
+ lightboardModal.addEventListener('click', function(e) {
+   if (e.target === lightboardModal) {
+     hideLightboardSettings();
+   }
+ });
  
  // Close modals with Escape key
  document.addEventListener('keydown', function(e) {
@@ -1736,6 +1880,8 @@ function startEditingName(nameElement, defaultName) {
        hideExitConfirmation();
      } else if (!resetModal.classList.contains('hidden')) {
        hideResetConfirmation();
+     } else if (!lightboardModal.classList.contains('hidden')) {
+       hideLightboardSettings();
      }
    }
  });
@@ -1782,17 +1928,7 @@ function restoreQuizState() {
   }
 }
 
-// Lightboard mode change handler
-lightboardModeSelect.addEventListener('change', function() {
-  const mode = parseInt(lightboardModeSelect.value);
-  console.log('Lightboard mode changed to:', mode);
-  
-  // Send mode change to server via WebSocket
-  ws.send(JSON.stringify({
-    action: 'lightboardMode',
-    mode: mode
-  }));
-});
+// Lightboard mode change handler (removed - now handled by modal)
 
 // Initialize quiz on load
 document.addEventListener('DOMContentLoaded', function() {
@@ -2280,6 +2416,23 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
             if (newMode >= 1 && newMode <= 6) {
               lightboardGameMode = newMode;
               Serial.printf("Lightboard mode changed to: %d\n", newMode);
+              sendLightboardUpdate(4); // mode-change action
+            }
+          }
+        } else if (message.indexOf("lightboardSettings") != -1) {
+          // Handle lightboard settings change from web interface
+          DynamicJsonDocument doc(1024);
+          deserializeJson(doc, message);
+          if (doc.containsKey("mode") && doc.containsKey("p1Color") && doc.containsKey("p2Color")) {
+            int newMode = doc["mode"];
+            int newP1Color = doc["p1Color"];
+            int newP2Color = doc["p2Color"];
+            
+            if (newMode >= 1 && newMode <= 6 && newP1Color >= 0 && newP1Color <= 4 && newP2Color >= 0 && newP2Color <= 4) {
+              lightboardGameMode = newMode;
+              lightboardP1ColorIndex = newP1Color;
+              lightboardP2ColorIndex = newP2Color;
+              Serial.printf("Lightboard settings updated: mode=%d, p1Color=%d, p2Color=%d\n", newMode, newP1Color, newP2Color);
               sendLightboardUpdate(4); // mode-change action
             }
           }
