@@ -1113,6 +1113,9 @@ function awardPoint(player) {
   updateScoreDisplay();
   savePersistedData();
   
+  // Determine winner and update lightboard
+  determineWinner();
+  
   // Reset game and advance to next question
   removeScorableState();
   hideWinner();
@@ -2000,16 +2003,9 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       Serial.printf("Player 2 hit detected at %lu (adjusted from %lu) with strength %d\n", 
                    adjustedTime, player2Data.hitTime, player2Data.hitStrength);
       
-      // Declare winner immediately if round active
+      // Record hit time only - point will be awarded after quiz question is answered
       if (gameActive) {
-        winner = "Player 2";
-        gameActive = false;
-        String j = "{\"winner\":\"" + winner + "\"}";
-        ws.broadcastTXT(j);
-        Serial.println("Winner declared: Player 2");
-        
-        // Send point update to lightboard
-        sendLightboardPointUpdate(2); // Player 2 scored
+        Serial.println("Player 2 hit recorded - waiting for quiz completion");
       }
     } else if (player2Data.action == 3) {
       // Reset request from Player 2
@@ -2061,8 +2057,17 @@ void sendLightboardUpdate(uint8_t action) {
   lightboardData.tugBoundary = lightboardTugBoundary;
   lightboardData.p1RacePos = lightboardP1RacePos;
   lightboardData.p2RacePos = lightboardP2RacePos;
-  lightboardData.celebrating = lightboardCelebrating;
-  lightboardData.winner = lightboardWinner;
+  
+  // Only send winner information for specific actions
+  if (action == 2) {
+    // Game state update - no winner information, just settings
+    lightboardData.celebrating = false;
+    lightboardData.winner = 0;
+  } else {
+    // Other actions (heartbeat, mode change, reset) - include winner info
+    lightboardData.celebrating = lightboardCelebrating;
+    lightboardData.winner = lightboardWinner;
+  }
   
   esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
   Serial.printf("Sent lightboard update: action=%d, mode=%d\n", action, lightboardGameMode);
@@ -2114,6 +2119,9 @@ void determineWinner() {
     // Broadcast winner to web interface
     String j = "{\"winner\":\"" + winner + "\"}";
     ws.broadcastTXT(j);
+    
+    // Update lightboard
+    updateLightboardGameState();
   }
 }
 
@@ -2416,15 +2424,8 @@ void loop(){
       myData.hitStrength = r.hitStrength;
       esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
       
-      // Declare winner immediately
-      winner = "Player 1";
-      gameActive = false;
-      String winMsg = "{\"winner\":\"" + winner + "\"}";
-      ws.broadcastTXT(winMsg);
-      Serial.println("Winner declared: Player 1");
-      
-      // Send point update to lightboard
-      sendLightboardPointUpdate(1); // Player 1 scored
+      // Record hit time only - point will be awarded after quiz question is answered
+      Serial.println("Player 1 hit recorded - waiting for quiz completion");
     } else {
       // Do not map toolboard hits to quiz actions.
       // Questions should advance only via UI button or when a point is awarded.
