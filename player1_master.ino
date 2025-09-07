@@ -1240,13 +1240,10 @@ function exitToCategories() {
   updateScoreDisplay();
   removeScorableState();
   
-  // Reset lightboard to defaults when exiting quiz
-  ws.send(JSON.stringify({action: 'reset'}));
-  
   // Hide modal
   hideExitConfirmation();
   
-  // Return to category selector
+  // Return to category selector (will automatically reset lightboard)
   showCategorySelector();
 }
 
@@ -1373,9 +1370,6 @@ function parseCSV(csv) {
   showCategorySelector();
   createCategoryButtons(availableCategories);
   
-  // Reset lightboard to defaults when resetting all data
-  ws.send(JSON.stringify({action: 'reset'}));
-  
   // Hide modal
   hideResetConfirmation();
 }
@@ -1476,6 +1470,9 @@ function addFileToList(filename, message, status) {
    fileInputSection.classList.remove('hidden');
    resetAllData.parentElement.classList.remove('hidden');
    lightboardModeSection.classList.remove('hidden');
+   
+   // Always reset lightboard when returning to category selector
+   ws.send(JSON.stringify({action: 'reset'}));
  }
 
  function showQuizDisplay() {
