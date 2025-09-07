@@ -1240,6 +1240,9 @@ function exitToCategories() {
   updateScoreDisplay();
   removeScorableState();
   
+  // Reset lightboard to defaults when exiting quiz
+  ws.send(JSON.stringify({action: 'reset'}));
+  
   // Hide modal
   hideExitConfirmation();
   
@@ -1369,6 +1372,9 @@ function parseCSV(csv) {
   }];
   showCategorySelector();
   createCategoryButtons(availableCategories);
+  
+  // Reset lightboard to defaults when resetting all data
+  ws.send(JSON.stringify({action: 'reset'}));
   
   // Hide modal
   hideResetConfirmation();
