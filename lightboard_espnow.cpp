@@ -49,6 +49,7 @@ bool player1Connected = false;
 unsigned long lastHeartbeat = 0;
 const unsigned long heartbeatTimeout = 2000; // 2 seconds
 bool player1MacLearned = false;
+static bool wasConnected = false; // Track if we've been connected before
 
 // ---- Game state ----
 int p1Pos = -1;
@@ -301,6 +302,13 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
     }
     player1Connected = true;
     lastHeartbeat = millis();
+    
+    // Clear demo mode and go black when first connected
+    if (!wasConnected) {
+      clearStrip();
+      Serial.println("Connection established - demo mode cleared");
+      wasConnected = true;
+    }
 
     if (player1Data.action == 1) {
       // Heartbeat - just update connection status
@@ -438,85 +446,104 @@ if (esp_now_add_peer(&peerInfo) == ESP_OK) {
 // ===================== Demo Mode =====================
 void runDemoMode() {
   static unsigned long lastDemoUpdate = 0;
-  static int demoStep = 0;
-  static int demoMode = 1;
+  static unsigned long lastFirework = 0;
+  static int rainbowOffset = 0;
+  static int fireworkCount = 0;
+  static int fireworkPositions[5] = {0};
+  static int fireworkAges[5] = {0};
+  static bool fireworkActive[5] = {false};
   
-  if (millis() - lastDemoUpdate >= 3000) { // Update every 3 seconds
+  if (millis() - lastDemoUpdate >= 50) { // Update every 50ms for smooth animation
     lastDemoUpdate = millis();
     
     if (!player1Connected) {
-      // Run demo when not connected to show different game modes
-      demoStep++;
+      // Rainbow chase effect
+      rainbowOffset = (rainbowOffset + 1) % 256;
       
-      if (demoStep >= 20) { // After 20 steps (60 seconds), cycle to next mode
-        demoStep = 0;
-        demoMode = (demoMode % 6) + 1;
-        gameMode = demoMode;
-        resetGame();
-        Serial.printf("Demo mode changed to: %d\n", demoMode);
+      // Clear strip
+      for (int i = 0; i < NUM_LEDS; i++) {
+        strip.setPixelColor(i, 0);
       }
       
-      // Simulate game progress based on mode
-      switch (gameMode) {
-        case 1: // Territory
-          if (demoStep < 10) {
-            p1Pos = min(p1Pos + 1, NUM_LEDS - 1);
-            p2Pos = max(p2Pos - 1, 0);
-          } else {
-            p1Pos = min(p1Pos + 2, NUM_LEDS - 1);
-            p2Pos = max(p2Pos - 2, 0);
-          }
-          break;
-          
-        case 2: // Swap Sides
-          if (demoStep < 10) {
-            p1Pos = min(p1Pos + 1, NUM_LEDS - 1);
-            p2Pos = max(p2Pos - 1, 0);
-          } else {
-            // Simulate swap
-            int temp = p1Pos;
-            p1Pos = p2Pos;
-            p2Pos = temp;
-          }
-          break;
-          
-        case 3: // Split Scoring
-          if (demoStep < 10) {
-            p1Pos = max(p1Pos - 1, 0);
-            p2Pos = min(p2Pos + 1, NUM_LEDS - 1);
-          } else {
-            p1Pos = max(p1Pos - 2, 0);
-            p2Pos = min(p2Pos + 2, NUM_LEDS - 1);
-          }
-          break;
-          
-        case 4: // Score Order
-          if (nextLedPosition < NUM_LEDS) {
-            scoringSequence[nextLedPosition] = (demoStep % 2) + 1; // Alternate players
-            nextLedPosition++;
-          }
-          break;
-          
-        case 5: // Race
-          if (demoStep < 10) {
-            p1RacePos = min(p1RacePos + 1, NUM_LEDS - 1);
-            p2RacePos = min(p2RacePos + 1, NUM_LEDS - 1);
-          } else {
-            p1RacePos = min(p1RacePos + 2, NUM_LEDS - 1);
-            p2RacePos = min(p2RacePos + 1, NUM_LEDS - 1);
-          }
-          break;
-          
-        case 6: // Tug O War
-          if (demoStep < 10) {
-            tugBoundary = min(tugBoundary + 1, NUM_LEDS - 1);
-          } else {
-            tugBoundary = max(tugBoundary - 1, 0);
-          }
-          break;
+      // Create rainbow chase
+      for (int i = 0; i < NUM_LEDS; i++) {
+        int hue = (rainbowOffset + (i * 256 / NUM_LEDS)) % 256;
+        uint32_t color = strip.gamma32(strip.ColorHSV(hue, 255, 128));
+        strip.setPixelColor(i, color);
       }
       
-      paintProgress();
+      // Add fireworks every 2-4 seconds
+      if (millis() - lastFirework >= random(2000, 4000)) {
+        lastFirework = millis();
+        
+        // Find an inactive firework slot
+        for (int i = 0; i < 5; i++) {
+          if (!fireworkActive[i]) {
+            fireworkPositions[i] = random(0, NUM_LEDS);
+            fireworkAges[i] = 0;
+            fireworkActive[i] = true;
+            break;
+          }
+        }
+      }
+      
+      // Update and draw fireworks
+      for (int i = 0; i < 5; i++) {
+        if (fireworkActive[i]) {
+          fireworkAges[i]++;
+          
+          if (fireworkAges[i] > 30) {
+            fireworkActive[i] = false; // Remove old firework
+          } else {
+            // Draw firework explosion
+            int pos = fireworkPositions[i];
+            int age = fireworkAges[i];
+            
+            // Main firework center
+            if (age < 10) {
+              // Growing explosion
+              int radius = age;
+              for (int j = max(0, pos - radius); j <= min(NUM_LEDS-1, pos + radius); j++) {
+                int distance = abs(j - pos);
+                if (distance <= radius) {
+                  float intensity = 1.0f - (float)distance / (float)radius;
+                  intensity *= (1.0f - (float)age / 10.0f); // Fade out
+                  
+                  // Random colors for fireworks
+                  uint8_t r = random(200, 255);
+                  uint8_t g = random(100, 255);
+                  uint8_t b = random(100, 255);
+                  
+                  uint32_t fireworkColor = strip.Color(
+                    (uint8_t)(r * intensity),
+                    (uint8_t)(g * intensity),
+                    (uint8_t)(b * intensity)
+                  );
+                  
+                  strip.setPixelColor(j, fireworkColor);
+                }
+              }
+            } else {
+              // Sparkle trail
+              int sparkleCount = 20 - age;
+              for (int s = 0; s < sparkleCount; s++) {
+                int sparklePos = pos + random(-5, 6);
+                if (sparklePos >= 0 && sparklePos < NUM_LEDS) {
+                  float intensity = (float)(20 - age) / 20.0f;
+                  uint32_t sparkleColor = strip.Color(
+                    (uint8_t)(255 * intensity),
+                    (uint8_t)(255 * intensity),
+                    (uint8_t)(255 * intensity)
+                  );
+                  strip.setPixelColor(sparklePos, sparkleColor);
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      strip.show();
     }
   }
 }
@@ -541,6 +568,7 @@ void loop(){
   if (player1Connected && (millis() - lastHeartbeat > heartbeatTimeout)) {
     player1Connected = false;
     player1MacLearned = false; // Reset MAC learning to force rediscovery
+    wasConnected = false; // Reset connection flag to allow demo mode again
     Serial.println("Player 1 connection lost - resetting discovery");
     clearStrip(); // Clear LEDs when disconnected
   }
