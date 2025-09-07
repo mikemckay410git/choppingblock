@@ -49,6 +49,7 @@ bool player1Connected = false;
 unsigned long lastHeartbeat = 0;
 const unsigned long heartbeatTimeout = 2000; // 2 seconds
 bool player1MacLearned = false;
+static bool wasConnected = false; // Track if we've been connected before
 
 // ---- Game state ----
 int p1Pos = -1;
@@ -299,12 +300,16 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
         Serial.println("Failed to add discovered Player 1 peer");
       }
     }
+    // Check if this is a new connection (was disconnected, now connected)
+    bool wasDisconnected = !player1Connected;
     player1Connected = true;
     lastHeartbeat = millis();
     
-    // Clear demo mode and go black when connected
-    clearStrip();
-    Serial.println("Connection established - demo mode cleared");
+    // Clear demo mode and go black only on new connection
+    if (wasDisconnected) {
+      clearStrip();
+      Serial.println("Connection established - demo mode cleared");
+    }
 
     if (player1Data.action == 1) {
       // Heartbeat - just update connection status
@@ -458,12 +463,7 @@ uint32_t wheel(byte WheelPos) {
 // ===================== Demo Mode =====================
 void runDemoMode() {
   static unsigned long lastDemoUpdate = 0;
-  static unsigned long lastFirework = 0;
   static int rainbowOffset = 0;
-  static int fireworkCount = 0;
-  static int fireworkPositions[5] = {0};
-  static int fireworkAges[5] = {0};
-  static bool fireworkActive[5] = {false};
   
   if (millis() - lastDemoUpdate >= 50) { // Update every 50ms for smooth animation
     lastDemoUpdate = millis();
@@ -481,77 +481,6 @@ void runDemoMode() {
       for (int i = 0; i < NUM_LEDS; i++) {
         int hue = (rainbowOffset + (i * 256 / NUM_LEDS)) % 256;
         strip.setPixelColor(i, wheel(hue));
-      }
-      
-      // Add fireworks every 2-4 seconds
-      if (millis() - lastFirework >= random(2000, 4000)) {
-        lastFirework = millis();
-        
-        // Find an inactive firework slot
-        for (int i = 0; i < 5; i++) {
-          if (!fireworkActive[i]) {
-            fireworkPositions[i] = random(0, NUM_LEDS);
-            fireworkAges[i] = 0;
-            fireworkActive[i] = true;
-            break;
-          }
-        }
-      }
-      
-      // Update and draw fireworks
-      for (int i = 0; i < 5; i++) {
-        if (fireworkActive[i]) {
-          fireworkAges[i]++;
-          
-          if (fireworkAges[i] > 30) {
-            fireworkActive[i] = false; // Remove old firework
-          } else {
-            // Draw firework explosion
-            int pos = fireworkPositions[i];
-            int age = fireworkAges[i];
-            
-            // Main firework center
-            if (age < 10) {
-              // Growing explosion
-              int radius = age;
-              for (int j = max(0, pos - radius); j <= min(NUM_LEDS-1, pos + radius); j++) {
-                int distance = abs(j - pos);
-                if (distance <= radius) {
-                  float intensity = 1.0f - (float)distance / (float)radius;
-                  intensity *= (1.0f - (float)age / 10.0f); // Fade out
-                  
-                  // Random colors for fireworks
-                  uint8_t r = random(200, 255);
-                  uint8_t g = random(100, 255);
-                  uint8_t b = random(100, 255);
-                  
-                  uint32_t fireworkColor = strip.Color(
-                    (uint8_t)(r * intensity),
-                    (uint8_t)(g * intensity),
-                    (uint8_t)(b * intensity)
-                  );
-                  
-                  strip.setPixelColor(j, fireworkColor);
-                }
-              }
-            } else {
-              // Sparkle trail
-              int sparkleCount = 20 - age;
-              for (int s = 0; s < sparkleCount; s++) {
-                int sparklePos = pos + random(-5, 6);
-                if (sparklePos >= 0 && sparklePos < NUM_LEDS) {
-                  float intensity = (float)(20 - age) / 20.0f;
-                  uint32_t sparkleColor = strip.Color(
-                    (uint8_t)(255 * intensity),
-                    (uint8_t)(255 * intensity),
-                    (uint8_t)(255 * intensity)
-                  );
-                  strip.setPixelColor(sparklePos, sparkleColor);
-                }
-              }
-            }
-          }
-        }
       }
       
       strip.show();
@@ -579,6 +508,7 @@ void loop(){
   if (player1Connected && (millis() - lastHeartbeat > heartbeatTimeout)) {
     player1Connected = false;
     player1MacLearned = false; // Reset MAC learning to force rediscovery
+    wasConnected = false; // Reset connection flag to allow demo mode again
     Serial.println("Player 1 connection lost - resetting discovery");
     clearStrip(); // Clear LEDs when disconnected
   }
