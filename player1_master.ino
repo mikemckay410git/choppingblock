@@ -167,10 +167,11 @@ const char HTML[] PROGMEM = R"HTML(
 <style>
 :root{ --text:#e5e7eb; --ok:#10b981; --bad:#ef4444; --accent:#6366f1; --accent2:#8b5cf6; --bg:#0b1220; --card:#101a33; --ink:#eaf0ff; --muted:#aab6d3; }
 html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
-html,body{height:100%}
+html,body{min-height:100%}
 body{ margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; color:var(--text);
   background:radial-gradient(1200px 600px at 50% -20%, #1e293b 0%, #0b1220 60%, #070b13 100%);
-  display:flex; align-items:center; justify-content:center; padding:24px; }
+  display:flex; align-items:flex-start; justify-content:center; padding:24px; }
+.app-container{ margin-top:max(0px, calc(50vh - 300px)); }
 .card{ background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
   border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:28px 22px;
   box-shadow:0 10px 30px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04); text-align:center; width:min(520px, 92vw) }
@@ -664,7 +665,7 @@ button:active { transform: translateY(1px) scale(.998); }
 </head><body>
   <div id=connDot class="bad"></div>
   
-     <div class="app">
+     <div class="app app-container">
      <!-- Quiz Interface -->
      <div id="quizInterface">
              <!-- Reset Button -->
@@ -800,6 +801,7 @@ const connDot=document.getElementById('connDot');
  const quizInterface = document.getElementById('quizInterface');
  const resetAllData = document.getElementById('resetAllData');
  const fileInputSection = document.getElementById('fileInputSection');
+ const lightboardModeSection = document.getElementById('lightboardModeSection');
  const loadedFiles = document.getElementById('loadedFiles');
  const fileList = document.getElementById('fileList');
 const categorySelector = document.getElementById('categorySelector');
@@ -1460,6 +1462,7 @@ function addFileToList(filename, message, status) {
    quizDisplay.classList.add('hidden');
    fileInputSection.classList.remove('hidden');
    resetAllData.parentElement.classList.remove('hidden');
+   lightboardModeSection.classList.remove('hidden');
  }
 
  function showQuizDisplay() {
@@ -1467,6 +1470,7 @@ function addFileToList(filename, message, status) {
    quizDisplay.classList.remove('hidden');
    fileInputSection.classList.add('hidden');
    resetAllData.parentElement.classList.add('hidden');
+   lightboardModeSection.classList.add('hidden');
  }
 
 function createCategoryButtons(categories) {

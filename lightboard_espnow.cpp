@@ -545,15 +545,15 @@ void loop(){
     clearStrip(); // Clear LEDs when disconnected
   }
 
-  // Send heartbeat to Player 1 (only if we have learned the MAC address)
+  // Send heartbeat to Player 1 (start immediately after setup)
   static unsigned long lastHeartbeatSend = 0;
   if (millis() - lastHeartbeatSend >= 1000) {
+    myData.action = 1; // heartbeat
+    esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
     if (player1MacLearned) {
-      myData.action = 1; // heartbeat
-      esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
       Serial.println("Sent heartbeat to Player 1");
     } else {
-      Serial.println("Waiting for Player 1 connection...");
+      Serial.println("Sent heartbeat to Player 1 (waiting for connection)");
     }
     lastHeartbeatSend = millis();
   }
