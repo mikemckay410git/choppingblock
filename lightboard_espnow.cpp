@@ -333,8 +333,8 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       
     } else if (player1Data.action == 3) {
       // Point update - run our own game logic
-      Serial.println("Point update received - running lightboard game logic");
-      handlePointUpdate();
+      Serial.printf("Point update received - Player %d scored, running lightboard game logic\n", player1Data.winner);
+      handlePointUpdate(player1Data.winner);
       
     } else if (player1Data.action == 4) {
       // Mode change
@@ -454,21 +454,27 @@ uint32_t wheel(byte WheelPos) {
 }
 
 // ===================== Lightboard Game Logic =====================
-void handlePointUpdate() {
+void handlePointUpdate(uint8_t scoringPlayer) {
   // This function runs the lightboard's own game logic based on point updates
-  // The lightboard determines how to update positions based on the current game mode
+  // The lightboard determines how to update positions based on the current game mode and which player scored
   
   switch (gameMode) {
     case 1: // Territory
-      // Move both players toward center
-      if (p1Pos < NUM_LEDS - 1) p1Pos++;
-      if (p2Pos > 0) p2Pos--;
+      // Move the scoring player toward center
+      if (scoringPlayer == 1 && p1Pos < NUM_LEDS - 1) {
+        p1Pos++;
+      } else if (scoringPlayer == 2 && p2Pos > 0) {
+        p2Pos--;
+      }
       break;
       
     case 2: // Swap Sides
-      // Move both players toward center, then swap when they meet
-      if (p1Pos < NUM_LEDS - 1) p1Pos++;
-      if (p2Pos > 0) p2Pos--;
+      // Move the scoring player toward center
+      if (scoringPlayer == 1 && p1Pos < NUM_LEDS - 1) {
+        p1Pos++;
+      } else if (scoringPlayer == 2 && p2Pos > 0) {
+        p2Pos--;
+      }
       
       // Check if they've met in the middle
       if (p1Pos >= CENTER_LEFT && p2Pos <= CENTER_RIGHT) {
@@ -480,32 +486,37 @@ void handlePointUpdate() {
       break;
       
     case 3: // Split Scoring
-      // Move players away from center
-      if (p1Pos > 0) p1Pos--;
-      if (p2Pos < NUM_LEDS - 1) p2Pos++;
+      // Move the scoring player away from center
+      if (scoringPlayer == 1 && p1Pos > 0) {
+        p1Pos--;
+      } else if (scoringPlayer == 2 && p2Pos < NUM_LEDS - 1) {
+        p2Pos++;
+      }
       break;
       
     case 4: // Score Order
-      // Fill LEDs in sequence
+      // Fill LEDs in sequence with the scoring player
       if (nextLedPosition < NUM_LEDS) {
-        // Alternate between players for each LED
-        scoringSequence[nextLedPosition] = (nextLedPosition % 2) + 1;
+        scoringSequence[nextLedPosition] = scoringPlayer;
         nextLedPosition++;
       }
       break;
       
     case 5: // Race
-      // Both players race to the end
-      if (p1RacePos < NUM_LEDS - 1) p1RacePos++;
-      if (p2RacePos < NUM_LEDS - 1) p2RacePos++;
+      // Move the scoring player forward
+      if (scoringPlayer == 1 && p1RacePos < NUM_LEDS - 1) {
+        p1RacePos++;
+      } else if (scoringPlayer == 2 && p2RacePos < NUM_LEDS - 1) {
+        p2RacePos++;
+      }
       break;
       
     case 6: // Tug O War
-      // Move boundary back and forth
-      if (tugBoundary < NUM_LEDS - 1) {
+      // Move boundary based on who scored
+      if (scoringPlayer == 1 && tugBoundary < NUM_LEDS - 1) {
         tugBoundary++;
-      } else {
-        tugBoundary = 0; // Reset to start
+      } else if (scoringPlayer == 2 && tugBoundary > 0) {
+        tugBoundary--;
       }
       break;
   }

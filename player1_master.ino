@@ -109,6 +109,7 @@ void determineWinner();
 void syncClock();
 void sendLightboardUpdate(uint8_t action);
 void updateLightboardGameState();
+void sendPointUpdateToLightboard(String player);
 
 volatile unsigned long g_firstTime[SENSOR_COUNT]; // first arrival micros() per sensor
 volatile uint32_t      g_hitMask = 0;             // bit i set when sensor i latched first arrival
@@ -1112,6 +1113,9 @@ function awardPoint(player) {
   updateScoreDisplay();
   savePersistedData();
   
+  // Send point update to lightboard
+  sendPointUpdateToLightboard(player);
+  
   // Reset game and advance to next question
   removeScorableState();
   hideWinner();
@@ -2082,6 +2086,29 @@ void updateLightboardGameState() {
   
   // Send game state update to lightboard
   sendLightboardUpdate(2); // game-state action
+}
+
+void sendPointUpdateToLightboard(String player) {
+  // Send point update to lightboard so it can run its own game logic
+  if (!lightboardConnected) return;
+  
+  lightboardData.deviceId = 1; // Player 1
+  lightboardData.action = 3; // point update action
+  lightboardData.gameMode = lightboardGameMode;
+  lightboardData.p1ColorIndex = lightboardP1ColorIndex;
+  lightboardData.p2ColorIndex = lightboardP2ColorIndex;
+  
+  // Set winner based on who got the point
+  if (player == "Player 1") {
+    lightboardData.winner = 1;
+  } else if (player == "Player 2") {
+    lightboardData.winner = 2;
+  } else {
+    lightboardData.winner = 0;
+  }
+  
+  esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
+  Serial.printf("Sent point update to lightboard: %s\n", player.c_str());
 }
 
 // ===================== Game Logic =====================
