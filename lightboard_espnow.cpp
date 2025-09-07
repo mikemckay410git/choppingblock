@@ -128,7 +128,6 @@ static inline uint32_t scaleColor(uint8_t r,uint8_t g,uint8_t b,float s){
 
 void startCelebration(bool player1Wins) {
   celActive = true;
-  celebrating = true;  // Set the celebrating flag to trigger animation
   celP1Wins = player1Wins;
   if (celP1Wins) { 
     PlayerColor c = getP1Color();
@@ -568,11 +567,15 @@ void checkWinConditions() {
   }
   
   if (p1Wins && !p2Wins) {
+    Serial.println("Lightboard: Player 1 wins! Starting celebration...");
     startCelebration(true); // Player 1 wins
-    Serial.println("Lightboard: Player 1 wins!");
+    celebrating = true;
+    Serial.printf("Celebration started: celActive=%d, celebrating=%d\n", celActive, celebrating);
   } else if (p2Wins && !p1Wins) {
+    Serial.println("Lightboard: Player 2 wins! Starting celebration...");
     startCelebration(false); // Player 2 wins
-    Serial.println("Lightboard: Player 2 wins!");
+    celebrating = true;
+    Serial.printf("Celebration started: celActive=%d, celebrating=%d\n", celActive, celebrating);
   }
 }
 
