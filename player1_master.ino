@@ -2010,9 +2010,6 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
         
         // Send point update to lightboard
         sendLightboardPointUpdate(2); // Player 2 scored
-        
-        // Update lightboard
-        updateLightboardGameState();
       }
     } else if (player2Data.action == 3) {
       // Reset request from Player 2
@@ -2072,19 +2069,8 @@ void sendLightboardUpdate(uint8_t action) {
 }
 
 void updateLightboardGameState() {
-  // Update lightboard state based on current game state
-  if (winner == "Player 1") {
-    lightboardWinner = 1;
-    lightboardCelebrating = true;
-  } else if (winner == "Player 2") {
-    lightboardWinner = 2;
-    lightboardCelebrating = true;
-  } else {
-    lightboardWinner = 0;
-    lightboardCelebrating = false;
-  }
-  
-  // Send game state update to lightboard
+  // Send game state update to lightboard (mode, colors only)
+  // Individual points are handled by sendLightboardPointUpdate()
   sendLightboardUpdate(2); // game-state action
 }
 
@@ -2128,9 +2114,6 @@ void determineWinner() {
     // Broadcast winner to web interface
     String j = "{\"winner\":\"" + winner + "\"}";
     ws.broadcastTXT(j);
-    
-    // Update lightboard
-    updateLightboardGameState();
   }
 }
 
@@ -2442,9 +2425,6 @@ void loop(){
       
       // Send point update to lightboard
       sendLightboardPointUpdate(1); // Player 1 scored
-      
-      // Update lightboard
-      updateLightboardGameState();
     } else {
       // Do not map toolboard hits to quiz actions.
       // Questions should advance only via UI button or when a point is awarded.

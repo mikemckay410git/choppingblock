@@ -315,20 +315,13 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       // Heartbeat - just update connection status
       Serial.println("Player 1 heartbeat received");
     } else if (player1Data.action == 2) {
-      // Game state update - only update essential settings, run our own logic
+      // Game state update - only update essential settings (mode, colors)
       gameMode = player1Data.gameMode;
       p1ColorIndex = player1Data.p1ColorIndex;
       p2ColorIndex = player1Data.p2ColorIndex;
       
-      // Handle winner celebration
-      if (player1Data.winner == 1) {
-        startCelebration(true); // Player 1 wins
-      } else if (player1Data.winner == 2) {
-        startCelebration(false); // Player 2 wins
-      }
-      
-      Serial.printf("Game state update: mode=%d, winner=%d\n", 
-                   gameMode, player1Data.winner);
+      Serial.printf("Game state update: mode=%d, p1Color=%d, p2Color=%d\n", 
+                   gameMode, p1ColorIndex, p2ColorIndex);
       paintProgress();
       
     } else if (player1Data.action == 3) {
