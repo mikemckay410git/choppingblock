@@ -332,26 +332,6 @@ button:active { transform: translateY(1px) scale(.998); }
    opacity: 0.8;
  }
 
- /* Lightboard Settings Button */
- .lightboard-settings-btn {
-   background: linear-gradient(180deg, rgba(99,102,241,.25), rgba(139,92,246,.15)) !important;
-   border: 1px solid rgba(99,102,241,.3) !important;
-   color: #a5b4fc !important;
-   font-size: 15px !important;
-   padding: 12px 18px !important;
-   border-radius: 12px !important;
-   transition: all 0.2s ease;
-   display: flex;
-   align-items: center;
-   gap: 8px;
-   font-weight: 600;
- }
-
- .lightboard-settings-btn:hover {
-   background: linear-gradient(180deg, rgba(99,102,241,.35), rgba(139,92,246,.25)) !important;
-   transform: translateY(-1px);
-   box-shadow: 0 8px 25px rgba(99,102,241,.3);
- }
 
  /* Settings Modal Styles */
  .settings-section {
@@ -732,8 +712,8 @@ button:active { transform: translateY(1px) scale(.998); }
 
        <!-- Lightboard Settings Button -->
        <div class="file-input" id="lightboardModeSection">
-         <button id="lightboardSettingsBtn" class="lightboard-settings-btn">
-           🎮 Lightboard Settings
+         <button id="lightboardSettingsBtn" class="reset-btn">
+           💡 Lightboard Settings
          </button>
          <div class="hint">Configure game mode and player colors</div>
        </div>
@@ -1087,6 +1067,7 @@ function savePersistedData() {
 // Initialize quiz
 function initQuiz() {
   loadPersistedData();
+  loadLightboardSettings();
 }
 
 function setOrder(randomize) {
@@ -1436,7 +1417,10 @@ function parseCSV(csv) {
 
   // Lightboard modal functions
   function showLightboardSettings() {
-    // Set current values
+    // Load current settings from localStorage first
+    loadLightboardSettings();
+    
+    // Set current values in modal
     document.getElementById('lightboardMode').value = lightboardGameMode;
     document.getElementById('lightboardP1Color').value = lightboardP1ColorIndex;
     document.getElementById('lightboardP2Color').value = lightboardP2ColorIndex;
@@ -1457,6 +1441,9 @@ function parseCSV(csv) {
     lightboardP1ColorIndex = newP1Color;
     lightboardP2ColorIndex = newP2Color;
     
+    // Save settings to localStorage
+    saveLightboardSettings();
+    
     // Send settings to server
     ws.send(JSON.stringify({
       action: 'lightboardSettings',
@@ -1466,6 +1453,28 @@ function parseCSV(csv) {
     }));
     
     hideLightboardSettings();
+  }
+
+  function saveLightboardSettings() {
+    localStorage.setItem('lightboardGameMode', lightboardGameMode.toString());
+    localStorage.setItem('lightboardP1ColorIndex', lightboardP1ColorIndex.toString());
+    localStorage.setItem('lightboardP2ColorIndex', lightboardP2ColorIndex.toString());
+  }
+
+  function loadLightboardSettings() {
+    const savedMode = localStorage.getItem('lightboardGameMode');
+    const savedP1Color = localStorage.getItem('lightboardP1ColorIndex');
+    const savedP2Color = localStorage.getItem('lightboardP2ColorIndex');
+    
+    if (savedMode !== null) {
+      lightboardGameMode = parseInt(savedMode);
+    }
+    if (savedP1Color !== null) {
+      lightboardP1ColorIndex = parseInt(savedP1Color);
+    }
+    if (savedP2Color !== null) {
+      lightboardP2ColorIndex = parseInt(savedP2Color);
+    }
   }
   
   function resetAllDataFunction() {
@@ -1485,6 +1494,11 @@ function parseCSV(csv) {
   order = [];
   idx = 0;
   roundComplete = false;
+  
+  // Reset lightboard settings to defaults
+  lightboardGameMode = 1;
+  lightboardP1ColorIndex = 0;
+  lightboardP2ColorIndex = 1;
   
   // Update UI
   player1Name.textContent = player1NameText;
