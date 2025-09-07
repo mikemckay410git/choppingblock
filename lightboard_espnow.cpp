@@ -128,6 +128,7 @@ static inline uint32_t scaleColor(uint8_t r,uint8_t g,uint8_t b,float s){
 
 void startCelebration(bool player1Wins) {
   celActive = true;
+  celebrating = true;  // Set the celebrating flag to trigger animation
   celP1Wins = player1Wins;
   if (celP1Wins) { 
     PlayerColor c = getP1Color();
