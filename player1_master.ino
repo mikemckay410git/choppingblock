@@ -113,6 +113,7 @@ void sendLightboardUpdate(uint8_t action);
 void updateLightboardGameState();
 void sendLightboardPointUpdate(uint8_t scoringPlayer);
 void awardPointToPlayer(uint8_t playerId);
+void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier);
 
 volatile unsigned long g_firstTime[SENSOR_COUNT]; // first arrival micros() per sensor
 volatile uint32_t      g_hitMask = 0;             // bit i set when sensor i latched first arrival
@@ -882,6 +883,15 @@ button:active { transform: translateY(1px) scale(.998); }
                 <option value="4">Orange</option>
               </select>
             </div>
+            
+            <div class="settings-section">
+              <label for="damageMultiplier">Damage Multiplier:</label>
+              <select id="damageMultiplier" class="settings-select">
+                <option value="1">Single (1x)</option>
+                <option value="2">Double (2x)</option>
+                <option value="3">Triple (3x)</option>
+              </select>
+            </div>
           </div>
           <div class="modal-actions">
             <button class="modal-btn cancel" id="cancelLightboard">Cancel</button>
@@ -957,6 +967,7 @@ const player2ScoreEl = document.getElementById('player2Score');
 let lightboardGameMode = 1; // Default to Territory mode
 let lightboardP1ColorIndex = 0; // Red
 let lightboardP2ColorIndex = 1; // Blue
+let damageMultiplier = 1; // Default to single damage
 
 // Quiz state
 let QA = [];
@@ -1221,15 +1232,15 @@ function removeScorableState() {
 function awardPoint(player) {
   if (!roundComplete) return;
   
-  // Update score
+  // Update score based on damage multiplier
   if (player === 'Player 1') {
-    player1Score++;
-    // Send message to ESP32 to award point to Player 1
-    ws.send(JSON.stringify({action: 'awardPoint', player: 1}));
+    player1Score += damageMultiplier;
+    // Send message to ESP32 to award points to Player 1
+    ws.send(JSON.stringify({action: 'awardPoint', player: 1, multiplier: damageMultiplier}));
   } else if (player === 'Player 2') {
-    player2Score++;
-    // Send message to ESP32 to award point to Player 2
-    ws.send(JSON.stringify({action: 'awardPoint', player: 2}));
+    player2Score += damageMultiplier;
+    // Send message to ESP32 to award points to Player 2
+    ws.send(JSON.stringify({action: 'awardPoint', player: 2, multiplier: damageMultiplier}));
   }
   
   updateScoreDisplay();
@@ -1461,6 +1472,7 @@ function parseCSV(csv) {
     document.getElementById('lightboardMode').value = lightboardGameMode;
     document.getElementById('lightboardP1Color').value = lightboardP1ColorIndex;
     document.getElementById('lightboardP2Color').value = lightboardP2ColorIndex;
+    document.getElementById('damageMultiplier').value = damageMultiplier;
     lightboardModal.classList.remove('hidden');
   }
 
@@ -1472,11 +1484,13 @@ function parseCSV(csv) {
     const newMode = parseInt(document.getElementById('lightboardMode').value);
     const newP1Color = parseInt(document.getElementById('lightboardP1Color').value);
     const newP2Color = parseInt(document.getElementById('lightboardP2Color').value);
+    const newMultiplier = parseInt(document.getElementById('damageMultiplier').value);
     
     // Update local variables
     lightboardGameMode = newMode;
     lightboardP1ColorIndex = newP1Color;
     lightboardP2ColorIndex = newP2Color;
+    damageMultiplier = newMultiplier;
     
     // Save settings to localStorage
     saveLightboardSettings();
@@ -1496,12 +1510,14 @@ function parseCSV(csv) {
     localStorage.setItem('lightboardGameMode', lightboardGameMode.toString());
     localStorage.setItem('lightboardP1ColorIndex', lightboardP1ColorIndex.toString());
     localStorage.setItem('lightboardP2ColorIndex', lightboardP2ColorIndex.toString());
+    localStorage.setItem('damageMultiplier', damageMultiplier.toString());
   }
 
   function loadLightboardSettings() {
     const savedMode = localStorage.getItem('lightboardGameMode');
     const savedP1Color = localStorage.getItem('lightboardP1ColorIndex');
     const savedP2Color = localStorage.getItem('lightboardP2ColorIndex');
+    const savedMultiplier = localStorage.getItem('damageMultiplier');
     
     if (savedMode !== null) {
       lightboardGameMode = parseInt(savedMode);
@@ -1511,6 +1527,9 @@ function parseCSV(csv) {
     }
     if (savedP2Color !== null) {
       lightboardP2ColorIndex = parseInt(savedP2Color);
+    }
+    if (savedMultiplier !== null) {
+      damageMultiplier = parseInt(savedMultiplier);
     }
   }
   
@@ -1536,6 +1555,7 @@ function parseCSV(csv) {
   lightboardGameMode = 1;
   lightboardP1ColorIndex = 0;
   lightboardP2ColorIndex = 1;
+  damageMultiplier = 1;
   
   // Update UI
   player1Name.textContent = player1NameText;
@@ -2335,6 +2355,51 @@ void awardPointToPlayer(uint8_t playerId) {
   Serial.printf("Awarded point to Player %d\n", playerId);
 }
 
+void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier) {
+  // Award multiple points to the specified player on the lightboard
+  // playerId: 1 = Player 1, 2 = Player 2
+  // multiplier: number of points to award
+  
+  if (playerId != 1 && playerId != 2) {
+    Serial.printf("Invalid player ID: %d. Must be 1 or 2.\n", playerId);
+    return;
+  }
+  
+  if (multiplier < 1 || multiplier > 3) {
+    Serial.printf("Invalid multiplier: %d. Must be 1-3.\n", multiplier);
+    return;
+  }
+  
+  if (!lightboardConnected) {
+    Serial.println("Lightboard not connected - cannot award points");
+    return;
+  }
+  
+  // Send multiple point updates to lightboard
+  for (int i = 0; i < multiplier; i++) {
+    sendLightboardPointUpdate(playerId);
+    delay(100); // Small delay between points for visual effect
+  }
+  
+  // Update local game state (only once at the end)
+  if (playerId == 1) {
+    winner = "Player 1";
+    player1HitTime = micros(); // Use current time as hit time
+  } else {
+    winner = "Player 2";
+    player2HitTime = micros(); // Use current time as hit time
+  }
+  
+  // Broadcast winner to web interface
+  String j = "{\"winner\":\"" + winner + "\"}";
+  ws.broadcastTXT(j);
+  
+  // Update lightboard game state
+  updateLightboardGameState();
+  
+  Serial.printf("Awarded %d points to Player %d\n", multiplier, playerId);
+}
+
 // ===================== Game Logic =====================
 void determineWinner() {
   if (player1HitTime > 0 && player2HitTime > 0) {
@@ -2465,8 +2530,14 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
           deserializeJson(doc, message);
           if (doc.containsKey("player")) {
             int player = doc["player"];
+            int multiplier = 1;
+            if (doc.containsKey("multiplier")) {
+              multiplier = doc["multiplier"];
+            }
+            
             if (player == 1 || player == 2) {
-              awardPointToPlayer(player);
+              // Award multiple points based on multiplier
+              awardMultiplePointsToPlayer(player, multiplier);
             }
           }
         } else if (message.indexOf("lightboardMode") != -1) {
