@@ -87,6 +87,7 @@ bool player2MacLearned = false;
 
 // Lightboard connection tracking
 bool lightboardConnected = false;
+bool lightboardWasConnected = false; // Track previous connection state for reconnection detection
 unsigned long lastLightboardHeartbeat = 0;
 bool lightboardMacLearned = false;
 
@@ -2213,7 +2214,11 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
     memcpy(&lightboardData, data, sizeof(lightboardData));
     
     if (lightboardData.deviceId == 3) { // Lightboard
+      // Check if this is a reconnection (was disconnected, now connected)
+      bool wasDisconnected = !lightboardConnected;
+      
       // Lightboard MAC is already known and peer is already added
+      lightboardWasConnected = lightboardConnected; // Store previous state
       lightboardConnected = true;
       lastLightboardHeartbeat = millis();
       Serial.println("Lightboard message received - connection confirmed");
@@ -2221,6 +2226,13 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       if (lightboardData.action == 1) {
         // Heartbeat - just update connection status
         Serial.println("Lightboard heartbeat received");
+        
+        // If this is a reconnection, resync the lightboard settings
+        if (wasDisconnected) {
+          Serial.println("Lightboard reconnected - resyncing settings");
+          // Send current game mode and player colors to resync
+          sendLightboardUpdate(4); // Send settings update
+        }
       }
     }
   }
@@ -2744,6 +2756,7 @@ void loop(){
   
   // Check for lightboard connection timeout
   if (lightboardConnected && (millis() - lastLightboardHeartbeat > heartbeatTimeout)) {
+    lightboardWasConnected = lightboardConnected; // Store previous state
     lightboardConnected = false;
     lightboardMacLearned = false; // Reset MAC learning to force rediscovery
     Serial.println("Lightboard connection lost - resetting discovery");
