@@ -897,6 +897,18 @@ button:active { transform: translateY(1px) scale(.998); }
 const ws=new WebSocket('ws://'+location.hostname+':81');
 const connDot=document.getElementById('connDot');
 
+// WebSocket connection handlers
+ws.onopen = function() {
+  console.log('WebSocket connected');
+  // Send current lightboard settings to ESP32 when connection is established
+  ws.send(JSON.stringify({
+    action: 'lightboardSettings',
+    mode: lightboardGameMode,
+    p1Color: lightboardP1ColorIndex,
+    p2Color: lightboardP2ColorIndex
+  }));
+};
+
  // Quiz elements
  const quizInterface = document.getElementById('quizInterface');
  const resetAllData = document.getElementById('resetAllData');
@@ -2227,9 +2239,9 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
         // Heartbeat - just update connection status
         Serial.println("Lightboard heartbeat received");
         
-        // If this is a reconnection, resync the lightboard settings
-        if (wasDisconnected) {
-          Serial.println("Lightboard reconnected - resyncing settings");
+        // If this is a reconnection or first connection, resync the lightboard settings
+        if (wasDisconnected || !lightboardWasConnected) {
+          Serial.println("Lightboard connected - resyncing settings");
           // Send current game mode and player colors to resync
           sendLightboardUpdate(4); // Send settings update
         }
