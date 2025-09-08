@@ -1325,7 +1325,10 @@ function exitToCategories() {
   // Hide modal
   hideExitConfirmation();
   
-  // Return to category selector (will automatically reset lightboard)
+  // Reset lightboard when exiting quiz
+  ws.send(JSON.stringify({action: 'reset'}));
+  
+  // Return to category selector
   showCategorySelector();
 }
 
@@ -1510,6 +1513,9 @@ function parseCSV(csv) {
   fileList.innerHTML = '';
   loadedFiles.classList.add('hidden');
   
+  // Reset lightboard when resetting all data
+  ws.send(JSON.stringify({action: 'reset'}));
+  
   // Show sample questions
   availableCategories = [{
     filename: 'sample.csv',
@@ -1613,16 +1619,13 @@ function addFileToList(filename, message, status) {
 }
 
 // === CATEGORY SELECTION ===
- function showCategorySelector() {
-   categorySelector.classList.remove('hidden');
-   quizDisplay.classList.add('hidden');
-   fileInputSection.classList.remove('hidden');
-   resetAllData.parentElement.classList.remove('hidden');
-   lightboardModeSection.classList.remove('hidden');
-   
-   // Always reset lightboard when returning to category selector
-   ws.send(JSON.stringify({action: 'reset'}));
- }
+function showCategorySelector() {
+  categorySelector.classList.remove('hidden');
+  quizDisplay.classList.add('hidden');
+  fileInputSection.classList.remove('hidden');
+  resetAllData.parentElement.classList.remove('hidden');
+  lightboardModeSection.classList.remove('hidden');
+}
 
  function showQuizDisplay() {
    categorySelector.classList.add('hidden');
