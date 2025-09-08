@@ -326,6 +326,27 @@ button:active { transform: translateY(1px) scale(.998); }
   transform: translateY(-1px);
 }
 
+/* Lightboard Settings Button - matches file-input label styling */
+.lightboard-settings-btn {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 500;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(106,161,255,.1);
+  border: 1px solid rgba(106,161,255,.2);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.lightboard-settings-btn:hover {
+  background: rgba(106,161,255,.15);
+  transform: translateY(-1px);
+}
+
  .file-input .hint {
    font-size: 11px;
    color: var(--muted);
@@ -712,8 +733,8 @@ button:active { transform: translateY(1px) scale(.998); }
 
        <!-- Lightboard Settings Button -->
        <div class="file-input" id="lightboardModeSection">
-         <button id="lightboardSettingsBtn" class="reset-btn">
-           💡 Lightboard Settings
+         <button id="lightboardSettingsBtn" class="lightboard-settings-btn">
+           💡 Lightboard
          </button>
          <div class="hint">Configure game mode and player colors</div>
        </div>
