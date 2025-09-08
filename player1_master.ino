@@ -890,6 +890,8 @@ button:active { transform: translateY(1px) scale(.998); }
                 <option value="1">Single (1x)</option>
                 <option value="2">Double (2x)</option>
                 <option value="3">Triple (3x)</option>
+                <option value="4">Quadruple (4x)</option>
+                <option value="5">Quintuple (5x)</option>
               </select>
             </div>
           </div>
@@ -967,7 +969,7 @@ const player2ScoreEl = document.getElementById('player2Score');
 let lightboardGameMode = 1; // Default to Territory mode
 let lightboardP1ColorIndex = 0; // Red
 let lightboardP2ColorIndex = 1; // Blue
-let damageMultiplier = 1; // Default to single damage
+let damageMultiplier = 3; // Default to triple damage
 
 // Quiz state
 let QA = [];
@@ -1555,7 +1557,7 @@ function parseCSV(csv) {
   lightboardGameMode = 1;
   lightboardP1ColorIndex = 0;
   lightboardP2ColorIndex = 1;
-  damageMultiplier = 1;
+  damageMultiplier = 3;
   
   // Update UI
   player1Name.textContent = player1NameText;
@@ -2365,8 +2367,8 @@ void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier) {
     return;
   }
   
-  if (multiplier < 1 || multiplier > 3) {
-    Serial.printf("Invalid multiplier: %d. Must be 1-3.\n", multiplier);
+  if (multiplier < 1 || multiplier > 5) {
+    Serial.printf("Invalid multiplier: %d. Must be 1-5.\n", multiplier);
     return;
   }
   
