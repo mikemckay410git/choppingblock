@@ -1,5 +1,6 @@
 #include <WiFi.h>
-#include <WebServer.h>
+#include <esp_now.h>
+#include <esp_wifi.h>
 #include <Adafruit_NeoPixel.h>
 
 // ---- LED strip config ----
@@ -8,16 +9,47 @@
 #define BRIGHTNESS   50
 Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
-// ---- WiFi config ----
-const char* ssid     = "McKays";
-const char* password = "muffin4444";
-
-// ---- Web server ----
-WebServer server(80);
-
 // ---- Center indices ----
 const int CENTER_LEFT  = (NUM_LEDS / 2) - 1; // 18
 const int CENTER_RIGHT = (NUM_LEDS / 2);     // 19
+
+// ===================== ESP-NOW Configuration =====================
+
+// Force STA interface to a specific channel so ESP-NOW matches the host AP
+static void forceStaChannel(uint8_t ch){
+  esp_wifi_set_promiscuous(true);
+  esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
+  esp_wifi_set_promiscuous(false);
+}
+
+// Player 1 MAC address (hardcoded for reliability)
+uint8_t player1Address[] = {0x78, 0x1C, 0x3C, 0xB8, 0xD5, 0xA9}; // Player 1 AP MAC
+
+typedef struct struct_lightboard_message {
+  uint8_t  deviceId;     // 3=Lightboard
+  uint8_t  action;       // 1=heartbeat, 2=game-state, 3=score-update, 4=mode-change, 5=reset
+  uint8_t  gameMode;     // 1-6 (Territory, Swap Sides, Split Scoring, Score Order, Race, Tug O War)
+  uint8_t  p1ColorIndex; // Player 1 color index
+  uint8_t  p2ColorIndex; // Player 2 color index
+  int8_t   p1Pos;        // Player 1 position (-1 to NUM_LEDS)
+  int8_t   p2Pos;        // Player 2 position (-1 to NUM_LEDS)
+  uint8_t  nextLedPos;   // For Score Order mode
+  uint8_t  tugBoundary;  // For Tug O War mode
+  uint8_t  p1RacePos;    // For Race mode
+  uint8_t  p2RacePos;    // For Race mode
+  uint8_t  celebrating;  // Celebration state
+  uint8_t  winner;       // 0=none, 1=Player1, 2=Player2
+} struct_lightboard_message;
+
+struct_lightboard_message myData;
+struct_lightboard_message player1Data;
+
+// Connection tracking
+bool player1Connected = false;
+unsigned long lastHeartbeat = 0;
+const unsigned long heartbeatTimeout = 2000; // 2 seconds
+bool player1MacLearned = false;
+static bool wasConnected = false; // Track if we've been connected before
 
 // ---- Game state ----
 int p1Pos = -1;
@@ -58,120 +90,11 @@ const int NUM_COLORS = sizeof(availableColors) / sizeof(availableColors[0]);
 int p1ColorIndex = 0; // Red (default)
 int p2ColorIndex = 1; // Blue (default)
 
-// ---- HTML page ----
-const char INDEX_HTML[] PROGMEM = R"HTML(
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ESP32 LED Duel</title>
-<style>
-  :root { font-family: system-ui, sans-serif; }
-  body { margin:0; background:#0b1220; color:#eaf0ff; }
-  .wrap { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:16px; height:100vh; box-sizing:border-box; }
-  .card { display:flex; align-items:center; justify-content:center; border:1px solid #22315a; border-radius:16px; background:#101a33; box-shadow:0 10px 30px rgba(0,0,0,.35); }
-  button { font-size: clamp(18px, 4vw, 28px); padding:18px 26px; border-radius:14px; border:0; cursor:pointer; color:white; }
-  .p1 button { background:#e24343; }
-  .p2 button { background:#3a7bf7; }
-  button:active { transform:translateY(1px); }
-  .status { position:fixed; left:50%; transform:translateX(-50%); bottom:12px; opacity:.8; font-size:14px; }
-  .mode-selector { position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:10; }
-  select { padding:8px 12px; border-radius:8px; border:1px solid #22315a; background:#101a33; color:#eaf0ff; font-size:14px; }
-</style>
-</head>
-<body>
-  <div class="mode-selector">
-    <select id="gameMode">
-      <option value="1">Territory</option>
-      <option value="2">Swap Sides</option>
-      <option value="3">Split Scoring</option>
-      <option value="4">Score Order</option>
-      <option value="5">Race</option>
-      <option value="6">Tug O War</option>
-    </select>
-    <select id="p1Color" style="margin-left: 8px;">
-      <option value="0">Red</option>
-      <option value="1">Blue</option>
-      <option value="2">Green</option>
-      <option value="3">Magenta</option>
-      <option value="4">Orange</option>
-    </select>
-    <select id="p2Color" style="margin-left: 8px;">
-      <option value="0">Red</option>
-      <option value="1">Blue</option>
-      <option value="2">Green</option>
-      <option value="3">Magenta</option>
-      <option value="4">Orange</option>
-    </select>
-  </div>
-  <div class="wrap">
-    <div class="card p1">
-      <button id="p1">Player 1</button>
-    </div>
-    <div class="card p2">
-      <button id="p2">Player 2</button>
-    </div>
-  </div>
-  <div class="status" id="status">Ready</div>
-<script>
-  const statusEl = document.getElementById('status');
-  const gameModeSelect = document.getElementById('gameMode');
-  const p1ColorSelect = document.getElementById('p1Color');
-  const p2ColorSelect = document.getElementById('p2Color');
-  
-  // Set default color selections
-  p1ColorSelect.value = '0'; // Red
-  p2ColorSelect.value = '1'; // Blue
-
-  async function hit(path) {
-    try {
-      const r = await fetch(path, { method:'POST' });
-      const t = await r.text();
-      statusEl.textContent = t || 'OK';
-    } catch(e) {
-      statusEl.textContent = 'Error';
-    }
-  }
-
-  async function setGameMode() {
-    try {
-      const mode = gameModeSelect.value;
-      const r = await fetch('/mode', {
-        method:'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'mode=' + mode
-      });
-      const t = await r.text();
-      statusEl.textContent = t || 'Mode set';
-    } catch(e) {
-      statusEl.textContent = 'Mode error';
-    }
-  }
-
-  async function setPlayerColor(player, colorIndex) {
-    try {
-      const r = await fetch('/color', {
-        method:'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'player=' + player + '&color=' + colorIndex
-      });
-      const t = await r.text();
-      statusEl.textContent = t || 'Color set';
-    } catch(e) {
-      statusEl.textContent = 'Color error';
-    }
-  }
-
-  document.getElementById('p1').addEventListener('click', ()=>hit('/p1'));
-  document.getElementById('p2').addEventListener('click', ()=>hit('/p2'));
-  gameModeSelect.addEventListener('change', setGameMode);
-  p1ColorSelect.addEventListener('change', ()=>setPlayerColor('1', p1ColorSelect.value));
-  p2ColorSelect.addEventListener('change', ()=>setPlayerColor('2', p2ColorSelect.value));
-</script>
-</body>
-</html>
-)HTML";
+// Prototypes to placate Arduino preprocessor with custom return types
+PlayerColor getP1Color();
+PlayerColor getP2Color();
+uint32_t getP1ColorValue();
+uint32_t getP2ColorValue();
 
 // ==================== Celebration Manager ====================
 enum CelebrationType : uint8_t {
@@ -323,9 +246,6 @@ uint32_t getP2ColorValue() {
 
 void clearStrip(){ for (int i=0;i<NUM_LEDS;i++) strip.setPixelColor(i,0); strip.show(); }
 
-// ---- painting, resetGame, checkWinConditions, HTTP handlers ----
-// (identical to your last working version, unchanged except celebrations are handled non-blocking)
-
 void paintProgress() {
   for (int i=0;i<NUM_LEDS;i++) strip.setPixelColor(i,0);
   if (gameMode==2) { if(p1Pos>=0&&p1Pos<NUM_LEDS) strip.setPixelColor(p1Pos,getP1ColorValue()); if(p2Pos>=0&&p2Pos<NUM_LEDS) strip.setPixelColor(p2Pos,getP2ColorValue()); }
@@ -337,16 +257,393 @@ void paintProgress() {
   strip.show();
 }
 
-void resetGame(){ switch(gameMode){case 1:case 2:p1Pos=-1;p2Pos=NUM_LEDS;break;case 3:p1Pos=CENTER_LEFT+1;p2Pos=CENTER_RIGHT-1;break;case 4:nextLedPosition=0;for(int i=0;i<NUM_LEDS;i++)scoringSequence[i]=0;break;case 5:p1RacePos=-1;p2RacePos=-1;break;case 6:tugBoundary=CENTER_LEFT;break;} if(gameMode==6) paintProgress(); else clearStrip(); }
+void resetGame(){ 
+  switch(gameMode){
+    case 1:case 2:p1Pos=-1;p2Pos=NUM_LEDS;break;
+    case 3:p1Pos=CENTER_LEFT+1;p2Pos=CENTER_RIGHT-1;break;
+    case 4:nextLedPosition=0;for(int i=0;i<NUM_LEDS;i++)scoringSequence[i]=0;break;
+    case 5:p1RacePos=-1;p2RacePos=-1;break;
+    case 6:tugBoundary=CENTER_LEFT;break;
+  } 
+  if(gameMode==6) paintProgress(); else clearStrip(); 
+}
 
-void checkWinConditions(){bool gameOver=false,player1Wins=false;switch(gameMode){case 1:if(p1Pos>=p2Pos){gameOver=true;player1Wins=(p1Pos+1>=NUM_LEDS-p2Pos);}break;case 2:if(p1Pos>=NUM_LEDS-1){gameOver=true;player1Wins=true;}else if(p2Pos<=0){gameOver=true;player1Wins=false;}break;case 3:if(p1Pos<=0){gameOver=true;player1Wins=true;}else if(p2Pos>=NUM_LEDS-1){gameOver=true;player1Wins=false;}break;case 4:if(nextLedPosition>=NUM_LEDS){gameOver=true;int p1=0,p2=0;for(int i=0;i<NUM_LEDS;i++){if(scoringSequence[i]==1)p1++;else if(scoringSequence[i]==2)p2++;}player1Wins=(p1>p2);}break;case 5:if(p1RacePos>=NUM_LEDS-1){gameOver=true;player1Wins=true;}else if(p2RacePos>=NUM_LEDS-1){gameOver=true;player1Wins=false;}break;case 6:if(tugBoundary>=NUM_LEDS-1){gameOver=true;player1Wins=true;}else if(tugBoundary<0){gameOver=true;player1Wins=false;}break;}if(gameOver){startCelebration(player1Wins);celebrating=true;}}
+// ===================== ESP-NOW Callbacks =====================
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  Serial.print("Lightboard Send Status: ");
+  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
+}
 
-void handleRoot(){server.send_P(200,"text/html",INDEX_HTML);}
-void handleP1(){if(celebrating){server.send(200,"text/plain","Celebrating…");return;}if(gameMode==2){if(p1Pos+1==p2Pos)p1Pos=p2Pos+1;else if(p1Pos<NUM_LEDS-1)p1Pos++;}else if(gameMode==3){if(p1Pos>0)p1Pos--;}else if(gameMode==4){if(nextLedPosition<NUM_LEDS){scoringSequence[nextLedPosition]=1;nextLedPosition++;}}else if(gameMode==5){if(p1RacePos<0)p1RacePos=0;else if(p1RacePos<NUM_LEDS-1)p1RacePos++;}else if(gameMode==6){if(tugBoundary<NUM_LEDS-1)tugBoundary++;}else{if(p1Pos<NUM_LEDS-1)p1Pos++;}paintProgress();checkWinConditions();server.send(200,"text/plain","P1 moved");}
-void handleP2(){if(celebrating){server.send(200,"text/plain","Celebrating…");return;}if(gameMode==2){if(p2Pos-1==p1Pos)p2Pos=p1Pos-1;else if(p2Pos>0)p2Pos--;}else if(gameMode==3){if(p2Pos<NUM_LEDS-1)p2Pos++;}else if(gameMode==4){if(nextLedPosition<NUM_LEDS){scoringSequence[nextLedPosition]=2;nextLedPosition++;}}else if(gameMode==5){if(p2RacePos<0)p2RacePos=0;else if(p2RacePos<NUM_LEDS-1)p2RacePos++;}else if(gameMode==6){if(tugBoundary>=0)tugBoundary--;}else{if(p2Pos>0)p2Pos--;}paintProgress();checkWinConditions();server.send(200,"text/plain","P2 moved");}
-void handleMode(){if(server.hasArg("mode")){int newMode=server.arg("mode").toInt();if(newMode>=1&&newMode<=6){gameMode=newMode;resetGame();server.send(200,"text/plain","Mode "+String(gameMode)+" set");}else server.send(400,"text/plain","Invalid mode");}else server.send(400,"text/plain","Missing mode parameter");}
-void handleColor(){if(server.hasArg("player")&&server.hasArg("color")){int player=server.arg("player").toInt();int colorIndex=server.arg("color").toInt();if(player>=1&&player<=2&&colorIndex>=0&&colorIndex<NUM_COLORS){if(player==1)p1ColorIndex=colorIndex;else p2ColorIndex=colorIndex;paintProgress();server.send(200,"text/plain","Player "+String(player)+" color set");}else server.send(400,"text/plain","Invalid player or color");}else server.send(400,"text/plain","Missing parameters");}
-void handleNotFound(){server.send(404,"text/plain","Not found");}
+void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
+  Serial.printf("ESP-NOW message received: len=%d, expected=%d\n", len, sizeof(struct_lightboard_message));
+  if (len != sizeof(struct_lightboard_message)) return;
+  
+  memcpy(&player1Data, data, sizeof(player1Data));
 
-void setup(){Serial.begin(115200);strip.begin();strip.setBrightness(BRIGHTNESS);clearStrip();randomSeed((uint32_t)esp_timer_get_time());WiFi.mode(WIFI_STA);WiFi.begin(ssid,password);while(WiFi.status()!=WL_CONNECTED){delay(400);Serial.print(".");}Serial.println("\nWiFi connected! IP: "+WiFi.localIP().toString());server.on("/",HTTP_GET,handleRoot);server.on("/p1",HTTP_POST,handleP1);server.on("/p2",HTTP_POST,handleP2);server.on("/mode",HTTP_POST,handleMode);server.on("/color",HTTP_POST,handleColor);server.onNotFound(handleNotFound);server.begin();resetGame();}
-void loop(){server.handleClient();if(celebrating){if(!updateCelebration()){celebrating=false;resetGame();paintProgress();}}}
+  if (player1Data.deviceId == 1) { // Player 1
+    // Learn Player 1 MAC dynamically
+    if (info && !player1MacLearned) {
+      memcpy(player1Address, info->src_addr, 6);
+      char macStr[18];
+      sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", player1Address[0],player1Address[1],player1Address[2],player1Address[3],player1Address[4],player1Address[5]);
+      Serial.printf("Discovered Player 1 MAC: %s\r\n", macStr);
+      esp_now_del_peer(player1Address);
+      esp_now_peer_info_t p = {};
+      memcpy(p.peer_addr, player1Address, 6);
+      p.channel = 1;
+      p.encrypt = false;
+      if (esp_now_add_peer(&p) == ESP_OK) {
+        player1MacLearned = true;
+        Serial.println("Player 1 peer added after discovery");
+        Serial.println("Connection established! Heartbeats will now be sent.");
+      } else {
+        Serial.println("Failed to add discovered Player 1 peer");
+      }
+    }
+    // Check if this is a new connection (was disconnected, now connected)
+    bool wasDisconnected = !player1Connected;
+    player1Connected = true;
+    lastHeartbeat = millis();
+    
+    // Clear demo mode and go black only on new connection
+    if (wasDisconnected) {
+      clearStrip();
+      Serial.println("Connection established - demo mode cleared");
+    }
+
+    if (player1Data.action == 1) {
+      // Heartbeat - just update connection status
+      Serial.println("Player 1 heartbeat received");
+    } else if (player1Data.action == 2) {
+      // Game state update - only update essential settings (mode, colors)
+      gameMode = player1Data.gameMode;
+      p1ColorIndex = player1Data.p1ColorIndex;
+      p2ColorIndex = player1Data.p2ColorIndex;
+      
+      Serial.printf("Game state update: mode=%d, p1Color=%d, p2Color=%d\n", 
+                   gameMode, p1ColorIndex, p2ColorIndex);
+      paintProgress();
+      
+    } else if (player1Data.action == 3) {
+      // Point update - run our own game logic
+      Serial.printf("Point update received - Player %d scored, running lightboard game logic\n", player1Data.winner);
+      handlePointUpdate(player1Data.winner);
+      
+    } else if (player1Data.action == 4) {
+      // Mode change
+      gameMode = player1Data.gameMode;
+      p1ColorIndex = player1Data.p1ColorIndex;
+      p2ColorIndex = player1Data.p2ColorIndex;
+      Serial.printf("Mode changed to: %d\n", gameMode);
+      resetGame();
+      
+    } else if (player1Data.action == 5) {
+      // Reset
+      Serial.println("Reset received - resetting lightboard game state");
+      resetGame();
+    }
+  }
+}
+
+// ===================== Setup =====================
+void setup(){
+  Serial.begin(115200);
+  delay(1000); // Give serial time to initialize
+  
+  Serial.println();
+  Serial.println("==========================================");
+  Serial.println("=== LIGHTBOARD ESP-NOW MODULE ===");
+  Serial.println("==========================================");
+  
+  // Display MAC address FIRST and prominently
+  WiFi.mode(WIFI_STA);
+  delay(50);
+  forceStaChannel(1);
+  Serial.println("Forced STA channel to 1");
+  String macStr = WiFi.macAddress();
+  Serial.println();
+  Serial.println("*** LIGHTBOARD MAC ADDRESS ***");
+  Serial.printf("STA MAC: %s\r\n", macStr.c_str());
+  Serial.printf("WiFi Channel: %d\r\n", WiFi.channel());
+  Serial.println("===============================");
+  
+  // Convert MAC address to proper format for player1_host_sync.ino
+  macStr.replace(":", "");
+  Serial.println("COPY THIS LINE TO player1_host_sync.ino:");
+  Serial.print("uint8_t lightboardAddress[] = {");
+  for (int i = 0; i < 6; i++) {
+    String byteStr = macStr.substring(i * 2, i * 2 + 2);
+    Serial.print("0x" + byteStr);
+    if (i < 5) Serial.print(", ");
+  }
+  Serial.println("}; // Lightboard STA MAC");
+  Serial.println("===============================");
+  Serial.println();
+  
+  Serial.printf("LED Strip: %d LEDs on pin %d\r\n", NUM_LEDS, LED_PIN);
+
+  // Initialize LED strip
+  strip.begin();
+  strip.setBrightness(BRIGHTNESS);
+  clearStrip();
+  randomSeed((uint32_t)esp_timer_get_time());
+
+  // Wi-Fi setup for ESP-NOW
+  WiFi.disconnect(); // Ensure clean state
+  delay(100);
+  
+    // (removed) rely on forceStaChannel(1) before esp_now_init
+  Serial.printf("WiFi Channel set to: %d\r\n", WiFi.channel());
+
+  // ESP-NOW setup
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initializing ESP-NOW");
+    while(true);
+  }
+  
+  esp_now_register_send_cb(OnDataSent);
+  esp_now_register_recv_cb(OnDataRecv);
+
+  // Add Player 1 peer with known MAC address
+  esp_now_peer_info_t peerInfo = {};
+  memcpy(peerInfo.peer_addr, player1Address, 6);
+  peerInfo.channel = 1; // follow current channel
+  peerInfo.encrypt = false;
+  
+  peerInfo.ifidx = WIFI_IF_STA;
+if (esp_now_add_peer(&peerInfo) == ESP_OK) {
+    Serial.println("Player 1 peer added successfully");
+  
+    player1MacLearned = true;
+    Serial.println("Connection established! Heartbeats will now be sent.");
+} else {
+    Serial.println("Failed to add Player 1 peer");
+  }
+
+  myData.deviceId = 3; // Lightboard device ID
+
+  // Initialize game state
+  resetGame();
+  
+  Serial.println("Lightboard ready - waiting for Player 1 connection");
+  Serial.println("Make sure Player 1 is running and has the correct lightboard MAC address");
+  Serial.println("The lightboard will automatically discover Player 1 when it sends a message");
+}
+
+// ===================== Helper Functions =====================
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t wheel(byte WheelPos) {
+  WheelPos = 255 - WheelPos;
+  if(WheelPos < 85) {
+    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  }
+  if(WheelPos < 170) {
+    WheelPos -= 85;
+    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
+  WheelPos -= 170;
+  return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
+
+// ===================== Lightboard Game Logic =====================
+void handlePointUpdate(uint8_t scoringPlayer) {
+  // This function runs the lightboard's own game logic based on point updates
+  // The lightboard determines how to update positions based on the current game mode and which player scored
+  
+  switch (gameMode) {
+    case 1: // Territory
+      // Move the scoring player toward center
+      if (scoringPlayer == 1 && p1Pos < NUM_LEDS - 1) {
+        p1Pos++;
+      } else if (scoringPlayer == 2 && p2Pos > 0) {
+        p2Pos--;
+      }
+      break;
+      
+    case 2: // Swap Sides
+      // Move the scoring player toward center, but avoid collision
+      if (scoringPlayer == 1) {
+        if (p1Pos + 1 == p2Pos) {
+          p1Pos = p2Pos + 1; // Jump over if about to collide
+        } else if (p1Pos < NUM_LEDS - 1) {
+          p1Pos++;
+        }
+      } else if (scoringPlayer == 2) {
+        if (p2Pos - 1 == p1Pos) {
+          p2Pos = p1Pos - 1; // Jump over if about to collide
+        } else if (p2Pos > 0) {
+          p2Pos--;
+        }
+      }
+      break;
+      
+    case 3: // Split Scoring
+      // Move the scoring player away from center
+      if (scoringPlayer == 1 && p1Pos > 0) {
+        p1Pos--;
+      } else if (scoringPlayer == 2 && p2Pos < NUM_LEDS - 1) {
+        p2Pos++;
+      }
+      break;
+      
+    case 4: // Score Order
+      // Fill LEDs in sequence with the scoring player
+      if (nextLedPosition < NUM_LEDS) {
+        scoringSequence[nextLedPosition] = scoringPlayer;
+        nextLedPosition++;
+      }
+      break;
+      
+    case 5: // Race
+      // Move the scoring player forward
+      if (scoringPlayer == 1 && p1RacePos < NUM_LEDS - 1) {
+        p1RacePos++;
+      } else if (scoringPlayer == 2 && p2RacePos < NUM_LEDS - 1) {
+        p2RacePos++;
+      }
+      break;
+      
+    case 6: // Tug O War
+      // Move boundary based on who scored
+      if (scoringPlayer == 1 && tugBoundary < NUM_LEDS - 1) {
+        tugBoundary++;
+      } else if (scoringPlayer == 2 && tugBoundary >= 0) {
+        tugBoundary--;
+      }
+      break;
+  }
+  
+  // Check for win conditions
+  checkWinConditions();
+  
+  // Update display
+  paintProgress();
+}
+
+void checkWinConditions() {
+  bool p1Wins = false;
+  bool p2Wins = false;
+  
+  switch (gameMode) {
+    case 1: // Territory
+      if (p1Pos >= p2Pos) {
+        p1Wins = (p1Pos + 1 >= NUM_LEDS - p2Pos);
+        p2Wins = !p1Wins;
+      }
+      break;
+      
+    case 2: // Swap Sides
+      p1Wins = (p1Pos >= NUM_LEDS - 1);
+      p2Wins = (p2Pos <= 0);
+      break;
+      
+    case 3: // Split Scoring
+      p1Wins = (p1Pos <= 0);
+      p2Wins = (p2Pos >= NUM_LEDS - 1);
+      break;
+      
+    case 4: // Score Order
+      if (nextLedPosition >= NUM_LEDS) {
+        int p1Count = 0, p2Count = 0;
+        for (int i = 0; i < NUM_LEDS; i++) {
+          if (scoringSequence[i] == 1) p1Count++;
+          else if (scoringSequence[i] == 2) p2Count++;
+        }
+        p1Wins = (p1Count > p2Count);
+        p2Wins = !p1Wins;
+      }
+      break;
+      
+    case 5: // Race
+      p1Wins = (p1RacePos >= NUM_LEDS - 1);
+      p2Wins = (p2RacePos >= NUM_LEDS - 1);
+      break;
+      
+    case 6: // Tug O War
+      p1Wins = (tugBoundary >= NUM_LEDS - 1);
+      p2Wins = (tugBoundary < 0);
+      break;
+  }
+  
+  if (p1Wins && !p2Wins) {
+    Serial.println("Lightboard: Player 1 wins! Starting celebration...");
+    startCelebration(true); // Player 1 wins
+    celebrating = true;
+    Serial.printf("Celebration started: celActive=%d, celebrating=%d\n", celActive, celebrating);
+  } else if (p2Wins && !p1Wins) {
+    Serial.println("Lightboard: Player 2 wins! Starting celebration...");
+    startCelebration(false); // Player 2 wins
+    celebrating = true;
+    Serial.printf("Celebration started: celActive=%d, celebrating=%d\n", celActive, celebrating);
+  }
+}
+
+// ===================== Demo Mode =====================
+void runDemoMode() {
+  static unsigned long lastDemoUpdate = 0;
+  static int rainbowOffset = 0;
+  
+  if (millis() - lastDemoUpdate >= 50) { // Update every 50ms for smooth animation
+    lastDemoUpdate = millis();
+    
+    if (!player1Connected) {
+      // Rainbow chase effect
+      rainbowOffset = (rainbowOffset + 1) % 256;
+      
+      // Clear strip
+      for (int i = 0; i < NUM_LEDS; i++) {
+        strip.setPixelColor(i, 0);
+      }
+      
+      // Create rainbow chase using wheel function
+      for (int i = 0; i < NUM_LEDS; i++) {
+        int hue = (rainbowOffset + (i * 256 / NUM_LEDS)) % 256;
+        strip.setPixelColor(i, wheel(hue));
+      }
+      
+      strip.show();
+    }
+  }
+}
+
+// ===================== Loop =====================
+void loop(){
+  const unsigned long nowMs = millis();
+
+  // Handle celebration animation
+  if (celebrating) {
+    if (!updateCelebration()) {
+      celebrating = false;
+      resetGame();
+      paintProgress();
+    }
+  }
+  
+  // Run demo mode when not connected
+  runDemoMode();
+
+  // Check for connection timeout
+  if (player1Connected && (millis() - lastHeartbeat > heartbeatTimeout)) {
+    player1Connected = false;
+    player1MacLearned = false; // Reset MAC learning to force rediscovery
+    wasConnected = false; // Reset connection flag to allow demo mode again
+    Serial.println("Player 1 connection lost - resetting discovery");
+    clearStrip(); // Clear LEDs when disconnected
+  }
+
+  // Send heartbeat to Player 1 (start immediately after setup)
+  static unsigned long lastHeartbeatSend = 0;
+  if (millis() - lastHeartbeatSend >= 1000) {
+    myData.action = 1; // heartbeat
+    esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
+    if (player1MacLearned) {
+      Serial.println("Sent heartbeat to Player 1");
+    } else {
+      Serial.println("Sent heartbeat to Player 1 (waiting for connection)");
+    }
+    lastHeartbeatSend = millis();
+  }
+
+  // Demo mode handles LED display when not connected
+}
