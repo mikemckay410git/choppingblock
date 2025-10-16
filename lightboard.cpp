@@ -105,7 +105,7 @@ enum CelebrationType : uint8_t {
 };
 
 bool celActive = false;
-bool celP1Wins = false;
+bool celP2Wins = false;
 CelebrationType celType = CEL_WINNER_CHASE;
 
 uint32_t celStartMs = 0;
@@ -126,15 +126,15 @@ static inline uint32_t scaleColor(uint8_t r,uint8_t g,uint8_t b,float s){
   return strip.Color((uint8_t)(r*s),(uint8_t)(g*s),(uint8_t)(b*s));
 }
 
-void startCelebration(bool player1Wins) {
+void startCelebration(bool player2Wins) {
   celActive = true;
-  celP1Wins = player1Wins;
-  if (celP1Wins) { 
-    PlayerColor c = getP1Color();
+  celP2Wins = player2Wins;
+  if (celP2Wins) { 
+    PlayerColor c = getP2Color();
     winnerR=c.r; winnerG=c.g; winnerB=c.b; 
   }
   else { 
-    PlayerColor c = getP2Color();
+    PlayerColor c = getP3Color();
     winnerR=c.r; winnerG=c.g; winnerB=c.b; 
   }
 
