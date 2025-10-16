@@ -862,27 +862,6 @@ document.addEventListener('DOMContentLoaded', function() {
   // Setup player name editing
   setupPlayerNameEditing();
   
-  // Add a demo button if no files are loaded after a short delay
-  setTimeout(() => {
-    if (availableCategories.length === 0) {
-      const demoBtn = document.createElement('button');
-      demoBtn.textContent = '🎮 Load Demo Quiz';
-      demoBtn.className = 'demo-btn';
-      demoBtn.style.cssText = `
-        background: linear-gradient(180deg, rgba(155,225,255,.25), rgba(155,225,255,.15));
-        border: 1px solid var(--accent2);
-        border-radius: 12px;
-        padding: 16px;
-        color: var(--ink);
-        font-weight: 600;
-        cursor: pointer;
-        margin-top: 16px;
-        width: 100%;
-      `;
-      demoBtn.addEventListener('click', loadDemoData);
-      
-      const fileInputSection = document.getElementById('fileInputSection');
-      fileInputSection.appendChild(demoBtn);
-    }
-  }, 1000);
+  // Load demo data immediately (like Player1.ino)
+  loadDemoData();
 });
