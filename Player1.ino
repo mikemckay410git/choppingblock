@@ -1263,7 +1263,10 @@ function awardPoint(player) {
   hideWinner();
   aEl.classList.remove('show');
   btnToggle.textContent = 'Show Answer';
-  next();
+  // Add a small delay before advancing to next question to prevent flashing
+  setTimeout(() => {
+    next();
+  }, 120);
 }
 
 // Quiz event listeners
