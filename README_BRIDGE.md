@@ -48,9 +48,9 @@ This project now uses a **Raspberry Pi + ESP32 Bridge** architecture instead of 
 - `script.js` - JavaScript logic for quiz functionality
 
 ### Bridge Server
-- `esp32_bridge.py` - Python web server that bridges web interface and ESP32
-- `requirements.txt` - Python dependencies
-- `setup.sh` - Setup script for Raspberry Pi
+- `esp32_bridge.js` - Node.js web server that bridges web interface and ESP32
+- `package.json` - Node.js dependencies
+- `README_NODEJS.md` - Node.js setup and usage documentation
 
 ### ESP32 Code
 - `Player1_Bridge.ino` - ESP32 code that acts as a pure communication bridge
@@ -59,15 +59,22 @@ This project now uses a **Raspberry Pi + ESP32 Bridge** architecture instead of 
 
 ### 1. On Raspberry Pi
 
-1. **Clone or copy the files** to your Raspberry Pi
-2. **Run the setup script**:
+1. **Install Node.js** (version 14 or higher):
    ```bash
-   ./setup.sh
+   curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+   sudo apt-get install -y nodejs
    ```
-3. **Connect ESP32** to Raspberry Pi via USB (usually `/dev/ttyUSB0`)
-4. **Start the service**:
+
+2. **Install dependencies**:
    ```bash
-   sudo systemctl start esp32-bridge.service
+   npm install
+   ```
+
+3. **Connect ESP32** to Raspberry Pi via USB (usually `/dev/ttyUSB0`)
+
+4. **Start the bridge server**:
+   ```bash
+   npm start
    ```
 
 ### 2. On ESP32
@@ -124,12 +131,12 @@ This project now uses a **Raspberry Pi + ESP32 Bridge** architecture instead of 
 
 ### ESP32 Not Connecting
 - Check serial port: `ls /dev/ttyUSB*`
-- Run manually: `python3 esp32_bridge.py --serial-port /dev/ttyUSB1`
+- Run manually: `node esp32_bridge.js --serial-port /dev/ttyUSB1`
 - Check ESP32 serial output for errors
 
 ### Web Interface Not Loading
-- Check if service is running: `sudo systemctl status esp32-bridge.service`
-- Check logs: `sudo journalctl -u esp32-bridge.service -f`
+- Check if server is running: `ps aux | grep node`
+- Check logs in terminal where you started the server
 - Try accessing: `http://localhost:3000`
 
 ### ESP-NOW Communication Issues
@@ -141,12 +148,12 @@ This project now uses a **Raspberry Pi + ESP32 Bridge** architecture instead of 
 
 ### Adding New Features
 1. **Web Interface**: Modify `script.js` and `index.html`
-2. **Bridge Logic**: Modify `esp32_bridge.py`
+2. **Bridge Logic**: Modify `esp32_bridge.js`
 3. **ESP32 Communication**: Modify `Player1_Bridge.ino`
 
 ### Testing
 - **Web Interface**: Test in browser with `http://localhost:3000`
-- **Serial Communication**: Monitor with `sudo journalctl -u esp32-bridge.service -f`
+- **Serial Communication**: Monitor terminal output where server is running
 - **ESP32**: Monitor serial output in Arduino IDE
 
 ## File Structure
@@ -156,9 +163,9 @@ project/
 ├── index.html              # Web interface
 ├── styles.css              # Web styling
 ├── script.js               # Web JavaScript
-├── esp32_bridge.py         # Python bridge server
-├── requirements.txt        # Python dependencies
-├── setup.sh               # Setup script
+├── esp32_bridge.js         # Node.js bridge server
+├── package.json            # Node.js dependencies
+├── README_NODEJS.md        # Node.js documentation
 ├── Player1_Bridge.ino     # ESP32 bridge code
 ├── Player2.ino            # Player 2 ESP32 code
 ├── Player3.ino            # Player 3 ESP32 code
