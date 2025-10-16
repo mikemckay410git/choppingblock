@@ -11,7 +11,7 @@ let esp32Enabled = false;
 // Socket.IO event handlers
 socket.on('connect', () => {
   console.log('Connected to server');
-  connDot.className = 'good';
+  connDot.className = 'ok';
 });
 
 socket.on('disconnect', () => {
@@ -26,7 +26,7 @@ socket.on('esp32_status', (status) => {
   
   // Update connection indicator
   if (esp32Enabled && esp32Connected) {
-    connDot.className = 'good';
+    connDot.className = 'ok';
   } else if (esp32Enabled && !esp32Connected) {
     connDot.className = 'warning';
   } else {
@@ -101,6 +101,7 @@ const fileList = document.getElementById('fileList');
 const categorySelector = document.getElementById('categorySelector');
 const categoryGrid = document.getElementById('categoryGrid');
 const quizInterface = document.getElementById('quizInterface');
+const quizDisplay = document.getElementById('quizDisplay');
 const quizTitle = document.getElementById('quizTitle');
 const qEl = document.getElementById('q');
 const aEl = document.getElementById('a');
@@ -110,6 +111,7 @@ const counterEl = document.getElementById('counter');
 const btnPrev = document.getElementById('prev');
 const btnNext = document.getElementById('next');
 const btnToggle = document.getElementById('toggle');
+const btnExit = document.getElementById('exitBtn');
 const card = document.getElementById('card');
 const player2ScoreEl = document.getElementById('player2Score');
 const player3ScoreEl = document.getElementById('player3Score');
@@ -130,8 +132,46 @@ const lightboardP2Color = document.getElementById('lightboardP2Color');
 const lightboardP3Color = document.getElementById('lightboardP3Color');
 const damageMultiplier = document.getElementById('damageMultiplier');
 
+// Game status elements
+const gameStatus = document.getElementById('gameStatus');
+const player2Tile = document.getElementById('player2Tile');
+const player3Tile = document.getElementById('player3Tile');
+const player2Name = document.querySelector('#player2Tile .player-name');
+const player3Name = document.querySelector('#player3Tile .player-name');
+
 let order = [];
 let idx = 0;
+
+// Lightboard settings
+let lightboardGameMode = 1; // Default to Territory mode
+let lightboardP2ColorIndex = 0; // Red
+let lightboardP3ColorIndex = 1; // Blue
+let damageMultiplierValue = 3; // Default to triple damage
+
+// Player names with persistence
+let player2NameText = 'Player 2';
+let player3NameText = 'Player 3';
+
+// Quiz state persistence
+let currentQuestionIndex = 0;
+let savedOrder = null; // Store the shuffled order to restore exactly
+
+// Scoring system
+let roundComplete = false;
+
+// Sample quiz data (you can replace this with your CSV data)
+const sampleQuestions = [
+  { q: "What is the capital of France?", a: "Paris", category: "Geography" },
+  { q: "What is 2 + 2?", a: "4", category: "Math" },
+  { q: "What is the largest planet in our solar system?", a: "Jupiter", category: "Science" },
+  { q: "Who wrote Romeo and Juliet?", a: "William Shakespeare", category: "Literature" },
+  { q: "What is the chemical symbol for gold?", a: "Au", category: "Science" },
+  { q: "What year did World War II end?", a: "1945", category: "History" },
+  { q: "What is the main component of the sun?", a: "Hydrogen", category: "Science" },
+  { q: "What is the largest ocean on Earth?", a: "Pacific Ocean", category: "Geography" },
+  { q: "What is the square root of 144?", a: "12", category: "Math" },
+  { q: "Who painted the Mona Lisa?", a: "Leonardo da Vinci", category: "Art" }
+];
 
 // === FILE HANDLING ===
 fileInput.addEventListener('change', handleFileSelect);
@@ -232,17 +272,21 @@ function addFileToList(filename, message, status) {
 // === CATEGORY SELECTION ===
 function showCategorySelector() {
   categorySelector.classList.remove('hidden');
-  quizInterface.classList.add('hidden');
+  quizDisplay.classList.add('hidden');
   fileInputSection.classList.remove('hidden');
+  resetAllData.parentElement.classList.remove('hidden');
+  lightboardSettingsBtn.parentElement.classList.remove('hidden');
   currentCategory = '';
   QA = [];
   console.log('Category selector shown, file input visible');
 }
 
-function showQuizInterface() {
+function showQuizDisplay() {
   categorySelector.classList.add('hidden');
-  quizInterface.classList.remove('hidden');
+  quizDisplay.classList.remove('hidden');
   fileInputSection.classList.add('hidden');
+  resetAllData.parentElement.classList.add('hidden');
+  lightboardSettingsBtn.parentElement.classList.add('hidden');
   console.log('Quiz interface shown, file input hidden');
 }
 
@@ -261,7 +305,7 @@ function createCategoryButtons(categories) {
   if (categories.length > 1) {
     const totalQuestions = categories.reduce((sum, cat) => sum + cat.questions.length, 0);
     buttonsHTML += `
-      <div class="category-btn combine-all" style="grid-column: 1 / -1; background: linear-gradient(180deg, rgba(155,225,255,.25), rgba(155,225,255,.15)); border-color: var(--accent-2);">
+      <div class="category-btn combine-all" style="grid-column: 1 / -1; background: linear-gradient(180deg, rgba(155,225,255,.25), rgba(155,225,255,.15)); border-color: var(--accent2);">
         <div style="font-size: 18px; margin-bottom: 4px;">🎯 Combine All Categories</div>
         <div style="font-size: 12px; color: var(--muted);">${totalQuestions} total questions from ${categories.length} categories</div>
       </div>
@@ -303,7 +347,7 @@ function loadCategory(filename) {
   currentCategory = category.name;
   quizTitle.textContent = currentCategory;
   
-  showQuizInterface();
+  showQuizDisplay();
   setOrder(true);
   render(true);
   enableControls();
@@ -327,7 +371,7 @@ function loadCombinedCategories(categories) {
   currentCategory = `Mixed: ${categoryNames.join(', ')}`;
   quizTitle.textContent = currentCategory;
   
-  showQuizInterface();
+  showQuizDisplay();
   setOrder(true);
   render(true);
   enableControls();
@@ -433,13 +477,19 @@ confirmReset.addEventListener('click', () => {
   confirmModal.classList.add('hidden');
   
   // Send reset command to ESP32
-  sendToESP32({ cmd: 'reset' });
+  sendToESP32({ action: 'reset' });
   
   console.log('All data reset');
 });
 
 // === LIGHTBOARD SETTINGS ===
 lightboardSettingsBtn.addEventListener('click', () => {
+  // Load current settings
+  lightboardMode.value = lightboardGameMode;
+  lightboardP2Color.value = lightboardP2ColorIndex;
+  lightboardP3Color.value = lightboardP3ColorIndex;
+  damageMultiplier.value = damageMultiplierValue;
+  
   lightboardModal.classList.remove('hidden');
 });
 
@@ -448,71 +498,139 @@ cancelLightboard.addEventListener('click', () => {
 });
 
 confirmLightboard.addEventListener('click', () => {
-  const settings = {
-    cmd: 'lightboardSettings',
-    mode: parseInt(lightboardMode.value),
-    p2Color: parseInt(lightboardP2Color.value),
-    p3Color: parseInt(lightboardP3Color.value),
-    multiplier: parseInt(damageMultiplier.value)
-  };
+  const newMode = parseInt(lightboardMode.value);
+  const newP2Color = parseInt(lightboardP2Color.value);
+  const newP3Color = parseInt(lightboardP3Color.value);
+  const newMultiplier = parseInt(damageMultiplier.value);
   
-  sendToESP32(settings);
+  // Update local variables
+  lightboardGameMode = newMode;
+  lightboardP2ColorIndex = newP2Color;
+  lightboardP3ColorIndex = newP3Color;
+  damageMultiplierValue = newMultiplier;
+  
+  // Send settings to ESP32
+  sendToESP32({
+    action: 'lightboardSettings',
+    mode: newMode,
+    p2Color: newP2Color,
+    p3Color: newP3Color
+  });
+  
   lightboardModal.classList.add('hidden');
   
-  console.log('Lightboard settings applied:', settings);
+  console.log('Lightboard settings applied:', { newMode, newP2Color, newP3Color, newMultiplier });
 });
 
 // === SCORE MANAGEMENT ===
-function awardPoint(player, multiplier = 1) {
-  if (player === 2) {
-    player2Score += multiplier;
+function awardPoint(player) {
+  if (!roundComplete) return;
+  
+  // Update score based on damage multiplier
+  if (player === 'Player 2') {
+    player2Score += damageMultiplierValue;
     player2ScoreEl.textContent = player2Score;
-  } else if (player === 3) {
-    player3Score += multiplier;
+    // Send message to ESP32 to award points to Player 2
+    sendToESP32({ action: 'awardPoint', player: 2, multiplier: damageMultiplierValue });
+  } else if (player === 'Player 3') {
+    player3Score += damageMultiplierValue;
     player3ScoreEl.textContent = player3Score;
+    // Send message to ESP32 to award points to Player 3
+    sendToESP32({ action: 'awardPoint', player: 3, multiplier: damageMultiplierValue });
   }
   
-  // Send score update to ESP32
-  sendToESP32({ 
-    cmd: 'awardPoint', 
-    player: player, 
-    multiplier: multiplier 
-  });
+  // Reset game and advance to next question
+  removeScorableState();
+  hideWinner();
+  aEl.classList.remove('show');
+  btnToggle.textContent = 'Show Answer';
+  // Add a small delay before advancing to next question to prevent flashing
+  setTimeout(() => {
+    next();
+  }, 120);
 }
 
-// === QUIZ ACTIONS ===
-function sendQuizAction(action) {
-  sendToESP32({ 
-    cmd: 'quizAction', 
-    action: action 
-  });
+// Add scorable state to player tiles
+function addScorableState() {
+  // Only add scorable class if the tile is not already a winner
+  if (!player2Tile.classList.contains('winner')) {
+    player2Tile.classList.add('scorable');
+  }
+  if (!player3Tile.classList.contains('winner')) {
+    player3Tile.classList.add('scorable');
+  }
+  roundComplete = true;
+}
+
+// Remove scorable state from player tiles
+function removeScorableState() {
+  player2Tile.classList.remove('scorable');
+  player3Tile.classList.remove('scorable');
+  roundComplete = false;
+}
+
+function showWinner(player) {
+  // Remove winner class from all tiles
+  player2Tile.classList.remove('winner');
+  player3Tile.classList.remove('winner');
+  
+  // Add winner class to the winning player's tile
+  if (player === 'Player 2') {
+    player2Tile.classList.add('winner');
+  } else if (player === 'Player 3') {
+    player3Tile.classList.add('winner');
+  }
+  
+  // Enable scoring immediately
+  addScorableState();
+}
+
+function hideWinner() {
+  player2Tile.classList.remove('winner');
+  player3Tile.classList.remove('winner');
+  removeScorableState();
 }
 
 // === EVENT LISTENERS ===
 btnNext.addEventListener('click', () => {
   next();
-  sendQuizAction('next');
+  sendToESP32({ action: 'reset', quizNav: true });
 });
 
 btnPrev.addEventListener('click', () => {
   prev();
-  sendQuizAction('prev');
+  sendToESP32({ action: 'reset', quizNav: true });
 });
 
 btnToggle.addEventListener('click', toggleAnswer);
+btnExit.addEventListener('click', showExitConfirmation);
 card.addEventListener('click', toggleAnswer);
+
+// Consolidated scoring event listener
+function handlePlayerClick(player) {
+  return function(e) {
+    if (roundComplete) {
+      e.preventDefault();
+      e.stopPropagation();
+      awardPoint(player);
+    }
+  };
+}
+
+player2Tile.addEventListener('click', handlePlayerClick('Player 2'));
+player3Tile.addEventListener('click', handlePlayerClick('Player 3'));
 
 // Keyboard shortcuts
 window.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowRight') { 
     e.preventDefault(); 
     next(); 
-    sendQuizAction('next');
+    sendToESP32({ action: 'reset', quizNav: true });
   }
   else if (e.key === 'ArrowLeft') { 
     e.preventDefault(); 
     prev(); 
-    sendQuizAction('prev');
+    sendToESP32({ action: 'reset', quizNav: true });
   }
   else if (e.key === ' ' || e.code === 'Space') { 
     e.preventDefault(); 
@@ -524,19 +642,74 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+// Exit functionality
+function showExitConfirmation() {
+  confirmModal.classList.remove('hidden');
+}
+
+function hideExitConfirmation() {
+  confirmModal.classList.add('hidden');
+}
+
+function exitToCategories() {
+  // Reset game state
+  hideWinner();
+  aEl.classList.remove('show');
+  btnToggle.textContent = 'Show Answer';
+  
+  // Reset scores
+  player2Score = 0;
+  player3Score = 0;
+  roundComplete = false;
+  player2ScoreEl.textContent = '0';
+  player3ScoreEl.textContent = '0';
+  removeScorableState();
+  
+  // Hide modal
+  hideExitConfirmation();
+  
+  // Reset lightboard when exiting quiz
+  sendToESP32({ action: 'reset' });
+  
+  // Return to category selector
+  showCategorySelector();
+}
+
+// Modal event listeners
+document.getElementById('cancelExit').addEventListener('click', hideExitConfirmation);
+document.getElementById('confirmExit').addEventListener('click', exitToCategories);
+
+// Close modals when clicking overlay
+confirmModal.addEventListener('click', function(e) {
+  if (e.target === confirmModal) {
+    hideExitConfirmation();
+  }
+});
+
+lightboardModal.addEventListener('click', function(e) {
+  if (e.target === lightboardModal) {
+    lightboardModal.classList.add('hidden');
+  }
+});
+
+// Close modals with Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    if (!confirmModal.classList.contains('hidden')) {
+      hideExitConfirmation();
+    } else if (!lightboardModal.classList.contains('hidden')) {
+      lightboardModal.classList.add('hidden');
+    }
+  }
+});
+
 // Demo data for testing without CSV files
 function loadDemoData() {
   const demoCategories = [
     {
       filename: 'demo.csv',
       name: 'Demo Quiz',
-      questions: [
-        { q: 'What is the capital of France?', a: 'Paris' },
-        { q: 'What is 2 + 2?', a: '4' },
-        { q: 'What color is the sky?', a: 'Blue' },
-        { q: 'How many days are in a week?', a: '7' },
-        { q: 'What is the largest planet?', a: 'Jupiter' }
-      ]
+      questions: sampleQuestions
     }
   ];
   
@@ -545,12 +718,12 @@ function loadDemoData() {
   createCategoryButtons(availableCategories);
   
   // Add demo file to the list
-  addFileToList('demo.csv', '5 questions (demo)', 'success');
+  addFileToList('demo.csv', '10 questions (demo)', 'success');
   loadedFiles.classList.remove('hidden');
 }
 
-// Load demo data on page load if no files are loaded
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize quiz on load
+document.addEventListener('DOMContentLoaded', function() {
   // Add a demo button if no files are loaded after a short delay
   setTimeout(() => {
     if (availableCategories.length === 0) {
@@ -559,7 +732,7 @@ document.addEventListener('DOMContentLoaded', () => {
       demoBtn.className = 'demo-btn';
       demoBtn.style.cssText = `
         background: linear-gradient(180deg, rgba(155,225,255,.25), rgba(155,225,255,.15));
-        border: 1px solid var(--accent-2);
+        border: 1px solid var(--accent2);
         border-radius: 12px;
         padding: 16px;
         color: var(--ink);
