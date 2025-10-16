@@ -151,6 +151,7 @@ let damageMultiplierValue = 3; // Default to triple damage
 // Player names with persistence
 let player2NameText = 'Player 2';
 let player3NameText = 'Player 3';
+let isEditingName = false;
 
 // Quiz state persistence
 let currentQuestionIndex = 0;
@@ -609,7 +610,7 @@ card.addEventListener('click', toggleAnswer);
 // Consolidated scoring event listener
 function handlePlayerClick(player) {
   return function(e) {
-    if (roundComplete) {
+    if (roundComplete && !isEditingName) {
       e.preventDefault();
       e.stopPropagation();
       awardPoint(player);
@@ -619,6 +620,140 @@ function handlePlayerClick(player) {
 
 player2Tile.addEventListener('click', handlePlayerClick('Player 2'));
 player3Tile.addEventListener('click', handlePlayerClick('Player 3'));
+
+// Player name editing functionality
+function setupPlayerNameEditing() {
+  // Use double-tap for mobile editing (more reliable than long press)
+  let lastTap = 0;
+  let tapTimer;
+  
+  // Player 2 name editing
+  player2Name.addEventListener('touchend', function(e) {
+    if (roundComplete) return; // Don't allow editing during scoring phase
+    
+    const currentTime = new Date().getTime();
+    const tapLength = currentTime - lastTap;
+    
+    if (tapLength < 500 && tapLength > 0) {
+      // Double tap detected
+      e.preventDefault();
+      startEditingName(player2Name, 'Player 2');
+    } else {
+      // Single tap - wait for potential double tap
+      tapTimer = setTimeout(() => {
+        // Single tap confirmed
+      }, 500);
+    }
+    lastTap = currentTime;
+  });
+
+  // Player 3 name editing
+  let lastTap3 = 0;
+  let tapTimer3;
+  
+  player3Name.addEventListener('touchend', function(e) {
+    if (roundComplete) return; // Don't allow editing during scoring phase
+    
+    const currentTime = new Date().getTime();
+    const tapLength = currentTime - lastTap3;
+    
+    if (tapLength < 500 && tapLength > 0) {
+      // Double tap detected
+      e.preventDefault();
+      startEditingName(player3Name, 'Player 3');
+    } else {
+      // Single tap - wait for potential double tap
+      tapTimer3 = setTimeout(() => {
+        // Single tap confirmed
+      }, 500);
+    }
+    lastTap3 = currentTime;
+  });
+
+  // Desktop double-click for editing
+  player2Name.addEventListener('dblclick', function(e) {
+    if (roundComplete) return; // Don't allow editing during scoring phase
+    e.preventDefault();
+    startEditingName(player2Name, 'Player 2');
+  });
+
+  player3Name.addEventListener('dblclick', function(e) {
+    if (roundComplete) return; // Don't allow editing during scoring phase
+    e.preventDefault();
+    startEditingName(player3Name, 'Player 3');
+  });
+}
+
+function startEditingName(nameElement, defaultName) {
+  if (isEditingName) return;
+  
+  isEditingName = true;
+  nameElement.classList.add('editing');
+  
+  const currentName = nameElement.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentName;
+  input.style.cssText = `
+    background: transparent;
+    border: none;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 16px;
+    text-align: center;
+    width: 100%;
+    outline: none;
+    font-family: inherit;
+    -webkit-user-select: text;
+    user-select: text;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  `;
+  
+  // Clear any existing content and add the input
+  nameElement.innerHTML = '';
+  nameElement.appendChild(input);
+  
+  // Force focus and selection on mobile
+  setTimeout(() => {
+    input.focus();
+    input.select();
+    // Force keyboard to appear on mobile
+    input.click();
+  }, 100);
+  
+  function finishEditing() {
+    const newName = input.value.trim() || defaultName;
+    nameElement.textContent = newName;
+    nameElement.classList.remove('editing');
+    isEditingName = false;
+    
+    // Update stored names
+    if (nameElement === player2Name) {
+      player2NameText = newName;
+    } else if (nameElement === player3Name) {
+      player3NameText = newName;
+    }
+  }
+  
+  input.addEventListener('blur', finishEditing);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      finishEditing();
+    } else if (e.key === 'Escape') {
+      // Restore original name without saving
+      nameElement.textContent = currentName;
+      nameElement.classList.remove('editing');
+      isEditingName = false;
+    }
+  });
+  
+  // Handle mobile keyboard "Done" button
+  input.addEventListener('input', function(e) {
+    // This ensures the input is properly handled on mobile
+  });
+}
 
 // Keyboard shortcuts
 window.addEventListener('keydown', (e) => {
@@ -724,6 +859,9 @@ function loadDemoData() {
 
 // Initialize quiz on load
 document.addEventListener('DOMContentLoaded', function() {
+  // Setup player name editing
+  setupPlayerNameEditing();
+  
   // Add a demo button if no files are loaded after a short delay
   setTimeout(() => {
     if (availableCategories.length === 0) {
