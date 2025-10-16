@@ -35,7 +35,7 @@ static const unsigned long DEADTIME_MS           = 120;  // ms quiet before reâ€
 
 // ===================== ESP-NOW Configuration =====================
 // Player 1 MAC address (hardcoded for reliability)
-uint8_t player1Address[] = {0x78, 0x1C, 0x3C, 0xB8, 0xD5, 0xA8}; // Player 1 STA MAC
+uint8_t player1Address[] = {0x80, 0xF3, 0xDA, 0x4A, 0x2F, 0x98}; // Player 1 STA MAC
 const uint8_t ESPNOW_BROADCAST_ADDR[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
 typedef struct struct_message {
@@ -254,7 +254,7 @@ void IRAM_ATTR edgeISR3(){ latch_time_min(3); }
 void (*ISR_FUN[SENSOR_COUNT])() = { edgeISR0, edgeISR1, edgeISR2, edgeISR3 };
 
 // ===================== ESP-NOW Callbacks =====================
-void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+void OnDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
   Serial.print("Send Status: ");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
 }

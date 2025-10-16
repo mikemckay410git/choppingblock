@@ -2274,7 +2274,9 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
 
 // ===================== Lightboard Communication =====================
 void sendLightboardUpdate(uint8_t action) {
-  if (!lightboardConnected) return;
+  // Always send heartbeats (action 1) regardless of connection status
+  // Other actions require connection
+  if (!lightboardConnected && action != 1) return;
   
   lightboardData.deviceId = 1; // Player 1
   lightboardData.action = action;

@@ -23,7 +23,7 @@ static void forceStaChannel(uint8_t ch){
 }
 
 // Player 1 MAC address (hardcoded for reliability)
-uint8_t player1Address[] = {0x78, 0x1C, 0x3C, 0xB8, 0xD5, 0xA9}; // Player 1 AP MAC
+uint8_t player1Address[] = {0x80, 0xF3, 0xDA, 0x4A, 0x2F, 0x98}; // Player 1 AP MAC
 
 typedef struct struct_lightboard_message {
   uint8_t  deviceId;     // 3=Lightboard
@@ -269,7 +269,7 @@ void resetGame(){
 }
 
 // ===================== ESP-NOW Callbacks =====================
-void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+void OnDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
   Serial.print("Lightboard Send Status: ");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
 }
