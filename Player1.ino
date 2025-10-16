@@ -1,46 +1,14 @@
 #include <WiFi.h>
-#include <WebServer.h>
-#include <WebSocketsServer.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
-#include <Preferences.h>
 #include <ArduinoJson.h>
 
 #define LED_PIN 2
 
 // ===================== USER CONFIG =====================
-static const int SENSOR_COUNT = 4;
-// Index order: 0=Top (GPIO35), 1=Bottom (GPIO33), 2=Right (GPIO34), 3=Left (GPIO32)
-static const uint8_t SENSOR_PINS[SENSOR_COUNT] = {35, 33, 34, 32};
-
-// Catch both polarities while debugging; later change to RISING or FALLING
-static const int EDGE_MODE = CHANGE;
-
-// Board coordinates: top-left origin (0,0) to (0.4,0.4) meters
-// Sensor positions in METERS matching index order above
-static const float SX[SENSOR_COUNT] = {0.200f, 0.200f, 0.300f, 0.100f};
-static const float SY[SENSOR_COUNT] = {0.100f, 0.300f, 0.200f, 0.200f};
-
-// Board bounds (meters) used to keep solutions on the board
-static const float BOARD_SIZE_M = 0.4f;
-static const float BOARD_MIN_X = 0.0f;
-static const float BOARD_MAX_X = BOARD_SIZE_M;
-static const float BOARD_MIN_Y = 0.0f;
-static const float BOARD_MAX_Y = BOARD_SIZE_M;
-// Solver acceptance threshold (meters RMS residual). Tune based on noise.
-static const float SOLVER_RMS_THRESH_M = 0.02f; // 20 mm
-
-// Estimated plate wave speed (tune this)
-static float V_SOUND = 3000.0f; // m/s
-
-// Timing
-static const unsigned long CAPTURE_WINDOW_US     = 8000; // wide for debugging
-static const unsigned long DEADTIME_MS           = 120;  // ms quiet before re‑arm
-static const unsigned long BROADCAST_INTERVAL_MS = 25;   // periodic lightweight WS
-
-// Wi‑Fi AP creds
-static const char* AP_SSID = "ToolBoard";
-static const char* AP_PASS = "12345678";
+// ESP-NOW Bridge: communicates between Raspberry Pi and other ESP32s
+static const unsigned long HEARTBEAT_INTERVAL_MS = 1000;   // heartbeat to players
+static const unsigned long SERIAL_TIMEOUT_MS = 100;        // serial read timeout
 // =======================================================
 
 // ===================== ESP-NOW Configuration =====================
@@ -108,10 +76,11 @@ const unsigned long SYNC_INTERVAL = 1000; // Sync at most once per second
 // =======================================================
 
 // ===================== Game State =====================
-WebServer server(80);
-WebSocketsServer ws(81);
-Preferences g_prefs;
-int32_t g_activeWsClient = -1; // enforce single WebSocket client
+// Serial communication with Raspberry Pi
+String serialBuffer = "";
+bool piConnected = false;
+unsigned long lastPiHeartbeat = 0;
+const unsigned long PI_HEARTBEAT_TIMEOUT = 5000; // 5 seconds
 
 // Function declarations
 void resetGame();
@@ -124,36 +93,16 @@ void sendLightboardPointUpdate(uint8_t scoringPlayer);
 void awardPointToPlayer(uint8_t playerId);
 void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier);
 
-volatile unsigned long g_firstTime[SENSOR_COUNT]; // first arrival micros() per sensor
-volatile uint32_t      g_hitMask = 0;             // bit i set when sensor i latched first arrival
-volatile bool          g_armed = true;            // ready for new hit
-volatile bool          g_capturing = false;       // capture window open
-volatile unsigned long g_t0 = 0;                  // first edge time (µs)
-
-// ISR-light start handoff
-volatile bool          g_startPending = false;    // main loop should start capture
-volatile int           g_firstIndex   = -1;       // who triggered first (for debug)
-
-// Edge debug counters (for UI table)
-volatile uint16_t g_edgeCount[SENSOR_COUNT]      = {0,0,0,0};
-volatile unsigned long g_lastEdgeUs[SENSOR_COUNT]= {0,0,0,0};
-
-unsigned long g_lastResultMs = 0;
+// Local sensor state removed (host-only)
+// Local result tracking removed (host-only)
 unsigned long g_lastBroadcastMs = 0;
 
-struct HitResult {
-  bool   valid = false;
-  float  x = 0, y = 0;  // meters in same top-left frame
-  int    haveTimes = 0;
-  String mode = "none";
-  uint32_t hitTime = 0;
-  uint16_t hitStrength = 0;
-} g_lastHit;
+// HitResult struct removed (host-only, no local hit detection)
 
 // Game state
 bool gameActive = true;  // Start with game active
 String winner = "none";
-uint32_t player1HitTime = 0;
+// Player 1 is host-only, no local hit time needed
 uint32_t player2HitTime = 0;
 uint32_t player3HitTime = 0;
 
@@ -2026,165 +1975,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </body></html>
 )HTML";
 
-// ===================== Math: TDoA solver =====================
-static bool tdoaSolve(const float *sx, const float *sy,
-                      const unsigned long *t, float vs,
-                      float &x, float &y, int &nUsed)
-{
-  // Count available timestamps
-  int have = 0;
-  for (int i = 0; i < SENSOR_COUNT; i++) if (t[i] != 0) have++;
-  nUsed = have;
-  if (have < 3) return false;
-
-  // Choose reference as earliest arrival
-  int ref = 0; unsigned long tref = ~0u;
-  for (int i = 0; i < SENSOR_COUNT; i++) {
-    if (t[i] && t[i] < tref) { tref = t[i]; ref = i; }
-  }
-
-  // Precompute TDoA (meters) relative to reference for used sensors
-  double dd[SENSOR_COUNT];
-  bool use[SENSOR_COUNT];
-  int rows = 0;
-  for (int i = 0; i < SENSOR_COUNT; i++) {
-    if (i == ref || t[i] == 0) { use[i] = false; continue; }
-    double dt_us = double(t[i]) - double(tref);
-    dd[i] = double(vs) * dt_us * 1e-6; // meters
-    use[i] = true;
-    rows++;
-  }
-  if (rows < 2) return false;
-
-  // Initial guess: board center (or mean of sensor positions)
-  double xg = 0.0, yg = 0.0; int npos = 0;
-  for (int i = 0; i < SENSOR_COUNT; i++) { xg += sx[i]; yg += sy[i]; npos++; }
-  xg /= (npos > 0 ? npos : 1);
-  yg /= (npos > 0 ? npos : 1);
-
-  // Keep iterations stable
-  const double eps = 1e-9;
-  const int maxIter = 15;
-  const double damping = 1e-6; // Levenberg damping
-
-  bool brokeSingular = false;
-  for (int it = 0; it < maxIter; it++) {
-    // Distances to reference and Jacobian accumulation
-    double dxr = xg - sx[ref];
-    double dyr = yg - sy[ref];
-    double Dr = sqrt(dxr*dxr + dyr*dyr); if (Dr < eps) Dr = eps;
-
-    double ATA00 = 0.0, ATA01 = 0.0, ATA11 = 0.0;
-    double ATb0 = 0.0, ATb1 = 0.0;
-
-    for (int i = 0; i < SENSOR_COUNT; i++) {
-      if (!use[i]) continue;
-      double dxi = xg - sx[i];
-      double dyi = yg - sy[i];
-      double Di = sqrt(dxi*dxi + dyi*dyi); if (Di < eps) Di = eps;
-
-      // Residual: (Di - Dr) - dd[i] = 0
-      double ri = (Di - Dr) - dd[i];
-
-      // Jacobian wrt x and y
-      double dFdx = (dxi/Di) - (dxr/Dr);
-      double dFdy = (dyi/Di) - (dyr/Dr);
-
-      // Accumulate normal equations
-      ATA00 += dFdx * dFdx;
-      ATA01 += dFdx * dFdy;
-      ATA11 += dFdy * dFdy;
-      ATb0  += dFdx * ri;
-      ATb1  += dFdy * ri;
-    }
-
-    // Solve (J^T J + lambda I) delta = -J^T r
-    ATA00 += damping; ATA11 += damping;
-    double det = ATA00 * ATA11 - ATA01 * ATA01;
-    if (fabs(det) < 1e-12) { brokeSingular = true; break; }
-
-    double inv00 =  ATA11 / det;
-    double inv01 = -ATA01 / det;
-    double inv11 =  ATA00 / det;
-
-    double dx = -(inv00 * ATb0 + inv01 * ATb1);
-    double dy = -(inv01 * ATb0 + inv11 * ATb1);
-
-    // Limit step size to keep stable
-    double stepNorm = sqrt(dx*dx + dy*dy);
-    const double maxStep = 0.05; // meters per iteration
-    if (stepNorm > maxStep) {
-      dx *= (maxStep / stepNorm);
-      dy *= (maxStep / stepNorm);
-    }
-
-    xg += dx; yg += dy;
-
-    if (sqrt(dx*dx + dy*dy) < 1e-4) break; // ~0.1 mm
-  }
-
-  if (brokeSingular) return false;
-
-  // Compute RMS residual to assess fit quality
-  {
-    double dxr = xg - sx[ref];
-    double dyr = yg - sy[ref];
-    double Dr = sqrt(dxr*dxr + dyr*dyr);
-    if (Dr < 1e-9) Dr = 1e-9;
-    double rss = 0.0; int m = 0;
-    for (int i = 0; i < SENSOR_COUNT; i++) {
-      if (!use[i]) continue;
-      double dxi = xg - sx[i];
-      double dyi = yg - sy[i];
-      double Di = sqrt(dxi*dxi + dyi*dyi); if (Di < 1e-9) Di = 1e-9;
-      double ri = (Di - Dr) - dd[i];
-      rss += ri * ri;
-      m++;
-    }
-    if (m >= 2) {
-      double rms = sqrt(rss / m);
-      if (rms > SOLVER_RMS_THRESH_M) return false;
-    }
-  }
-
-  // Clamp to board bounds to avoid off-board estimates due to noise
-  if (xg < BOARD_MIN_X) xg = BOARD_MIN_X; else if (xg > BOARD_MAX_X) xg = BOARD_MAX_X;
-  if (yg < BOARD_MIN_Y) yg = BOARD_MIN_Y; else if (yg > BOARD_MAX_Y) yg = BOARD_MAX_Y;
-
-  x = float(xg);
-  y = float(yg);
-  return true;
-}
-
-// ===================== ISRs (ultra-minimal) =====================
-static inline void IRAM_ATTR latch_time_min(int i) {
-  unsigned long now = micros(); // safe on ESP32 core
-
-  // count every edge for debug
-  g_edgeCount[i]++;
-  g_lastEdgeUs[i] = now;
-
-  // First edge -> ask main loop to start capture
-  if (g_armed && !g_capturing && !g_startPending) {
-    g_t0 = now;
-    g_firstIndex = i;
-    g_startPending = true; // main loop will open window & light LED
-  }
-
-  // If capture already open (or about to open), latch first time for this sensor
-  if (g_capturing || g_startPending) {
-    if (!(g_hitMask & (1u << i))) {
-      g_hitMask |= (1u << i);
-      g_firstTime[i] = now;
-    }
-  }
-}
-
-void IRAM_ATTR edgeISR0(){ latch_time_min(0); }
-void IRAM_ATTR edgeISR1(){ latch_time_min(1); }
-void IRAM_ATTR edgeISR2(){ latch_time_min(2); }
-void IRAM_ATTR edgeISR3(){ latch_time_min(3); }
-void (*ISR_FUN[SENSOR_COUNT])() = { edgeISR0, edgeISR1, edgeISR2, edgeISR3 };
+// (Local TDoA solver and ISR code removed - host-only)
 
 // ===================== ESP-NOW Callbacks =====================
 void OnDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
@@ -2673,26 +2464,14 @@ void setup(){
   delay(50);
   Serial.println();
   Serial.println(F("=== Two Player Impact Game - Player 1 (Host) - SYNC VERSION ==="));
-  Serial.printf("GPIOs: [%d, %d, %d, %d]\r\n", SENSOR_PINS[0],SENSOR_PINS[1],SENSOR_PINS[2],SENSOR_PINS[3]);
+  Serial.println(F("Host-only mode: no local sensors"));
 
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
 
-  for(int i=0;i<SENSOR_COUNT;i++){
-    pinMode(SENSOR_PINS[i], INPUT);
-  }
+  // No sensor pin init in host-only mode
 
-  // Load persisted calibration
-  g_prefs.begin("shock", false);
-  float vsSaved = g_prefs.getFloat("vs", V_SOUND);
-  if (vsSaved > 0.0f && vsSaved < 20000.0f) {
-    V_SOUND = vsSaved;
-  }
-  Serial.printf("V_SOUND (loaded): %.1f m/s\r\n", V_SOUND);
-  
-  // Clear any stored connection state to ensure clean startup
-  g_prefs.clear();
-  Serial.println("Cleared stored preferences for clean startup");
+  // No local calibration/preferences in host-only mode
 
   // Wi‑Fi AP + web UI (keep STA active for ESP-NOW reliability)
   WiFi.mode(WIFI_AP_STA);
@@ -2769,21 +2548,8 @@ if (esp_now_add_peer(&lightboardPeerInfo) == ESP_OK) {
 
   myData.playerId = 1;
 
-  // Attach interrupts
-  for(int i=0;i<SENSOR_COUNT;i++){
-    attachInterrupt(digitalPinToInterrupt(SENSOR_PINS[i]), ISR_FUN[i], EDGE_MODE);
-  }
-  Serial.println(F("Interrupts attached. Waiting for hits..."));
-
-  // Arm
-  g_armed = true;
-  g_capturing = false;
-  g_startPending = false;
-  g_firstIndex = -1;
-  g_hitMask = 0;
-  for(int i=0;i<SENSOR_COUNT;i++){
-    g_firstTime[i]=0; g_edgeCount[i]=0; g_lastEdgeUs[i]=0;
-  }
+  // Local hit detection disabled: Player 1 is host-only
+  Serial.println(F("Local hit detection disabled (host-only)."));
 
   // Initialize game state
   gameActive = true;  // Ensure game starts active
@@ -2808,102 +2574,10 @@ void loop(){
   // Clock synchronization
   syncClock();
 
-  // If ISR asked us to start, open the capture window here (NOT inside ISR)
-  if (g_startPending) {
-    noInterrupts();
-    g_capturing = true;
-    g_armed = false;
-    // clear edge counters for this window
-    for (int k=0;k<SENSOR_COUNT;k++){ g_edgeCount[k]=0; g_lastEdgeUs[k]=0; }
-    // ensure the very first sensor time exists
-    if (g_firstIndex >= 0 && !(g_hitMask & (1u << g_firstIndex))) {
-      g_hitMask |= (1u << g_firstIndex);
-      g_firstTime[g_firstIndex] = g_t0;
-    }
-    g_startPending = false;
-    interrupts();
+  // Local capture disabled: skip start/capture processing
+  // if (g_startPending) { ... }
 
-    digitalWrite(LED_PIN, HIGH);
-    Serial.println(F(">> Capture started"));
-    Serial.printf("t0=%lu, first sensor=%d\r\n", g_t0, g_firstIndex);
-  }
-
-  // If capturing, close window after CAPTURE_WINDOW_US and process
-  if (g_capturing && (nowUs - g_t0) >= CAPTURE_WINDOW_US) {
-    // Copy volatile data atomically
-    noInterrupts();
-    unsigned long tcopy[SENSOR_COUNT];
-    uint32_t mask = g_hitMask;
-    unsigned long t0copy = g_t0;
-    unsigned long lastEdgeCopy[SENSOR_COUNT];
-    uint16_t cntCopy[SENSOR_COUNT];
-    for (int i=0;i<SENSOR_COUNT;i++){
-      tcopy[i]        = g_firstTime[i];
-      lastEdgeCopy[i] = g_lastEdgeUs[i];
-      cntCopy[i]      = g_edgeCount[i];
-    }
-    // end capture
-    g_capturing = false;
-    interrupts();
-
-    // Count timestamps
-    int have=0; for(int i=0;i<SENSOR_COUNT;i++) if (tcopy[i]) have++;
-
-    // Minimal serial debug
-    Serial.printf("Capture t0=%lu mask=0b%lu sensors=%d\r\n", t0copy, (unsigned long)mask, have);
-
-    HitResult r;
-    r.haveTimes = have;
-    r.hitTime = t0copy;
-    r.hitStrength = have; // Use number of sensors as strength indicator
-    
-    if (have >= 3){
-      float x,y; int nUsed;
-      if (tdoaSolve(SX,SY,tcopy,V_SOUND,x,y,nUsed)){
-        r.valid = true; r.x=x; r.y=y; r.mode="tdoa";
-      }
-    }
-    if (!r.valid){
-      // Fallback: earliest sensor heuristic (cheap & dirty)
-      int first=-1; unsigned long tf=~0u;
-      for(int i=0;i<SENSOR_COUNT;i++) if(tcopy[i] && tcopy[i]<tf){ tf=tcopy[i]; first=i; }
-      if (first>=0){ r.valid=true; r.x=SX[first]*0.8f; r.y=SY[first]*0.8f; r.mode = (have>=2) ? "partial" : "nearest"; }
-    }
-
-      // Record Player 1 hit (but don't participate in game - host only)
-  if (r.valid) {
-    // Player 1 is host only - hits are not counted for game purposes
-    Serial.printf("Player 1 (Host) hit detected at %lu with strength %d (not counted)\n", r.hitTime, r.hitStrength);
-    
-    // Do not send hit to other players or declare winner
-    // Player 1 is just the host managing the game
-  } else {
-    // Debug output to see what's happening
-    Serial.println("Hit not valid - check sensor readings");
-  }
-
-    // No sensor/location broadcast in minimal UI
-
-    // Store for periodic/lightweight broadcast
-    if (r.valid) { g_lastHit = r; g_lastResultMs = nowMs; }
-    else { g_lastHit.valid = false; }
-
-    // Deadtime (keep servicing web so UI stays alive)
-    unsigned long start = nowMs;
-    while (millis()-start < DEADTIME_MS) { server.handleClient(); ws.loop(); delay(1); }
-
-    // Re-arm
-    noInterrupts();
-    g_armed = true;
-    g_hitMask = 0;
-    g_firstIndex = -1;
-    for(int i=0;i<SENSOR_COUNT;i++){
-      g_firstTime[i]=0; g_edgeCount[i]=0; g_lastEdgeUs[i]=0;
-    }
-    interrupts();
-    digitalWrite(LED_PIN, LOW);
-    Serial.println(F("<< Re-armed"));
-  }
+  // if (g_capturing && (nowUs - g_t0) >= CAPTURE_WINDOW_US) { ... }
 
   // Periodic status broadcast
   if (nowMs - g_lastBroadcastMs >= BROADCAST_INTERVAL_MS){

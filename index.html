@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToolBoard Quiz - Raspberry Pi</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="connDot" class="bad"></div>
+    
+    <div class="app app-container">
+        <!-- Quiz Interface -->
+        <div id="quizInterface">
+            <!-- Reset Button -->
+            <div class="reset-section">
+                <button id="resetAllData" class="reset-btn">🗑️ Reset All Data</button>
+                <div class="reset-hint">This will clear all loaded categories, scores, and player names</div>
+            </div>
+
+            <!-- Lightboard Settings Button -->
+            <div class="file-input" id="lightboardModeSection">
+                <button id="lightboardSettingsBtn" class="lightboard-settings-btn">
+                    💡 Lightboard
+                </button>
+                <div class="hint">Configure game mode and player colors</div>
+            </div>
+
+            <!-- File Upload Section -->
+            <div class="file-input" id="fileInputSection">
+                <label for="csvFile">📁 Load CSV Files</label>
+                <input type="file" id="csvFile" accept=".csv" multiple>
+                <div class="hint">Hold Ctrl/Cmd for multiple files</div>
+                
+                <div class="loaded-files hidden" id="loadedFiles">
+                    <h3>Loaded Files:</h3>
+                    <ul class="file-list" id="fileList"></ul>
+                </div>
+            </div>
+
+            <!-- Category Selector -->
+            <div class="category-selector hidden" id="categorySelector">
+                <h2>Choose a Quiz Category</h2>
+                <div class="category-grid" id="categoryGrid">
+                    <div class="category-btn">Loading categories...</div>
+                </div>
+            </div>
+
+            <!-- Quiz Display -->
+            <div class="quiz-display hidden" id="quizDisplay">
+                <div class="bar">
+                    <h1 id="quizTitle">Quick‑Fire Quiz</h1>
+                    <div class="pill"><span id="counter">Loading...</span></div>
+                    <button id="exitBtn" class="exit-btn" title="Exit to Categories">↩</button>
+                </div>
+
+                <!-- Game Status in Quiz Mode -->
+                <div class="game-status" id="gameStatus">
+                    <div class="player-display">
+                        <div class="player-tile" id="player2Tile">
+                            <div class="player-name">Player 2</div>
+                            <div class="player-score" id="player2Score">0</div>
+                        </div>
+                        <div class="player-tile" id="player3Tile">
+                            <div class="player-name">Player 3</div>
+                            <div class="player-score" id="player3Score">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quiz-card" id="card" aria-live="polite">
+                    <div class="category-badge hidden" id="categoryBadge"></div>
+                    <p class="q" id="q">Loading…</p>
+                    <p class="a" id="a"><strong>Answer:</strong> <span id="answerText"></span></p>
+                </div>
+
+                <div class="controls" aria-label="Controls">
+                    <button id="prev" title="Previous (←)">◀ Prev</button>
+                    <button id="toggle" class="ghost" title="Show/Hide Answer (Space)">Show Answer</button>
+                    <button id="next" title="Next (→)">Next ▶</button>
+                </div>
+
+                <div class="progress">
+                    <div>Shortcuts: <span class="kbd">←/→</span> prev/next, <span class="kbd">Space</span> show</div>
+                    <div class="kbd">Tip: Click the card to toggle the answer.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Exit Confirmation Dialog -->
+        <div class="modal-overlay hidden" id="confirmModal">
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3>Exit Quiz?</h3>
+                </div>
+                <div class="modal-content">
+                    <p>Are you sure you want to exit this quiz and return to categories?</p>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn cancel" id="cancelExit">Cancel</button>
+                    <button class="modal-btn confirm" id="confirmExit">Exit</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reset Data Confirmation Dialog -->
+        <div class="modal-overlay hidden" id="resetModal">
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3>Reset All Data?</h3>
+                </div>
+                <div class="modal-content">
+                    <p>Are you sure you want to reset all data? This will clear:</p>
+                    <ul style="margin: 12px 0; padding-left: 20px; color: var(--muted);">
+                        <li>All loaded categories</li>
+                        <li>Player scores</li>
+                        <li>Player names</li>
+                        <li>Current quiz progress</li>
+                    </ul>
+                    <p style="color: #fca5a5; font-weight: 600;">This action cannot be undone.</p>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn cancel" id="cancelReset">Cancel</button>
+                    <button class="modal-btn confirm" id="confirmReset">Reset All Data</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lightboard Settings Dialog -->
+        <div class="modal-overlay hidden" id="lightboardModal">
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3>🎮 Lightboard Settings</h3>
+                </div>
+                <div class="modal-content">
+                    <div class="settings-section">
+                        <label for="lightboardMode">Game Mode:</label>
+                        <select id="lightboardMode" class="settings-select">
+                            <option value="1">Territory</option>
+                            <option value="2">Swap Sides</option>
+                            <option value="3">Split Scoring</option>
+                            <option value="4">Score Order</option>
+                            <option value="5">Race</option>
+                            <option value="6">Tug O War</option>
+                        </select>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <label for="lightboardP2Color">Player 2 Color:</label>
+                        <select id="lightboardP2Color" class="settings-select">
+                            <option value="0">Red</option>
+                            <option value="1">Blue</option>
+                            <option value="2">Green</option>
+                            <option value="3">Magenta</option>
+                            <option value="4">Orange</option>
+                        </select>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <label for="lightboardP3Color">Player 3 Color:</label>
+                        <select id="lightboardP3Color" class="settings-select">
+                            <option value="0">Red</option>
+                            <option value="1">Blue</option>
+                            <option value="2">Green</option>
+                            <option value="3">Magenta</option>
+                            <option value="4">Orange</option>
+                        </select>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <label for="damageMultiplier">Damage Multiplier:</label>
+                        <select id="damageMultiplier" class="settings-select">
+                            <option value="1">Single (1x)</option>
+                            <option value="2">Double (2x)</option>
+                            <option value="3">Triple (3x)</option>
+                            <option value="4">Quadruple (4x)</option>
+                            <option value="5">Quintuple (5x)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn cancel" id="cancelLightboard">Cancel</button>
+                    <button class="modal-btn confirm" id="confirmLightboard">Apply Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
