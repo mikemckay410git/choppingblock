@@ -46,12 +46,14 @@ static const char* AP_PASS = "12345678";
 // ===================== ESP-NOW Configuration =====================
 // Player 2 MAC address (hardcoded for reliability)
 uint8_t player2Address[] = {0x6C, 0xC8, 0x40, 0x4E, 0xEC, 0x2C}; // Player 2 STA MAC
+// Player 3 MAC address (hardcoded for reliability)
+uint8_t player3Address[] = {0x80, 0xF3, 0xDA, 0x5E, 0x14, 0xC8}; // Player 3 STA MAC
 // Lightboard MAC address (will be learned dynamically)
 uint8_t lightboardAddress[] = {0x78, 0x1C, 0x3C, 0xB8, 0xD5, 0xA8}; // Lightboard STA MAC
 const uint8_t ESPNOW_BROADCAST_ADDR[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
 typedef struct struct_message {
-  uint8_t  playerId;   // 1=Player1, 2=Player2
+  uint8_t  playerId;   // 1=Player1, 2=Player2, 3=Player3
   uint8_t  action;     // 1=heartbeat, 2=hit-detected, 3=reset-request, 4=clock-sync
   uint32_t hitTime;    // micros() timestamp of hit
   uint16_t hitStrength; // impact strength
@@ -63,27 +65,31 @@ typedef struct struct_lightboard_message {
   uint8_t  deviceId;     // 1=Player1, 3=Lightboard
   uint8_t  action;       // 1=heartbeat, 2=game-state, 3=score-update, 4=mode-change, 5=reset
   uint8_t  gameMode;     // 1-6 (Territory, Swap Sides, Split Scoring, Score Order, Race, Tug O War)
-  uint8_t  p1ColorIndex; // Player 1 color index
   uint8_t  p2ColorIndex; // Player 2 color index
-  int8_t   p1Pos;        // Player 1 position (-1 to NUM_LEDS)
+  uint8_t  p3ColorIndex; // Player 3 color index
   int8_t   p2Pos;        // Player 2 position (-1 to NUM_LEDS)
+  int8_t   p3Pos;        // Player 3 position (-1 to NUM_LEDS)
   uint8_t  nextLedPos;   // For Score Order mode
   uint8_t  tugBoundary;  // For Tug O War mode
-  uint8_t  p1RacePos;    // For Race mode
   uint8_t  p2RacePos;    // For Race mode
+  uint8_t  p3RacePos;    // For Race mode
   uint8_t  celebrating;  // Celebration state
-  uint8_t  winner;       // 0=none, 1=Player1, 2=Player2
+  uint8_t  winner;       // 0=none, 2=Player2, 3=Player3
 } struct_lightboard_message;
 
 struct_message myData;
 struct_message player2Data;
+struct_message player3Data;
 struct_lightboard_message lightboardData;
 
 // Connection tracking
 bool player2Connected = false;
+bool player3Connected = false;
 unsigned long lastHeartbeat = 0;
+unsigned long lastPlayer3Heartbeat = 0;
 const unsigned long heartbeatTimeout = 2000; // 2 seconds
 bool player2MacLearned = false;
+bool player3MacLearned = false;
 
 // Lightboard connection tracking
 bool lightboardConnected = false;
@@ -93,8 +99,11 @@ bool lightboardMacLearned = false;
 
 // Clock synchronization
 bool clockSynced = false;
+bool player3ClockSynced = false;
 int32_t clockOffset = 0; // Player2 time - Player1 time
+int32_t player3ClockOffset = 0; // Player3 time - Player1 time
 uint32_t lastSyncTime = 0;
+uint32_t lastPlayer3SyncTime = 0;
 const unsigned long SYNC_INTERVAL = 1000; // Sync at most once per second
 // =======================================================
 
@@ -146,19 +155,20 @@ bool gameActive = true;  // Start with game active
 String winner = "none";
 uint32_t player1HitTime = 0;
 uint32_t player2HitTime = 0;
+uint32_t player3HitTime = 0;
 
 // Lightboard game state (for LED strip display)
 int lightboardGameMode = 1; // Default to Territory mode
-int lightboardP1ColorIndex = 0; // Red
-int lightboardP2ColorIndex = 1; // Blue
-int lightboardP1Pos = -1;
-int lightboardP2Pos = 38; // NUM_LEDS
+int lightboardP2ColorIndex = 0; // Red
+int lightboardP3ColorIndex = 1; // Blue
+int lightboardP2Pos = -1;
+int lightboardP3Pos = 38; // NUM_LEDS
 int lightboardNextLedPos = 0;
 int lightboardTugBoundary = 18; // CENTER_LEFT
-int lightboardP1RacePos = -1;
 int lightboardP2RacePos = -1;
+int lightboardP3RacePos = -1;
 bool lightboardCelebrating = false;
-uint8_t lightboardWinner = 0; // 0=none, 1=Player1, 2=Player2
+uint8_t lightboardWinner = 0; // 0=none, 2=Player2, 3=Player3
 
 // Quiz action debouncing
 unsigned long lastQuizActionTime = 0;
@@ -772,13 +782,13 @@ button:active { transform: translateY(1px) scale(.998); }
                                        <!-- Game Status in Quiz Mode -->
                        <div class="game-status" id="gameStatus">
               <div class="player-display">
-                <div class="player-tile" id="player1Tile">
-                  <div class="player-name">Player 1</div>
-                  <div class="player-score" id="player1Score">0</div>
-                </div>
                 <div class="player-tile" id="player2Tile">
                   <div class="player-name">Player 2</div>
                   <div class="player-score" id="player2Score">0</div>
+                </div>
+                <div class="player-tile" id="player3Tile">
+                  <div class="player-name">Player 3</div>
+                  <div class="player-score" id="player3Score">0</div>
                 </div>
               </div>
             </div>
@@ -863,8 +873,8 @@ button:active { transform: translateY(1px) scale(.998); }
             </div>
             
             <div class="settings-section">
-              <label for="lightboardP1Color">Player 1 Color:</label>
-              <select id="lightboardP1Color" class="settings-select">
+              <label for="lightboardP2Color">Player 2 Color:</label>
+              <select id="lightboardP2Color" class="settings-select">
                 <option value="0">Red</option>
                 <option value="1">Blue</option>
                 <option value="2">Green</option>
@@ -874,8 +884,8 @@ button:active { transform: translateY(1px) scale(.998); }
             </div>
             
             <div class="settings-section">
-              <label for="lightboardP2Color">Player 2 Color:</label>
-              <select id="lightboardP2Color" class="settings-select">
+              <label for="lightboardP3Color">Player 3 Color:</label>
+              <select id="lightboardP3Color" class="settings-select">
                 <option value="0">Red</option>
                 <option value="1">Blue</option>
                 <option value="2">Green</option>
@@ -916,8 +926,8 @@ ws.onopen = function() {
   ws.send(JSON.stringify({
     action: 'lightboardSettings',
     mode: lightboardGameMode,
-    p1Color: lightboardP1ColorIndex,
-    p2Color: lightboardP2ColorIndex
+    p2Color: lightboardP2ColorIndex,
+    p3Color: lightboardP3ColorIndex
   }));
 };
 
@@ -958,17 +968,17 @@ const csvFileInput = document.getElementById('csvFile');
 
 // Game status elements in quiz mode
 const gameStatus = document.getElementById('gameStatus');
-const player1Tile = document.getElementById('player1Tile');
 const player2Tile = document.getElementById('player2Tile');
-const player1Name = document.querySelector('#player1Tile .player-name');
+const player3Tile = document.getElementById('player3Tile');
 const player2Name = document.querySelector('#player2Tile .player-name');
-const player1ScoreEl = document.getElementById('player1Score');
+const player3Name = document.querySelector('#player3Tile .player-name');
 const player2ScoreEl = document.getElementById('player2Score');
+const player3ScoreEl = document.getElementById('player3Score');
 
 // Lightboard elements (moved to modal)
 let lightboardGameMode = 1; // Default to Territory mode
-let lightboardP1ColorIndex = 0; // Red
-let lightboardP2ColorIndex = 1; // Blue
+let lightboardP2ColorIndex = 0; // Red
+let lightboardP3ColorIndex = 1; // Blue
 let damageMultiplier = 3; // Default to triple damage
 
 // Quiz state
@@ -978,8 +988,8 @@ let idx = 0;
 let availableCategories = [];
 
 // Player names with persistence
-let player1NameText = 'Player 1';
 let player2NameText = 'Player 2';
+let player3NameText = 'Player 3';
 
 // Quiz state persistence
 let currentCategory = null;
@@ -987,8 +997,8 @@ let currentQuestionIndex = 0;
 let savedOrder = null; // Store the shuffled order to restore exactly
 
 // Scoring system
-let player1Score = 0;
 let player2Score = 0;
+let player3Score = 0;
 let roundComplete = false;
 
 // Sample quiz data (you can replace this with your CSV data)
@@ -1009,20 +1019,20 @@ const sampleQuestions = [
 function loadPersistedData() {
   try {
     // Load player names
-    const savedPlayer1Name = localStorage.getItem('player1Name');
     const savedPlayer2Name = localStorage.getItem('player2Name');
-    if (savedPlayer1Name) player1NameText = savedPlayer1Name;
+    const savedPlayer3Name = localStorage.getItem('player3Name');
     if (savedPlayer2Name) player2NameText = savedPlayer2Name;
+    if (savedPlayer3Name) player3NameText = savedPlayer3Name;
     
     // Load scores
-    const savedPlayer1Score = localStorage.getItem('player1Score');
     const savedPlayer2Score = localStorage.getItem('player2Score');
-    if (savedPlayer1Score) player1Score = parseInt(savedPlayer1Score);
+    const savedPlayer3Score = localStorage.getItem('player3Score');
     if (savedPlayer2Score) player2Score = parseInt(savedPlayer2Score);
+    if (savedPlayer3Score) player3Score = parseInt(savedPlayer3Score);
     
     // Update player name displays
-    player1Name.textContent = player1NameText;
     player2Name.textContent = player2NameText;
+    player3Name.textContent = player3NameText;
     updateScoreDisplay();
     
     // Load categories from localStorage
@@ -1078,12 +1088,12 @@ function savePersistedData() {
   const saveData = () => {
     try {
       // Save player names
-      localStorage.setItem('player1Name', player1NameText);
       localStorage.setItem('player2Name', player2NameText);
+      localStorage.setItem('player3Name', player3NameText);
       
       // Save scores
-      localStorage.setItem('player1Score', player1Score.toString());
       localStorage.setItem('player2Score', player2Score.toString());
+      localStorage.setItem('player3Score', player3Score.toString());
       
       // Save categories
       localStorage.setItem('quizCategories', JSON.stringify(availableCategories));
@@ -1200,33 +1210,33 @@ function toggleAnswer() {
 // Initialize quiz mode status
 function initQuizMode() {
   // Reset player tiles to default state
-  player1Tile.classList.remove('winner');
   player2Tile.classList.remove('winner');
+  player3Tile.classList.remove('winner');
   updateScoreDisplay();
 }
 
 // Update score display
 function updateScoreDisplay() {
-  player1ScoreEl.textContent = player1Score;
   player2ScoreEl.textContent = player2Score;
+  player3ScoreEl.textContent = player3Score;
 }
 
 // Add scorable state to player tiles
 function addScorableState() {
   // Only add scorable class if the tile is not already a winner
-  if (!player1Tile.classList.contains('winner')) {
-    player1Tile.classList.add('scorable');
-  }
   if (!player2Tile.classList.contains('winner')) {
     player2Tile.classList.add('scorable');
+  }
+  if (!player3Tile.classList.contains('winner')) {
+    player3Tile.classList.add('scorable');
   }
   roundComplete = true;
 }
 
 // Remove scorable state from player tiles
 function removeScorableState() {
-  player1Tile.classList.remove('scorable');
   player2Tile.classList.remove('scorable');
+  player3Tile.classList.remove('scorable');
   roundComplete = false;
 }
 
@@ -1235,14 +1245,14 @@ function awardPoint(player) {
   if (!roundComplete) return;
   
   // Update score based on damage multiplier
-  if (player === 'Player 1') {
-    player1Score += damageMultiplier;
-    // Send message to ESP32 to award points to Player 1
-    ws.send(JSON.stringify({action: 'awardPoint', player: 1, multiplier: damageMultiplier}));
-  } else if (player === 'Player 2') {
+  if (player === 'Player 2') {
     player2Score += damageMultiplier;
     // Send message to ESP32 to award points to Player 2
     ws.send(JSON.stringify({action: 'awardPoint', player: 2, multiplier: damageMultiplier}));
+  } else if (player === 'Player 3') {
+    player3Score += damageMultiplier;
+    // Send message to ESP32 to award points to Player 3
+    ws.send(JSON.stringify({action: 'awardPoint', player: 3, multiplier: damageMultiplier}));
   }
   
   updateScoreDisplay();
@@ -1273,8 +1283,8 @@ function handlePlayerClick(player) {
   };
 }
 
-player1Tile.addEventListener('click', handlePlayerClick('Player 1'));
 player2Tile.addEventListener('click', handlePlayerClick('Player 2'));
+player3Tile.addEventListener('click', handlePlayerClick('Player 3'));
 
 // Secret long-press functionality for mobile
 let pressTimer;
@@ -1312,15 +1322,15 @@ window.addEventListener('keydown', (e) => {
 
 // Game functions
 function showWinner(player) {
-  // Remove winner class from both tiles
-  player1Tile.classList.remove('winner');
+  // Remove winner class from all tiles
   player2Tile.classList.remove('winner');
+  player3Tile.classList.remove('winner');
   
   // Add winner class to the winning player's tile
-  if (player === 'Player 1') {
-    player1Tile.classList.add('winner');
-  } else if (player === 'Player 2') {
+  if (player === 'Player 2') {
     player2Tile.classList.add('winner');
+  } else if (player === 'Player 3') {
+    player3Tile.classList.add('winner');
   }
   
   // Enable scoring immediately
@@ -1328,8 +1338,8 @@ function showWinner(player) {
 }
 
 function hideWinner() {
-  player1Tile.classList.remove('winner');
   player2Tile.classList.remove('winner');
+  player3Tile.classList.remove('winner');
   removeScorableState();
 }
 
@@ -1361,11 +1371,11 @@ function exitToCategories() {
   localStorage.removeItem('savedOrder');
   
   // Reset scores
-  player1Score = 0;
   player2Score = 0;
+  player3Score = 0;
   roundComplete = false;
-  localStorage.removeItem('player1Score');
   localStorage.removeItem('player2Score');
+  localStorage.removeItem('player3Score');
   updateScoreDisplay();
   removeScorableState();
   
@@ -1472,8 +1482,8 @@ function parseCSV(csv) {
     
     // Set current values in modal
     document.getElementById('lightboardMode').value = lightboardGameMode;
-    document.getElementById('lightboardP1Color').value = lightboardP1ColorIndex;
     document.getElementById('lightboardP2Color').value = lightboardP2ColorIndex;
+    document.getElementById('lightboardP3Color').value = lightboardP3ColorIndex;
     document.getElementById('damageMultiplier').value = damageMultiplier;
     lightboardModal.classList.remove('hidden');
   }
@@ -1484,14 +1494,14 @@ function parseCSV(csv) {
 
   function applyLightboardSettings() {
     const newMode = parseInt(document.getElementById('lightboardMode').value);
-    const newP1Color = parseInt(document.getElementById('lightboardP1Color').value);
     const newP2Color = parseInt(document.getElementById('lightboardP2Color').value);
+    const newP3Color = parseInt(document.getElementById('lightboardP3Color').value);
     const newMultiplier = parseInt(document.getElementById('damageMultiplier').value);
     
     // Update local variables
     lightboardGameMode = newMode;
-    lightboardP1ColorIndex = newP1Color;
     lightboardP2ColorIndex = newP2Color;
+    lightboardP3ColorIndex = newP3Color;
     damageMultiplier = newMultiplier;
     
     // Save settings to localStorage
@@ -1501,8 +1511,8 @@ function parseCSV(csv) {
     ws.send(JSON.stringify({
       action: 'lightboardSettings',
       mode: newMode,
-      p1Color: newP1Color,
-      p2Color: newP2Color
+      p2Color: newP2Color,
+      p3Color: newP3Color
     }));
     
     hideLightboardSettings();
@@ -1510,25 +1520,25 @@ function parseCSV(csv) {
 
   function saveLightboardSettings() {
     localStorage.setItem('lightboardGameMode', lightboardGameMode.toString());
-    localStorage.setItem('lightboardP1ColorIndex', lightboardP1ColorIndex.toString());
     localStorage.setItem('lightboardP2ColorIndex', lightboardP2ColorIndex.toString());
+    localStorage.setItem('lightboardP3ColorIndex', lightboardP3ColorIndex.toString());
     localStorage.setItem('damageMultiplier', damageMultiplier.toString());
   }
 
   function loadLightboardSettings() {
     const savedMode = localStorage.getItem('lightboardGameMode');
-    const savedP1Color = localStorage.getItem('lightboardP1ColorIndex');
     const savedP2Color = localStorage.getItem('lightboardP2ColorIndex');
+    const savedP3Color = localStorage.getItem('lightboardP3ColorIndex');
     const savedMultiplier = localStorage.getItem('damageMultiplier');
     
     if (savedMode !== null) {
       lightboardGameMode = parseInt(savedMode);
     }
-    if (savedP1Color !== null) {
-      lightboardP1ColorIndex = parseInt(savedP1Color);
-    }
     if (savedP2Color !== null) {
       lightboardP2ColorIndex = parseInt(savedP2Color);
+    }
+    if (savedP3Color !== null) {
+      lightboardP3ColorIndex = parseInt(savedP3Color);
     }
     if (savedMultiplier !== null) {
       damageMultiplier = parseInt(savedMultiplier);
@@ -1541,10 +1551,10 @@ function parseCSV(csv) {
   
   // Reset all variables to default state
   availableCategories = [];
-  player1Score = 0;
   player2Score = 0;
-  player1NameText = 'Player 1';
+  player3Score = 0;
   player2NameText = 'Player 2';
+  player3NameText = 'Player 3';
   currentCategory = null;
   currentQuestionIndex = 0;
   savedOrder = null;
@@ -1555,13 +1565,13 @@ function parseCSV(csv) {
   
   // Reset lightboard settings to defaults
   lightboardGameMode = 1;
-  lightboardP1ColorIndex = 0;
-  lightboardP2ColorIndex = 1;
+  lightboardP2ColorIndex = 0;
+  lightboardP3ColorIndex = 1;
   damageMultiplier = 3;
   
   // Update UI
-  player1Name.textContent = player1NameText;
   player2Name.textContent = player2NameText;
+  player3Name.textContent = player3NameText;
   updateScoreDisplay();
   removeScorableState();
   
@@ -1789,8 +1799,8 @@ function setupPlayerNameEditing() {
   let lastTap = 0;
   let tapTimer;
   
-  // Player 1 name editing
-  player1Name.addEventListener('touchend', function(e) {
+  // Player 2 name editing
+  player2Name.addEventListener('touchend', function(e) {
     if (roundComplete) return; // Don't allow editing during scoring phase
     
     const currentTime = new Date().getTime();
@@ -1799,7 +1809,7 @@ function setupPlayerNameEditing() {
     if (tapLength < 500 && tapLength > 0) {
       // Double tap detected
       e.preventDefault();
-      startEditingName(player1Name, 'Player 1');
+      startEditingName(player2Name, 'Player 2');
     } else {
       // Single tap - wait for potential double tap
       tapTimer = setTimeout(() => {
@@ -1809,40 +1819,40 @@ function setupPlayerNameEditing() {
     lastTap = currentTime;
   });
 
-  // Player 2 name editing
-  let lastTap2 = 0;
-  let tapTimer2;
+  // Player 3 name editing
+  let lastTap3 = 0;
+  let tapTimer3;
   
-  player2Name.addEventListener('touchend', function(e) {
+  player3Name.addEventListener('touchend', function(e) {
     if (roundComplete) return; // Don't allow editing during scoring phase
     
     const currentTime = new Date().getTime();
-    const tapLength = currentTime - lastTap2;
+    const tapLength = currentTime - lastTap3;
     
     if (tapLength < 500 && tapLength > 0) {
       // Double tap detected
       e.preventDefault();
-      startEditingName(player2Name, 'Player 2');
+      startEditingName(player3Name, 'Player 3');
     } else {
       // Single tap - wait for potential double tap
-      tapTimer2 = setTimeout(() => {
+      tapTimer3 = setTimeout(() => {
         // Single tap confirmed
       }, 500);
     }
-    lastTap2 = currentTime;
+    lastTap3 = currentTime;
   });
 
   // Desktop double-click for editing
-  player1Name.addEventListener('dblclick', function(e) {
-    if (roundComplete) return; // Don't allow editing during scoring phase
-    e.preventDefault();
-    startEditingName(player1Name, 'Player 1');
-  });
-
   player2Name.addEventListener('dblclick', function(e) {
     if (roundComplete) return; // Don't allow editing during scoring phase
     e.preventDefault();
     startEditingName(player2Name, 'Player 2');
+  });
+
+  player3Name.addEventListener('dblclick', function(e) {
+    if (roundComplete) return; // Don't allow editing during scoring phase
+    e.preventDefault();
+    startEditingName(player3Name, 'Player 3');
   });
 }
 
@@ -1892,10 +1902,10 @@ function startEditingName(nameElement, defaultName) {
      isEditingName = false;
      
      // Update stored names and save
-     if (nameElement === player1Name) {
-       player1NameText = newName;
-     } else if (nameElement === player2Name) {
+     if (nameElement === player2Name) {
        player2NameText = newName;
+     } else if (nameElement === player3Name) {
+       player3NameText = newName;
      }
      savePersistedData();
    }
@@ -2182,7 +2192,7 @@ void OnDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
 void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
   // Handle different message types based on length
   if (len == sizeof(struct_message)) {
-    // Player 2 message
+    // Player 2 or Player 3 message
     memcpy(&player2Data, data, sizeof(player2Data));
     
     if (player2Data.playerId == 2) {
@@ -2242,6 +2252,63 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       
       Serial.printf("Clock sync: offset=%ld us, roundTrip=%lu us\n", clockOffset, roundTrip);
     }
+    } else if (player2Data.playerId == 3) {
+    // Learn Player 3 MAC dynamically to avoid manual entry issues
+    if (info && !player3MacLearned) {
+      memcpy(player3Address, info->src_addr, 6);
+      char macStr[18];
+      sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", player3Address[0],player3Address[1],player3Address[2],player3Address[3],player3Address[4],player3Address[5]);
+      Serial.printf("Discovered Player 3 MAC: %s\r\n", macStr);
+      esp_now_del_peer(player3Address); // ignore result
+      esp_now_peer_info_t p = {};
+      memcpy(p.peer_addr, player3Address, 6);
+      p.channel = 0;
+      p.encrypt = false;
+      if (esp_now_add_peer(&p) == ESP_OK) {
+        player3MacLearned = true;
+        Serial.println("Player 3 peer added after discovery");
+      } else {
+        Serial.println("Failed to add discovered Player 3 peer");
+      }
+    }
+    player3Connected = true;
+    lastPlayer3Heartbeat = millis();
+
+    if (player2Data.action == 1) {
+      // Heartbeat - just update connection status
+      Serial.println("Player 3 heartbeat received");
+    } else if (player2Data.action == 2) {
+      // Hit detected by Player 3
+      // Convert Player 3's timestamp to our time reference
+      uint32_t adjustedTime = player2Data.hitTime + player3ClockOffset;
+      player3HitTime = adjustedTime;
+      Serial.printf("Player 3 hit detected at %lu (adjusted from %lu) with strength %d\n", 
+                   adjustedTime, player2Data.hitTime, player2Data.hitStrength);
+      
+      // Declare winner immediately if round active
+      if (gameActive) {
+        winner = "Player 3";
+        gameActive = false;
+        String j = "{\"winner\":\"" + winner + "\"}";
+        ws.broadcastTXT(j);
+        Serial.println("Winner declared: Player 3");
+      }
+    } else if (player2Data.action == 3) {
+      // Reset request from Player 3
+      resetGame();
+    } else if (player2Data.action == 4) {
+      // Clock synchronization response
+      uint32_t now = micros();
+      uint32_t roundTrip = now - player2Data.syncTime;
+      uint32_t player3Time = player2Data.roundTripTime;
+      
+      // Calculate clock offset: (Player3 time + roundTrip/2) - Player1 time
+      player3ClockOffset = (player3Time + roundTrip/2) - now;
+      player3ClockSynced = true;
+      lastPlayer3SyncTime = millis();
+      
+      Serial.printf("Player 3 Clock sync: offset=%ld us, roundTrip=%lu us\n", player3ClockOffset, roundTrip);
+    }
     }
   } else if (len == sizeof(struct_lightboard_message)) {
     // Lightboard message
@@ -2281,14 +2348,14 @@ void sendLightboardUpdate(uint8_t action) {
   lightboardData.deviceId = 1; // Player 1
   lightboardData.action = action;
   lightboardData.gameMode = lightboardGameMode;
-  lightboardData.p1ColorIndex = lightboardP1ColorIndex;
   lightboardData.p2ColorIndex = lightboardP2ColorIndex;
-  lightboardData.p1Pos = lightboardP1Pos;
+  lightboardData.p3ColorIndex = lightboardP3ColorIndex;
   lightboardData.p2Pos = lightboardP2Pos;
+  lightboardData.p3Pos = lightboardP3Pos;
   lightboardData.nextLedPos = lightboardNextLedPos;
   lightboardData.tugBoundary = lightboardTugBoundary;
-  lightboardData.p1RacePos = lightboardP1RacePos;
   lightboardData.p2RacePos = lightboardP2RacePos;
+  lightboardData.p3RacePos = lightboardP3RacePos;
   
   // Only send winner information for specific actions
   if (action == 2) {
@@ -2317,7 +2384,7 @@ void sendLightboardPointUpdate(uint8_t scoringPlayer) {
   
   lightboardData.deviceId = 1; // Player 1
   lightboardData.action = 3; // point update
-  lightboardData.winner = scoringPlayer; // Which player scored the point
+  lightboardData.winner = scoringPlayer; // Send Player 2 or Player 3 directly
   
   esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
   Serial.printf("Sent lightboard point update: Player %d scored\n", scoringPlayer);
@@ -2325,10 +2392,10 @@ void sendLightboardPointUpdate(uint8_t scoringPlayer) {
 
 void awardPointToPlayer(uint8_t playerId) {
   // Award a point to the specified player on the lightboard
-  // playerId: 1 = Player 1, 2 = Player 2
+  // playerId: 2 = Player 2, 3 = Player 3 (Player 1 is host only)
   
-  if (playerId != 1 && playerId != 2) {
-    Serial.printf("Invalid player ID: %d. Must be 1 or 2.\n", playerId);
+  if (playerId != 2 && playerId != 3) {
+    Serial.printf("Invalid player ID: %d. Must be 2 or 3 (Player 1 is host only).\n", playerId);
     return;
   }
   
@@ -2341,12 +2408,12 @@ void awardPointToPlayer(uint8_t playerId) {
   sendLightboardPointUpdate(playerId);
   
   // Update local game state
-  if (playerId == 1) {
-    winner = "Player 1";
-    player1HitTime = micros(); // Use current time as hit time
-  } else {
+  if (playerId == 2) {
     winner = "Player 2";
     player2HitTime = micros(); // Use current time as hit time
+  } else if (playerId == 3) {
+    winner = "Player 3";
+    player3HitTime = micros(); // Use current time as hit time
   }
   
   // Broadcast winner to web interface
@@ -2361,11 +2428,11 @@ void awardPointToPlayer(uint8_t playerId) {
 
 void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier) {
   // Award multiple points to the specified player on the lightboard
-  // playerId: 1 = Player 1, 2 = Player 2
+  // playerId: 2 = Player 2, 3 = Player 3 (Player 1 is host only)
   // multiplier: number of points to award
   
-  if (playerId != 1 && playerId != 2) {
-    Serial.printf("Invalid player ID: %d. Must be 1 or 2.\n", playerId);
+  if (playerId != 2 && playerId != 3) {
+    Serial.printf("Invalid player ID: %d. Must be 2 or 3 (Player 1 is host only).\n", playerId);
     return;
   }
   
@@ -2386,12 +2453,12 @@ void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier) {
   }
   
   // Update local game state (only once at the end)
-  if (playerId == 1) {
-    winner = "Player 1";
-    player1HitTime = micros(); // Use current time as hit time
-  } else {
+  if (playerId == 2) {
     winner = "Player 2";
     player2HitTime = micros(); // Use current time as hit time
+  } else if (playerId == 3) {
+    winner = "Player 3";
+    player3HitTime = micros(); // Use current time as hit time
   }
   
   // Broadcast winner to web interface
@@ -2406,18 +2473,18 @@ void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier) {
 
 // ===================== Game Logic =====================
 void determineWinner() {
-  if (player1HitTime > 0 && player2HitTime > 0) {
+  if (player2HitTime > 0 && player3HitTime > 0) {
     // Calculate time difference in microseconds
-    int32_t timeDiff = (int32_t)player1HitTime - (int32_t)player2HitTime;
+    int32_t timeDiff = (int32_t)player2HitTime - (int32_t)player3HitTime;
     
-    if (timeDiff < -100) { // Player 2 hit first (with 100us tolerance)
+    if (timeDiff < -100) { // Player 3 hit first (with 100us tolerance)
+      winner = "Player 3";
+      Serial.printf("Player 3 wins! Time diff: %ld us\n", -timeDiff);
+      
+      
+    } else if (timeDiff > 100) { // Player 2 hit first (with 100us tolerance)
       winner = "Player 2";
-      Serial.printf("Player 2 wins! Time diff: %ld us\n", -timeDiff);
-      
-      
-    } else if (timeDiff > 100) { // Player 1 hit first (with 100us tolerance)
-      winner = "Player 1";
-      Serial.printf("Player 1 wins! Time diff: %ld us\n", timeDiff);
+      Serial.printf("Player 2 wins! Time diff: %ld us\n", timeDiff);
       
       
     } else {
@@ -2436,23 +2503,27 @@ void determineWinner() {
 
 void resetGame() {
   winner = "none";
-  player1HitTime = 0;
+  // Player 1 is host only - no need to reset player1HitTime
   player2HitTime = 0;
+  player3HitTime = 0;
   gameActive = true;
   
   // Reset lightboard state
   lightboardWinner = 0;
   lightboardCelebrating = false;
-  lightboardP1Pos = -1;
-  lightboardP2Pos = 38;
+  lightboardP2Pos = -1;
+  lightboardP3Pos = 38;
   lightboardNextLedPos = 0;
   lightboardTugBoundary = 18;
-  lightboardP1RacePos = -1;
   lightboardP2RacePos = -1;
+  lightboardP3RacePos = -1;
   
   // Send reset to Player 2
   myData.action = 3; // reset request
   esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
+  
+  // Send reset to Player 3
+  esp_now_send(player3Address, (uint8_t*)&myData, sizeof(myData));
   
   // Send reset to lightboard
   sendLightboardUpdate(5); // reset action
@@ -2467,8 +2538,9 @@ void resetGame() {
 void resetGameForQuiz() {
   // Light version of reset for quiz navigation - doesn't reset lightboard state
   winner = "none";
-  player1HitTime = 0;
+  // Player 1 is host only - no need to reset player1HitTime
   player2HitTime = 0;
+  player3HitTime = 0;
   gameActive = true;
   
   // Broadcast reset to web interface
@@ -2485,7 +2557,15 @@ void syncClock() {
     myData.syncTime = micros();
     myData.roundTripTime = 0;
     esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
-    Serial.println("Clock sync request sent");
+    Serial.println("Clock sync request sent to Player 2");
+  }
+  
+  if (player3Connected && (millis() - lastPlayer3SyncTime >= SYNC_INTERVAL)) {
+    myData.action = 4; // clock sync
+    myData.syncTime = micros();
+    myData.roundTripTime = 0;
+    esp_now_send(player3Address, (uint8_t*)&myData, sizeof(myData));
+    Serial.println("Clock sync request sent to Player 3");
   }
 }
 
@@ -2513,6 +2593,7 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
       // Send initial state to new client
       j = "{";
       j += "\"connected\":" + String(player2Connected ? "true" : "false") + ",";
+      j += "\"player3Connected\":" + String(player3Connected ? "true" : "false") + ",";
       j += "\"lightboardConnected\":" + String(lightboardConnected ? "true" : "false") + ",";
       j += "\"winner\":\"" + winner + "\"";
       j += "}";
@@ -2539,7 +2620,7 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
               multiplier = doc["multiplier"];
             }
             
-            if (player == 1 || player == 2) {
+            if (player == 2 || player == 3) {
               // Award multiple points based on multiplier
               awardMultiplePointsToPlayer(player, multiplier);
             }
@@ -2560,16 +2641,16 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
           // Handle lightboard settings change from web interface
           DynamicJsonDocument doc(1024);
           deserializeJson(doc, message);
-          if (doc.containsKey("mode") && doc.containsKey("p1Color") && doc.containsKey("p2Color")) {
+          if (doc.containsKey("mode") && doc.containsKey("p2Color") && doc.containsKey("p3Color")) {
             int newMode = doc["mode"];
-            int newP1Color = doc["p1Color"];
             int newP2Color = doc["p2Color"];
+            int newP3Color = doc["p3Color"];
             
-            if (newMode >= 1 && newMode <= 6 && newP1Color >= 0 && newP1Color <= 4 && newP2Color >= 0 && newP2Color <= 4) {
+            if (newMode >= 1 && newMode <= 6 && newP2Color >= 0 && newP2Color <= 4 && newP3Color >= 0 && newP3Color <= 4) {
               lightboardGameMode = newMode;
-              lightboardP1ColorIndex = newP1Color;
               lightboardP2ColorIndex = newP2Color;
-              Serial.printf("Lightboard settings updated: mode=%d, p1Color=%d, p2Color=%d\n", newMode, newP1Color, newP2Color);
+              lightboardP3ColorIndex = newP3Color;
+              Serial.printf("Lightboard settings updated: mode=%d, p2Color=%d, p3Color=%d\n", newMode, newP2Color, newP3Color);
               sendLightboardUpdate(4); // mode-change action
             }
           }
@@ -2657,6 +2738,17 @@ void setup(){
     Serial.println("Failed to add Player 2 peer");
   }
 
+  // Add Player 3 peer with known MAC address
+  esp_now_peer_info_t player3PeerInfo = {};
+  memcpy(player3PeerInfo.peer_addr, player3Address, 6);
+  player3PeerInfo.channel = 0; // follow current channel
+  player3PeerInfo.encrypt = false;
+  if (esp_now_add_peer(&player3PeerInfo) == ESP_OK) {
+    Serial.println("Player 3 peer added successfully");
+  } else {
+    Serial.println("Failed to add Player 3 peer");
+  }
+
   // Add Lightboard peer with known MAC address
   esp_now_peer_info_t lightboardPeerInfo = {};
   memcpy(lightboardPeerInfo.peer_addr, lightboardAddress, 6);
@@ -2693,10 +2785,13 @@ if (esp_now_add_peer(&lightboardPeerInfo) == ESP_OK) {
   // Initialize game state
   gameActive = true;  // Ensure game starts active
   winner = "none";
-  player1HitTime = 0;
+  // Player 1 is host only - no need to initialize player1HitTime
   player2HitTime = 0;
+  player3HitTime = 0;
   clockSynced = false;
+  player3ClockSynced = false;
   clockOffset = 0;
+  player3ClockOffset = 0;
 }
 
 // ===================== Loop =====================
@@ -2772,30 +2867,13 @@ void loop(){
       if (first>=0){ r.valid=true; r.x=SX[first]*0.8f; r.y=SY[first]*0.8f; r.mode = (have>=2) ? "partial" : "nearest"; }
     }
 
-      // Record Player 1 hit
+      // Record Player 1 hit (but don't participate in game - host only)
   if (r.valid) {
-    // Handle game mode FIRST if active (priority over quiz controls)
-    if (gameActive) {
-      player1HitTime = r.hitTime;
-      Serial.printf("Player 1 hit detected at %lu with strength %d\n", player1HitTime, r.hitStrength);
-      
-      // Send hit to Player 2
-      myData.action = 2; // hit detected
-      myData.hitTime = r.hitTime;
-      myData.hitStrength = r.hitStrength;
-      esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
-      
-      // Declare winner immediately
-      winner = "Player 1";
-      gameActive = false;
-      String winMsg = "{\"winner\":\"" + winner + "\"}";
-      ws.broadcastTXT(winMsg);
-      Serial.println("Winner declared: Player 1");
-      
-    } else {
-      // Do not map toolboard hits to quiz actions.
-      // Questions should advance only via UI button or when a point is awarded.
-    }
+    // Player 1 is host only - hits are not counted for game purposes
+    Serial.printf("Player 1 (Host) hit detected at %lu with strength %d (not counted)\n", r.hitTime, r.hitStrength);
+    
+    // Do not send hit to other players or declare winner
+    // Player 1 is just the host managing the game
   } else {
     // Debug output to see what's happening
     Serial.println("Hit not valid - check sensor readings");
@@ -2827,8 +2905,10 @@ void loop(){
   // Periodic status broadcast
   if (nowMs - g_lastBroadcastMs >= BROADCAST_INTERVAL_MS){
     String j = "{\"connected\":" + String(player2Connected ? "true" : "false") + 
+               ",\"player3Connected\":" + String(player3Connected ? "true" : "false") + 
                ",\"lightboardConnected\":" + String(lightboardConnected ? "true" : "false") + 
-               ",\"clockSynced\":" + String(clockSynced ? "true" : "false") + "}";
+               ",\"clockSynced\":" + String(clockSynced ? "true" : "false") + 
+               ",\"player3ClockSynced\":" + String(player3ClockSynced ? "true" : "false") + "}";
     ws.broadcastTXT(j);
     g_lastBroadcastMs = nowMs;
   }
@@ -2839,6 +2919,13 @@ void loop(){
     clockSynced = false; // Reset sync when connection lost
     player2MacLearned = false; // Reset MAC learning to force rediscovery
     Serial.println("Player 2 connection lost - resetting discovery");
+  }
+  
+  if (player3Connected && (millis() - lastPlayer3Heartbeat > heartbeatTimeout)) {
+    player3Connected = false;
+    player3ClockSynced = false; // Reset sync when connection lost
+    player3MacLearned = false; // Reset MAC learning to force rediscovery
+    Serial.println("Player 3 connection lost - resetting discovery");
   }
   
   // Check for lightboard connection timeout
@@ -2856,6 +2943,15 @@ void loop(){
     esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
     Serial.println("Sent heartbeat to Player 2");
     lastHeartbeatSend = millis();
+  }
+  
+  // Send heartbeat to Player 3
+  static unsigned long lastPlayer3HeartbeatSend = 0;
+  if (millis() - lastPlayer3HeartbeatSend >= 1000) {
+    myData.action = 1; // heartbeat
+    esp_now_send(player3Address, (uint8_t*)&myData, sizeof(myData));
+    Serial.println("Sent heartbeat to Player 3");
+    lastPlayer3HeartbeatSend = millis();
   }
   
   // Send heartbeat to lightboard (always try, even if MAC not learned yet)
