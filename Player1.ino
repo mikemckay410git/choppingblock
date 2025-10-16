@@ -47,7 +47,7 @@ static const char* AP_PASS = "12345678";
 // Player 2 MAC address (hardcoded for reliability)
 uint8_t player2Address[] = {0x6C, 0xC8, 0x40, 0x4E, 0xEC, 0x2C}; // Player 2 STA MAC
 // Lightboard MAC address (will be learned dynamically)
-uint8_t lightboardAddress[] = {0x80, 0xF3, 0xDA, 0x5E, 0x14, 0xC8}; // Lightboard STA MAC
+uint8_t lightboardAddress[] = {0x78, 0x1C, 0x3C, 0xB8, 0xD5, 0xA8}; // Lightboard STA MAC
 const uint8_t ESPNOW_BROADCAST_ADDR[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
 typedef struct struct_message {
