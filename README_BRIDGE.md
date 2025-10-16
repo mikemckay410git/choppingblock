@@ -48,7 +48,7 @@ This project now uses a **Raspberry Pi + ESP32 Bridge** architecture instead of 
 - `script.js` - JavaScript logic for quiz functionality
 
 ### Bridge Server
-- `esp32_bridge.js` - Node.js web server that bridges web interface and ESP32
+- `server.js` - Node.js web server that bridges web interface and ESP32
 - `package.json` - Node.js dependencies
 - `README_NODEJS.md` - Node.js setup and usage documentation
 
@@ -131,7 +131,7 @@ This project now uses a **Raspberry Pi + ESP32 Bridge** architecture instead of 
 
 ### ESP32 Not Connecting
 - Check serial port: `ls /dev/ttyUSB*`
-- Run manually: `node esp32_bridge.js --serial-port /dev/ttyUSB1`
+- Run manually: `node server.js --serial-port /dev/ttyUSB1`
 - Check ESP32 serial output for errors
 
 ### Web Interface Not Loading
@@ -148,7 +148,7 @@ This project now uses a **Raspberry Pi + ESP32 Bridge** architecture instead of 
 
 ### Adding New Features
 1. **Web Interface**: Modify `script.js` and `index.html`
-2. **Bridge Logic**: Modify `esp32_bridge.js`
+2. **Bridge Logic**: Modify `server.js`
 3. **ESP32 Communication**: Modify `Player1_Bridge.ino`
 
 ### Testing
@@ -163,7 +163,7 @@ project/
 ├── index.html              # Web interface
 ├── styles.css              # Web styling
 ├── script.js               # Web JavaScript
-├── esp32_bridge.js         # Node.js bridge server
+├── server.js              # Node.js bridge server
 ├── package.json            # Node.js dependencies
 ├── README_NODEJS.md        # Node.js documentation
 ├── Player1_Bridge.ino     # ESP32 bridge code

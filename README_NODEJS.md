@@ -30,7 +30,7 @@ npm start
 
 ### With Custom Serial Port
 ```bash
-node esp32_bridge.js --serial-port COM3 --baud-rate 115200
+node server.js --serial-port COM3 --baud-rate 115200
 ```
 
 ### Development Mode (with auto-restart)
@@ -107,7 +107,7 @@ void sendData() {
 1. **Find available ports**:
    ```bash
    # Windows
-   node esp32_bridge.js --help
+   node server.js --help
    
    # Linux/macOS
    ls /dev/tty*
@@ -140,7 +140,7 @@ void sendData() {
 
 ### Project Structure
 ```
-├── esp32_bridge.js      # Main bridge server
+├── server.js            # Main bridge server
 ├── package.json         # Node.js dependencies
 ├── index.html          # Web interface
 ├── script.js           # Frontend JavaScript
