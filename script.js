@@ -585,6 +585,10 @@ function awardPoint(player) {
   hideWinner();
   aEl.classList.remove('show');
   btnToggle.textContent = 'Show Answer';
+  
+  // Send reset command to ESP32 to rearm for next round
+  sendToESP32({ action: 'reset' });
+  
   // Add a small delay before advancing to next question to prevent flashing
   setTimeout(() => {
     next();
