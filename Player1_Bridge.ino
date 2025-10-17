@@ -158,7 +158,7 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       memcpy(player2Address, info->src_addr, 6);
       char macStr[18];
       sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", player2Address[0],player2Address[1],player2Address[2],player2Address[3],player2Address[4],player2Address[5]);
-      Serial.printf("Discovered Player 2 MAC: %s\r\n", macStr);
+      // Debug: Serial.printf("Discovered Player 2 MAC: %s\r\n", macStr);
       esp_now_del_peer(player2Address); // ignore result
       esp_now_peer_info_t p = {};
       memcpy(p.peer_addr, player2Address, 6);
@@ -166,17 +166,16 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       p.encrypt = false;
       if (esp_now_add_peer(&p) == ESP_OK) {
         player2MacLearned = true;
-        Serial.println("Player 2 peer added after discovery");
+        // Debug: Serial.println("Player 2 peer added after discovery");
       } else {
-        Serial.println("Failed to add discovered Player 2 peer");
+        // Debug: Serial.println("Failed to add discovered Player 2 peer");
       }
     }
     player2Connected = true;
     lastHeartbeat = millis();
 
     if (player2Data.action == 1) {
-      // Heartbeat - just update connection status
-      Serial.println("Player 2 heartbeat received");
+      // Heartbeat - just update connection status (no need to send to Pi)
     } else if (player2Data.action == 2) {
       // Hit detected by Player 2
       // Convert Player 2's timestamp to our time reference
@@ -210,6 +209,7 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       lastSyncTime = millis();
       
       Serial.printf("Clock sync: offset=%ld us, roundTrip=%lu us\n", clockOffset, roundTrip);
+      // Clock sync complete - no need to send to Pi
     }
     } else if (player2Data.playerId == 3) {
     // Learn Player 3 MAC dynamically to avoid manual entry issues
@@ -217,7 +217,7 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       memcpy(player3Address, info->src_addr, 6);
       char macStr[18];
       sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", player3Address[0],player3Address[1],player3Address[2],player3Address[3],player3Address[4],player3Address[5]);
-      Serial.printf("Discovered Player 3 MAC: %s\r\n", macStr);
+      // Debug: Serial.printf("Discovered Player 3 MAC: %s\r\n", macStr);
       esp_now_del_peer(player3Address); // ignore result
       esp_now_peer_info_t p = {};
       memcpy(p.peer_addr, player3Address, 6);
@@ -225,17 +225,16 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       p.encrypt = false;
       if (esp_now_add_peer(&p) == ESP_OK) {
         player3MacLearned = true;
-        Serial.println("Player 3 peer added after discovery");
+        // Debug: Serial.println("Player 3 peer added after discovery");
       } else {
-        Serial.println("Failed to add discovered Player 3 peer");
+        // Debug: Serial.println("Failed to add discovered Player 3 peer");
       }
     }
     player3Connected = true;
     lastPlayer3Heartbeat = millis();
 
     if (player2Data.action == 1) {
-      // Heartbeat - just update connection status
-      Serial.println("Player 3 heartbeat received");
+      // Heartbeat - just update connection status (no need to send to Pi)
     } else if (player2Data.action == 2) {
       // Hit detected by Player 3
       // Convert Player 3's timestamp to our time reference
@@ -269,6 +268,7 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       lastPlayer3SyncTime = millis();
       
       Serial.printf("Player 3 Clock sync: offset=%ld us, roundTrip=%lu us\n", player3ClockOffset, roundTrip);
+      // Clock sync complete - no need to send to Pi
     }
     }
   } else if (len == sizeof(struct_lightboard_message)) {
@@ -283,15 +283,14 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       lightboardWasConnected = lightboardConnected; // Store previous state
       lightboardConnected = true;
       lastLightboardHeartbeat = millis();
-      Serial.println("Lightboard message received - connection confirmed");
+      // Debug: Serial.println("Lightboard message received - connection confirmed");
 
       if (lightboardData.action == 1) {
-        // Heartbeat - just update connection status
-        Serial.println("Lightboard heartbeat received");
+        // Heartbeat - just update connection status (no need to send to Pi)
         
         // If this is a reconnection or first connection, resync the lightboard settings
         if (wasDisconnected || !lightboardWasConnected) {
-          Serial.println("Lightboard connected - resyncing settings");
+          // Debug: Serial.println("Lightboard connected - resyncing settings");
           // Send current game mode and player colors to resync
           sendLightboardUpdate(4); // Send settings update
         }
@@ -330,7 +329,7 @@ void sendLightboardUpdate(uint8_t action) {
   }
   
   esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
-  Serial.printf("Sent lightboard update: action=%d, mode=%d\n", action, lightboardGameMode);
+  // Debug: Serial.printf("Sent lightboard update: action=%d, mode=%d\n", action, lightboardGameMode);
 }
 
 void updateLightboardGameState() {
@@ -348,7 +347,7 @@ void sendLightboardPointUpdate(uint8_t scoringPlayer) {
   lightboardData.winner = scoringPlayer; // Send Player 2 or Player 3 directly
   
   esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
-  Serial.printf("Sent lightboard point update: Player %d scored\n", scoringPlayer);
+  // Debug: Serial.printf("Sent lightboard point update: Player %d scored\n", scoringPlayer);
 }
 
 void awardPointToPlayer(uint8_t playerId) {
@@ -500,7 +499,7 @@ void syncClock() {
     myData.syncTime = micros();
     myData.roundTripTime = 0;
     esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
-    Serial.println("Clock sync request sent to Player 2");
+    // Debug: Serial.println("Clock sync request sent to Player 2");
   }
   
   if (player3Connected && (millis() - lastPlayer3SyncTime >= SYNC_INTERVAL)) {
@@ -508,7 +507,7 @@ void syncClock() {
     myData.syncTime = micros();
     myData.roundTripTime = 0;
     esp_now_send(player3Address, (uint8_t*)&myData, sizeof(myData));
-    Serial.println("Clock sync request sent to Player 3");
+    // Debug: Serial.println("Clock sync request sent to Player 3");
   }
 }
 
@@ -527,7 +526,7 @@ void processPiCommand(String command) {
     if (cmd == "heartbeat") {
       piConnected = true;
       lastPiHeartbeat = millis();
-      Serial.println("Pi heartbeat received");
+      // Debug: Serial.println("Pi heartbeat received");
       
       // Send status back to Pi
       sendToPi("{\"type\":\"status\",\"player2Connected\":" + String(player2Connected ? "true" : "false") + 
@@ -714,7 +713,7 @@ void loop(){
     player2Connected = false;
     clockSynced = false; // Reset sync when connection lost
     player2MacLearned = false; // Reset MAC learning to force rediscovery
-    Serial.println("Player 2 connection lost - resetting discovery");
+    // Debug: Serial.println("Player 2 connection lost - resetting discovery");
     sendToPi("{\"type\":\"error\",\"message\":\"Player 2 disconnected\"}");
   }
   
@@ -722,7 +721,7 @@ void loop(){
     player3Connected = false;
     player3ClockSynced = false; // Reset sync when connection lost
     player3MacLearned = false; // Reset MAC learning to force rediscovery
-    Serial.println("Player 3 connection lost - resetting discovery");
+    // Debug: Serial.println("Player 3 connection lost - resetting discovery");
     sendToPi("{\"type\":\"error\",\"message\":\"Player 3 disconnected\"}");
   }
   
@@ -731,7 +730,7 @@ void loop(){
     lightboardWasConnected = lightboardConnected; // Store previous state
     lightboardConnected = false;
     lightboardMacLearned = false; // Reset MAC learning to force rediscovery
-    Serial.println("Lightboard connection lost - resetting discovery");
+    // Debug: Serial.println("Lightboard connection lost - resetting discovery");
     sendToPi("{\"type\":\"error\",\"message\":\"Lightboard disconnected\"}");
   }
 
@@ -740,7 +739,7 @@ void loop(){
   if (millis() - lastHeartbeatSend >= HEARTBEAT_INTERVAL_MS) {
     myData.action = 1; // heartbeat
     esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
-    Serial.println("Sent heartbeat to Player 2");
+    // Debug: Serial.println("Sent heartbeat to Player 2");
     lastHeartbeatSend = millis();
   }
   
@@ -749,7 +748,7 @@ void loop(){
   if (millis() - lastPlayer3HeartbeatSend >= HEARTBEAT_INTERVAL_MS) {
     myData.action = 1; // heartbeat
     esp_now_send(player3Address, (uint8_t*)&myData, sizeof(myData));
-    Serial.println("Sent heartbeat to Player 3");
+    // Debug: Serial.println("Sent heartbeat to Player 3");
     lastPlayer3HeartbeatSend = millis();
   }
   
@@ -757,11 +756,7 @@ void loop(){
   static unsigned long lastLightboardHeartbeatSend = 0;
   if (millis() - lastLightboardHeartbeatSend >= HEARTBEAT_INTERVAL_MS) {
     sendLightboardUpdate(1); // heartbeat action
-    if (lightboardMacLearned) {
-      Serial.println("Sent heartbeat to lightboard (MAC learned)");
-    } else {
-      Serial.println("Sent heartbeat to lightboard (using hardcoded MAC)");
-    }
+    // Debug: Serial.println("Sent heartbeat to lightboard");
     lastLightboardHeartbeatSend = millis();
   }
 }
