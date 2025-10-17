@@ -391,6 +391,9 @@ void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier) {
   // playerId: 2 = Player 2, 3 = Player 3 (Player 1 is host only)
   // multiplier: number of points to award
   
+  Serial.printf("awardMultiplePointsToPlayer called: playerId=%d, multiplier=%d, lightboardConnected=%s\n", 
+               playerId, multiplier, lightboardConnected ? "true" : "false");
+  
   if (playerId != 2 && playerId != 3) {
     Serial.printf("Invalid player ID: %d. Must be 2 or 3 (Player 1 is host only).\n", playerId);
     return;
@@ -405,6 +408,8 @@ void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier) {
     Serial.println("Lightboard not connected - cannot award points");
     return;
   }
+  
+  Serial.printf("Sending %d point updates to lightboard for Player %d\n", multiplier, playerId);
   
   // Send multiple point updates to lightboard
   for (int i = 0; i < multiplier; i++) {
@@ -557,9 +562,16 @@ void processPiCommand(String command) {
         int player = doc["player"];
         int multiplier = doc["multiplier"];
         
+        Serial.printf("Received awardPoint command: player=%d, multiplier=%d, lightboardConnected=%s\n", 
+                     player, multiplier, lightboardConnected ? "true" : "false");
+        
         if (player == 2 || player == 3) {
           awardMultiplePointsToPlayer(player, multiplier);
+        } else {
+          Serial.printf("Invalid player ID: %d. Must be 2 or 3.\n", player);
         }
+      } else {
+        Serial.println("awardPoint command missing required fields: player, multiplier");
       }
       
     } else if (cmd == "lightboardSettings") {
