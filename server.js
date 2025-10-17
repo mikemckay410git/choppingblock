@@ -101,7 +101,22 @@ class ESP32Bridge {
       
     } catch (error) {
       // Handle non-JSON messages (like debug output)
-      console.debug('Non-JSON message from ESP32:', message);
+      console.log('Non-JSON message from ESP32:', message);
+      
+      // Forward important status messages to frontend
+      if (message.includes('heartbeat') || 
+          message.includes('Clock sync') || 
+          message.includes('lightboard') ||
+          message.includes('Player') ||
+          message.includes('Status')) {
+        
+        // Send status message to frontend
+        this.io.emit('esp32_status_message', {
+          type: 'status',
+          message: message,
+          timestamp: new Date().toISOString()
+        });
+      }
     }
   }
 
@@ -129,7 +144,7 @@ class ESP32Bridge {
 }
 
 // Create ESP32 bridge instance
-const esp32Bridge = new ESP32Bridge();
+const esp32Bridge = new ESP32Bridge('/dev/ttyUSB0', 115200);
 
 // Example endpoint
 app.get("/api", (req, res) => {

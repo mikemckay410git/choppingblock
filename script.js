@@ -39,6 +39,12 @@ socket.on('esp32_data', (data) => {
   // Handle ESP32 data here if needed
 });
 
+socket.on('esp32_status_message', (data) => {
+  console.log('ESP32 Status:', data.message);
+  // Display status messages in the console for now
+  // You could add a status display area to the UI if needed
+});
+
 // Function to send commands to ESP32
 function sendToESP32(command) {
   if (esp32Enabled && esp32Connected) {
