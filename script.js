@@ -596,10 +596,7 @@ function awardPoint(player) {
   hideWinner();
   aEl.classList.remove('show');
   btnToggle.textContent = 'Show Answer';
-  // Add a small delay before advancing to next question to prevent flashing
-  setTimeout(() => {
-    next();
-  }, 120);
+  next();
 }
 
 // Handle player hits from ESP32
