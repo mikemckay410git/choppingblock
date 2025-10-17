@@ -916,7 +916,95 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
-// Demo data for testing without CSV files
+// Preload all CSV files from Quizes folder
+async function loadAllQuizzes() {
+  try {
+    // List of CSV files in the Quizes folder
+    const quizFiles = [
+      'Quizes/Animals.csv',
+      'Quizes/Bluey.csv', 
+      'Quizes/Cats & Dogs.csv',
+      'Quizes/Colours.csv',
+      'Quizes/Disney.csv',
+      'Quizes/Easy Maths.csv',
+      'Quizes/General.csv',
+      'Quizes/GenZ.csv',
+      'Quizes/Harry Potter.csv',
+      'Quizes/KPOP Demon Hunters.csv',
+      'Quizes/Millennial.csv',
+      'Quizes/Minecraft.csv',
+      'Quizes/New Zealand.csv',
+      'Quizes/NZ Roadcode.csv',
+      'Quizes/Scouts.csv',
+      'Quizes/Zootopia.csv'
+    ];
+    
+    availableCategories = [];
+    fileList.innerHTML = '';
+    
+    let loadedCount = 0;
+    const totalFiles = quizFiles.length;
+    
+    for (const filePath of quizFiles) {
+      try {
+        const response = await fetch(filePath);
+        if (!response.ok) {
+          console.warn(`Failed to load ${filePath}: ${response.status}`);
+          addFileToList(filePath.split('/').pop(), 'Not found', 'error');
+          loadedCount++;
+          continue;
+        }
+        
+        const csvText = await response.text();
+        const csvData = parseCSV(csvText);
+        
+        // Convert CSV data to the expected format
+        const questions = csvData.map(row => {
+          const question = row.Question || row.question || row.Q || row.q || Object.values(row)[0];
+          const answer = row.Answer || row.answer || row.A || row.a || Object.values(row)[1];
+          return { q: question, a: answer };
+        }).filter(qa => qa.q && qa.a);
+        
+        if (questions.length > 0) {
+          const filename = filePath.split('/').pop();
+          const categoryName = filename.replace('.csv', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          availableCategories.push({
+            filename: filename,
+            name: categoryName,
+            questions: questions
+          });
+          
+          // Add success message to file list
+          addFileToList(filename, `${questions.length} questions`, 'success');
+        } else {
+          addFileToList(filePath.split('/').pop(), 'No questions', 'error');
+        }
+      } catch (error) {
+        console.error(`Error loading ${filePath}:`, error);
+        addFileToList(filePath.split('/').pop(), 'Error', 'error');
+      }
+      
+      loadedCount++;
+    }
+    
+    // Show category selector when all files are processed
+    if (availableCategories.length > 0) {
+      showCategorySelector();
+      createCategoryButtons(availableCategories);
+    } else {
+      console.warn('No valid quiz files loaded');
+    }
+    
+    loadedFiles.classList.remove('hidden');
+    
+  } catch (error) {
+    console.error('Error loading quiz files:', error);
+    // Fallback to demo data if all else fails
+    loadDemoData();
+  }
+}
+
+// Demo data for testing without CSV files (fallback)
 function loadDemoData() {
   const demoCategories = [
     {
@@ -940,6 +1028,6 @@ document.addEventListener('DOMContentLoaded', function() {
   // Setup player name editing
   setupPlayerNameEditing();
   
-  // Load demo data immediately (like Player1.ino)
-  loadDemoData();
+  // Load all quiz files immediately
+  loadAllQuizzes();
 });
