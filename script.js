@@ -1000,7 +1000,7 @@ function hideExitConfirmation() {
   confirmModal.classList.add('hidden');
 }
 
-function exitToCategories(keepNames = false, keepScores = false) {
+function exitToCategories(keepNames = false, keepScores = false, keepLightboardSettings = true) {
   // Reset game state
   hideWinner();
   aEl.classList.remove('show');
@@ -1027,8 +1027,8 @@ function exitToCategories(keepNames = false, keepScores = false) {
   }
   
   if (keepScores) {
-    // Keep current scores and lightboard settings - don't reset them
-    console.log('Keeping scores and lightboard settings');
+    // Keep current scores - don't reset them
+    console.log('Keeping scores');
   } else {
     // Reset scores
     player1Score = 0;
@@ -1036,6 +1036,14 @@ function exitToCategories(keepNames = false, keepScores = false) {
     player1ScoreEl.textContent = '0';
     player2ScoreEl.textContent = '0';
     
+    // Send reset command to ESP32 to reset lightboard scores
+    sendToESP32({ action: 'reset' });
+  }
+  
+  if (keepLightboardSettings) {
+    // Keep current lightboard settings - don't reset them
+    console.log('Keeping lightboard settings');
+  } else {
     // Reset lightboard settings to defaults
     lightboardGameMode = 1;
     lightboardP1ColorIndex = 0;
@@ -1047,9 +1055,6 @@ function exitToCategories(keepNames = false, keepScores = false) {
     lightboardP1Color.value = lightboardP1ColorIndex;
     lightboardP2Color.value = lightboardP2ColorIndex;
     damageMultiplier.value = damageMultiplierValue;
-    
-    // Send reset command to ESP32 (this will reset the lightboard)
-    sendToESP32({ action: 'reset' });
   }
   
   // Hide modal
@@ -1064,8 +1069,8 @@ function exitToCategories(keepNames = false, keepScores = false) {
 
 // Modal event listeners
 document.getElementById('cancelExit').addEventListener('click', hideExitConfirmation);
-document.getElementById('confirmExitKeepNames').addEventListener('click', () => exitToCategories(true, false));
-document.getElementById('confirmExitKeepScores').addEventListener('click', () => exitToCategories(true, true));
+document.getElementById('confirmExitKeepNames').addEventListener('click', () => exitToCategories(true, false, true));
+document.getElementById('confirmExitKeepScores').addEventListener('click', () => exitToCategories(true, true, true));
 
 // Close modals when clicking overlay
 confirmModal.addEventListener('click', function(e) {
