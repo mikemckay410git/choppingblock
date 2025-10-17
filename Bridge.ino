@@ -396,8 +396,8 @@ void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier) {
     return;
   }
   
-  if (multiplier < 1 || multiplier > 5) {
-    Serial.printf("Invalid multiplier: %d. Must be 1-5.\n", multiplier);
+  if (multiplier < 1 || multiplier > 10) {
+    Serial.printf("Invalid multiplier: %d. Must be 1-10.\n", multiplier);
     return;
   }
   
