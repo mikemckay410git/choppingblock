@@ -25,6 +25,9 @@ class ESP32Bridge {
     this.serialConnection = null;
     this.io = io;
     this.enabled = false; // Track if serial is enabled
+    // Debounce for server-side awarding
+    this.lastAwardAtMs = 0;
+    this.lastAwardPlayer = null;
   }
 
   async startSerialCommunication() {
@@ -112,6 +115,16 @@ class ESP32Bridge {
         const playerNum = parseInt(hitMatch[1], 10);
         const strength = parseInt(hitMatch[2], 10);
         this.io.emit('esp32_data', { type: 'hit', player: playerNum, strength });
+
+        // Auto-award on hit to ensure lightboard updates even without frontend action
+        const now = Date.now();
+        if (this.lastAwardPlayer !== playerNum || (now - this.lastAwardAtMs) > 250) {
+          const cmd = { cmd: 'awardPoint', player: playerNum, multiplier: 1 };
+          this.sendToESP32(cmd);
+          console.log('Auto-award on hit -> ESP32', cmd);
+          this.lastAwardPlayer = playerNum;
+          this.lastAwardAtMs = now;
+        }
       }
 
       const winnerMatch = message.match(/^Winner declared:\s*(Player\s*[23]|Tie)/i);
@@ -147,6 +160,12 @@ class ESP32Bridge {
       const message = JSON.stringify(command) + '\n';
       this.serialConnection.write(message);
       console.log('Sent to ESP32:', command);
+      // Surface to clients for debugging
+      this.io.emit('esp32_status_message', {
+        type: 'status',
+        message: `Sent to ESP32: ${JSON.stringify(command)}`,
+        timestamp: new Date().toISOString()
+      });
     } catch (error) {
       console.error('Error sending to ESP32:', error);
     }

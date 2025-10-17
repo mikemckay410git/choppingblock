@@ -617,11 +617,6 @@ function handlePlayerHit(playerNumber) {
   
   // Show winner immediately (ESP32 has already determined winner)
   showWinner(playerName);
-  
-  // Send reset command to ESP32 to reactivate game for next hit
-  setTimeout(() => {
-    sendToESP32({ action: 'reset', quizNav: true });
-  }, 100);
 }
 
 // Add scorable state to player tiles
