@@ -827,11 +827,20 @@ function setupPlayerNameEditing() {
     if (tapLength < 500 && tapLength > 0) {
       // Double tap detected
       e.preventDefault();
+      // Clear any pending timer
+      if (tapTimer) {
+        clearTimeout(tapTimer);
+        tapTimer = null;
+      }
       startEditingName(player1Name, 'Player 1');
     } else {
       // Single tap - wait for potential double tap
+      if (tapTimer) {
+        clearTimeout(tapTimer);
+      }
       tapTimer = setTimeout(() => {
         // Single tap confirmed
+        tapTimer = null;
       }, 500);
     }
     lastTap = currentTime;
@@ -850,11 +859,20 @@ function setupPlayerNameEditing() {
     if (tapLength < 500 && tapLength > 0) {
       // Double tap detected
       e.preventDefault();
+      // Clear any pending timer
+      if (tapTimer2) {
+        clearTimeout(tapTimer2);
+        tapTimer2 = null;
+      }
       startEditingName(player2Name, 'Player 2');
     } else {
       // Single tap - wait for potential double tap
+      if (tapTimer2) {
+        clearTimeout(tapTimer2);
+      }
       tapTimer2 = setTimeout(() => {
         // Single tap confirmed
+        tapTimer2 = null;
       }, 500);
     }
     lastTap2 = currentTime;
@@ -906,7 +924,7 @@ function startEditingName(nameElement, defaultName) {
   nameElement.appendChild(input);
   
   // Force focus and selection on mobile
-  setTimeout(() => {
+  const focusTimer = setTimeout(() => {
     input.focus();
     input.select();
     // Force keyboard to appear on mobile
@@ -914,6 +932,9 @@ function startEditingName(nameElement, defaultName) {
   }, 100);
   
   function finishEditing() {
+    // Clear the focus timer
+    clearTimeout(focusTimer);
+    
     const newName = input.value.trim() || defaultName;
     nameElement.textContent = newName;
     nameElement.classList.remove('editing');
@@ -1171,6 +1192,24 @@ function loadDemoData() {
   loadedFiles.classList.remove('hidden');
 }
 
+// Cleanup function for client-side resources
+function cleanupClientResources() {
+  // Clear any pending timeouts
+  if (window.tapTimer) {
+    clearTimeout(window.tapTimer);
+    window.tapTimer = null;
+  }
+  if (window.tapTimer2) {
+    clearTimeout(window.tapTimer2);
+    window.tapTimer2 = null;
+  }
+  
+  // Disconnect socket if connected
+  if (socket && socket.connected) {
+    socket.disconnect();
+  }
+}
+
 // Initialize quiz on load
 document.addEventListener('DOMContentLoaded', function() {
   // Load persisted data
@@ -1182,3 +1221,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Load all quiz files immediately
   loadAllQuizzes();
 });
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', cleanupClientResources);
+window.addEventListener('unload', cleanupClientResources);

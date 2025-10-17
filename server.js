@@ -23,12 +23,23 @@ class ESP32Bridge {
     this.serialPort = serialPort;
     this.baudRate = baudRate;
     this.serialConnection = null;
+    this.parser = null;
     this.io = io;
     this.enabled = false; // Track if serial is enabled
+    this.retryTimeout = null; // Track retry timeout for cleanup
     // Removed debounce variables - ESP32 handles awarding internally
   }
 
   async startSerialCommunication() {
+    // Clear any existing retry timeout
+    if (this.retryTimeout) {
+      clearTimeout(this.retryTimeout);
+      this.retryTimeout = null;
+    }
+
+    // Clean up existing connection
+    this.cleanup();
+
     try {
       // List available ports for debugging
       const ports = await SerialPort.list();
@@ -50,7 +61,7 @@ class ESP32Bridge {
         autoOpen: false
       });
 
-      const parser = this.serialConnection.pipe(new ReadlineParser({ delimiter: '\n' }));
+      this.parser = this.serialConnection.pipe(new ReadlineParser({ delimiter: '\n' }));
       
       this.serialConnection.on('open', () => {
         console.log(`Connected to ESP32 on ${this.serialPort}`);
@@ -60,15 +71,15 @@ class ESP32Bridge {
 
       this.serialConnection.on('error', (err) => {
         console.warn(`Serial connection error: ${err.message}`);
-        this.serialConnection = null;
+        this.cleanup();
         this.enabled = false;
         // Notify all clients that ESP32 is disconnected
         this.io.emit('esp32_status', { connected: false, enabled: false });
         // Retry connection after 5 seconds (longer delay for optional connection)
-        setTimeout(() => this.startSerialCommunication(), 5000);
+        this.retryTimeout = setTimeout(() => this.startSerialCommunication(), 5000);
       });
 
-      parser.on('data', (data) => {
+      this.parser.on('data', (data) => {
         this.handleSerialMessage(data.trim());
       });
 
@@ -83,11 +94,12 @@ class ESP32Bridge {
     } catch (error) {
       console.warn(`Failed to connect to serial port ${this.serialPort}:`, error.message);
       console.log('Server will continue running without ESP32 connection.');
+      this.cleanup();
       this.enabled = false;
       // Notify all clients that ESP32 is disconnected
       this.io.emit('esp32_status', { connected: false, enabled: false });
       // Retry connection after 5 seconds (longer delay for optional connection)
-      setTimeout(() => this.startSerialCommunication(), 5000);
+      this.retryTimeout = setTimeout(() => this.startSerialCommunication(), 5000);
     }
   }
 
@@ -160,10 +172,31 @@ class ESP32Bridge {
     }
   }
 
-  stop() {
-    if (this.serialConnection && this.serialConnection.isOpen) {
-      this.serialConnection.close();
+  cleanup() {
+    // Clear retry timeout
+    if (this.retryTimeout) {
+      clearTimeout(this.retryTimeout);
+      this.retryTimeout = null;
     }
+
+    // Remove parser event listeners
+    if (this.parser) {
+      this.parser.removeAllListeners();
+      this.parser = null;
+    }
+
+    // Close and cleanup serial connection
+    if (this.serialConnection) {
+      if (this.serialConnection.isOpen) {
+        this.serialConnection.close();
+      }
+      this.serialConnection.removeAllListeners();
+      this.serialConnection = null;
+    }
+  }
+
+  stop() {
+    this.cleanup();
     console.log('ESP32 Bridge stopped');
   }
 }
@@ -178,11 +211,19 @@ app.get("/api", (req, res) => {
 
 // Health check endpoint
 app.get("/health", (req, res) => {
+  const memUsage = process.memoryUsage();
   res.json({ 
     status: 'ok', 
     esp32Enabled: esp32Bridge.enabled,
     esp32Connected: esp32Bridge.serialConnection ? esp32Bridge.serialConnection.isOpen : false,
-    socketClients: io.engine.clientsCount 
+    socketClients: io.engine.clientsCount,
+    memory: {
+      rss: Math.round(memUsage.rss / 1024 / 1024) + ' MB',
+      heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024) + ' MB',
+      heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024) + ' MB',
+      external: Math.round(memUsage.external / 1024 / 1024) + ' MB'
+    },
+    uptime: Math.round(process.uptime()) + ' seconds'
   });
 });
 
@@ -209,6 +250,18 @@ io.on("connection", (socket) => {
 
 // Start ESP32 communication
 esp32Bridge.startSerialCommunication();
+
+// Periodic cleanup routine to prevent memory leaks
+setInterval(() => {
+  // Force garbage collection if available
+  if (global.gc) {
+    global.gc();
+  }
+  
+  // Log memory usage every 10 minutes
+  const memUsage = process.memoryUsage();
+  console.log(`Memory usage - RSS: ${Math.round(memUsage.rss / 1024 / 1024)}MB, Heap: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`);
+}, 10 * 60 * 1000); // Every 10 minutes
 
 const PORT = 3000;
 server.listen(PORT, '0.0.0.0', () => {
