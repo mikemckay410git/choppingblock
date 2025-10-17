@@ -414,6 +414,9 @@ void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier) {
     delay(100); // Small delay between points for visual effect
   }
   
+  // Update lightboard game state (needed for proper LED progression)
+  updateLightboardGameState();
+  
   Serial.printf("Awarded %d points to Player %d\n", multiplier, playerId);
 }
 
@@ -440,9 +443,6 @@ void determineWinner() {
     
     // Send winner notification to Pi
     sendToPi("{\"type\":\"winner\",\"winner\":\"" + winner + "\"}");
-    
-    // Update lightboard
-    updateLightboardGameState();
   }
 }
 
