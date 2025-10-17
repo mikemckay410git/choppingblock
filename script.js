@@ -578,14 +578,14 @@ confirmLightboard.addEventListener('click', () => {
 function awardPoint(player) {
   if (!roundComplete) return;
   
-  // Award single point to player (damage multiplier only affects lightboard)
+  // Update score based on damage multiplier
   if (player === 'Player 2') {
-    player2Score += 1;
+    player2Score += damageMultiplierValue;
     player2ScoreEl.textContent = player2Score;
     // Send message to ESP32 to award points to Player 2
     sendToESP32({ action: 'awardPoint', player: 2, multiplier: damageMultiplierValue });
   } else if (player === 'Player 3') {
-    player3Score += 1;
+    player3Score += damageMultiplierValue;
     player3ScoreEl.textContent = player3Score;
     // Send message to ESP32 to award points to Player 3
     sendToESP32({ action: 'awardPoint', player: 3, multiplier: damageMultiplierValue });
@@ -613,21 +613,7 @@ function handlePlayerHit(playerNumber) {
   // Show winner immediately (ESP32 has already determined winner)
   showWinner(playerName);
   
-  // Update local score display (ESP32 handles actual awarding)
-  const nowMs = Date.now();
-  if (lastAwardPlayer !== playerNumber || (nowMs - lastAwardAtMs) > 250) {
-    console.log(`Updating score display for Player ${playerNumber}`);
-    if (playerNumber === 2) {
-      player2Score += (damageMultiplierValue || 1);
-      player2ScoreEl.textContent = player2Score;
-    } else if (playerNumber === 3) {
-      player3Score += (damageMultiplierValue || 1);
-      player3ScoreEl.textContent = player3Score;
-    }
-    // Note: ESP32 already handles awarding points, no need to send additional commands
-    lastAwardPlayer = playerNumber;
-    lastAwardAtMs = nowMs;
-  }
+  // Note: Points are only awarded when clicking the player tile, not on hit detection
   
   // Note: ESP32 handles reset internally when hit is detected, no need to send additional reset
 }
