@@ -41,14 +41,18 @@ socket.on('esp32_data', (data) => {
   // Handle different types of ESP32 messages
   if (data.type === 'hit') {
     console.log(`Player ${data.player} hit detected! Time: ${data.time}, Strength: ${data.strength}`);
-    handlePlayerHit(data.player);
+    // Map backend player numbers to frontend player numbers
+    const frontendPlayer = data.player === 2 ? 1 : 2; // Backend Player 2->Frontend Player 1, Backend Player 3->Frontend Player 2
+    handlePlayerHit(frontendPlayer);
   } else if (data.type === 'winner') {
     console.log(`Winner declared: ${data.winner}`);
+    // Map backend winner names to frontend winner names
+    const frontendWinner = data.winner === 'Player 2' ? 'Player 1' : 'Player 2';
     // Only process winner if round is not already complete
     if (!roundComplete) {
-      showWinner(data.winner);
+      showWinner(frontendWinner);
     } else {
-      console.log(`Winner message for ${data.winner} ignored - round already complete`);
+      console.log(`Winner message for ${frontendWinner} ignored - round already complete`);
     }
   }
 });
@@ -70,13 +74,13 @@ function sendToESP32(command) {
       esp32Command = { 
         cmd: 'lightboardSettings', 
         mode: command.mode, 
-        p2Color: command.p2Color, 
-        p3Color: command.p3Color 
+        p2Color: command.p1Color, // Map frontend Player 1 color to backend Player 2 color
+        p3Color: command.p2Color  // Map frontend Player 2 color to backend Player 3 color
       };
     } else if (command.action === 'awardPoint') {
       esp32Command = { 
         cmd: 'awardPoint', 
-        player: command.player, 
+        player: command.player === 1 ? 2 : 3, // Map frontend Player 1->2, Player 2->3 for backend
         multiplier: command.multiplier 
       };
     } else {
@@ -131,8 +135,8 @@ function parseCSV(csv) {
 let QA = [];
 let currentCategory = '';
 let availableCategories = [];
+let player1Score = 0;
 let player2Score = 0;
-let player3Score = 0;
 
 // DOM Elements
 const fileInput = document.getElementById('csvFile');
@@ -154,8 +158,8 @@ const btnNext = document.getElementById('next');
 const btnToggle = document.getElementById('toggle');
 const btnExit = document.getElementById('exitBtn');
 const card = document.getElementById('card');
+const player1ScoreEl = document.getElementById('player1Score');
 const player2ScoreEl = document.getElementById('player2Score');
-const player3ScoreEl = document.getElementById('player3Score');
 
 // Reset button
 const resetAllData = document.getElementById('resetAllData');
@@ -169,24 +173,24 @@ const lightboardModal = document.getElementById('lightboardModal');
 const cancelLightboard = document.getElementById('cancelLightboard');
 const confirmLightboard = document.getElementById('confirmLightboard');
 const lightboardMode = document.getElementById('lightboardMode');
+const lightboardP1Color = document.getElementById('lightboardP1Color');
 const lightboardP2Color = document.getElementById('lightboardP2Color');
-const lightboardP3Color = document.getElementById('lightboardP3Color');
 const damageMultiplier = document.getElementById('damageMultiplier');
 
 // Game status elements
 const gameStatus = document.getElementById('gameStatus');
+const player1Tile = document.getElementById('player1Tile');
 const player2Tile = document.getElementById('player2Tile');
-const player3Tile = document.getElementById('player3Tile');
+const player1Name = document.querySelector('#player1Tile .player-name');
 const player2Name = document.querySelector('#player2Tile .player-name');
-const player3Name = document.querySelector('#player3Tile .player-name');
 
 let order = [];
 let idx = 0;
 
 // Lightboard settings
 let lightboardGameMode = 1; // Default to Territory mode
-let lightboardP2ColorIndex = 0; // Red
-let lightboardP3ColorIndex = 1; // Blue
+let lightboardP1ColorIndex = 0; // Red
+let lightboardP2ColorIndex = 1; // Blue
 let damageMultiplierValue = 3; // Default to triple damage
 
 // Debounce awarding to avoid duplicate points on multiple hit logs
@@ -194,8 +198,8 @@ let lastAwardAtMs = 0;
 let lastAwardPlayer = null;
 
 // Player names with persistence
+let player1NameText = 'Player 1';
 let player2NameText = 'Player 2';
-let player3NameText = 'Player 3';
 let isEditingName = false;
 
 // Quiz state persistence
@@ -510,12 +514,12 @@ confirmReset.addEventListener('click', () => {
   QA = [];
   currentCategory = '';
   availableCategories = [];
+  player1Score = 0;
   player2Score = 0;
-  player3Score = 0;
   
   // Update UI
+  player1ScoreEl.textContent = '0';
   player2ScoreEl.textContent = '0';
-  player3ScoreEl.textContent = '0';
   
   // Reset file input
   fileInput.value = '';
@@ -538,8 +542,8 @@ confirmReset.addEventListener('click', () => {
 lightboardSettingsBtn.addEventListener('click', () => {
   // Load current settings
   lightboardMode.value = lightboardGameMode;
+  lightboardP1Color.value = lightboardP1ColorIndex;
   lightboardP2Color.value = lightboardP2ColorIndex;
-  lightboardP3Color.value = lightboardP3ColorIndex;
   damageMultiplier.value = damageMultiplierValue;
   
   lightboardModal.classList.remove('hidden');
@@ -551,27 +555,27 @@ cancelLightboard.addEventListener('click', () => {
 
 confirmLightboard.addEventListener('click', () => {
   const newMode = parseInt(lightboardMode.value);
+  const newP1Color = parseInt(lightboardP1Color.value);
   const newP2Color = parseInt(lightboardP2Color.value);
-  const newP3Color = parseInt(lightboardP3Color.value);
   const newMultiplier = parseInt(damageMultiplier.value);
   
   // Update local variables
   lightboardGameMode = newMode;
+  lightboardP1ColorIndex = newP1Color;
   lightboardP2ColorIndex = newP2Color;
-  lightboardP3ColorIndex = newP3Color;
   damageMultiplierValue = newMultiplier;
   
   // Send settings to ESP32
   sendToESP32({
     action: 'lightboardSettings',
     mode: newMode,
-    p2Color: newP2Color,
-    p3Color: newP3Color
+    p1Color: newP1Color,
+    p2Color: newP2Color
   });
   
   lightboardModal.classList.add('hidden');
   
-  console.log('Lightboard settings applied:', { newMode, newP2Color, newP3Color, newMultiplier });
+  console.log('Lightboard settings applied:', { newMode, newP1Color, newP2Color, newMultiplier });
 });
 
 // === SCORE MANAGEMENT ===
@@ -579,16 +583,16 @@ function awardPoint(player) {
   if (!roundComplete) return;
   
   // Award single point to player (damage multiplier only affects lightboard)
-  if (player === 'Player 2') {
+  if (player === 'Player 1') {
+    player1Score += 1;
+    player1ScoreEl.textContent = player1Score;
+    // Send message to ESP32 to award points to Player 1
+    sendToESP32({ action: 'awardPoint', player: 1, multiplier: damageMultiplierValue });
+  } else if (player === 'Player 2') {
     player2Score += 1;
     player2ScoreEl.textContent = player2Score;
     // Send message to ESP32 to award points to Player 2
     sendToESP32({ action: 'awardPoint', player: 2, multiplier: damageMultiplierValue });
-  } else if (player === 'Player 3') {
-    player3Score += 1;
-    player3ScoreEl.textContent = player3Score;
-    // Send message to ESP32 to award points to Player 3
-    sendToESP32({ action: 'awardPoint', player: 3, multiplier: damageMultiplierValue });
   }
   
   // Reset game and advance to next question
@@ -601,7 +605,7 @@ function awardPoint(player) {
 
 // Handle player hits from ESP32
 function handlePlayerHit(playerNumber) {
-  const playerName = playerNumber === 2 ? 'Player 2' : 'Player 3';
+  const playerName = playerNumber === 1 ? 'Player 1' : 'Player 2';
   console.log(`ESP32 detected hit from ${playerName}`);
   
   // Check if a round is already complete (winner already declared)
@@ -621,32 +625,32 @@ function handlePlayerHit(playerNumber) {
 // Add scorable state to player tiles
 function addScorableState() {
   // Only add scorable class if the tile is not already a winner
+  if (!player1Tile.classList.contains('winner')) {
+    player1Tile.classList.add('scorable');
+  }
   if (!player2Tile.classList.contains('winner')) {
     player2Tile.classList.add('scorable');
-  }
-  if (!player3Tile.classList.contains('winner')) {
-    player3Tile.classList.add('scorable');
   }
   roundComplete = true;
 }
 
 // Remove scorable state from player tiles
 function removeScorableState() {
+  player1Tile.classList.remove('scorable');
   player2Tile.classList.remove('scorable');
-  player3Tile.classList.remove('scorable');
   roundComplete = false;
 }
 
 function showWinner(player) {
   // Remove winner class from all tiles
+  player1Tile.classList.remove('winner');
   player2Tile.classList.remove('winner');
-  player3Tile.classList.remove('winner');
   
   // Add winner class to the winning player's tile
-  if (player === 'Player 2') {
+  if (player === 'Player 1') {
+    player1Tile.classList.add('winner');
+  } else if (player === 'Player 2') {
     player2Tile.classList.add('winner');
-  } else if (player === 'Player 3') {
-    player3Tile.classList.add('winner');
   }
   
   // Automatically reveal answer when winner tile is shown
@@ -658,8 +662,8 @@ function showWinner(player) {
 }
 
 function hideWinner() {
+  player1Tile.classList.remove('winner');
   player2Tile.classList.remove('winner');
-  player3Tile.classList.remove('winner');
   removeScorableState();
   
   // Hide answer when winner tile is hidden
@@ -693,8 +697,8 @@ function handlePlayerClick(player) {
   };
 }
 
+player1Tile.addEventListener('click', handlePlayerClick('Player 1'));
 player2Tile.addEventListener('click', handlePlayerClick('Player 2'));
-player3Tile.addEventListener('click', handlePlayerClick('Player 3'));
 
 // Player name editing functionality
 function setupPlayerNameEditing() {
@@ -702,8 +706,8 @@ function setupPlayerNameEditing() {
   let lastTap = 0;
   let tapTimer;
   
-  // Player 2 name editing
-  player2Name.addEventListener('touchend', function(e) {
+  // Player 1 name editing
+  player1Name.addEventListener('touchend', function(e) {
     if (roundComplete) return; // Don't allow editing during scoring phase
     
     const currentTime = new Date().getTime();
@@ -712,7 +716,7 @@ function setupPlayerNameEditing() {
     if (tapLength < 500 && tapLength > 0) {
       // Double tap detected
       e.preventDefault();
-      startEditingName(player2Name, 'Player 2');
+      startEditingName(player1Name, 'Player 1');
     } else {
       // Single tap - wait for potential double tap
       tapTimer = setTimeout(() => {
@@ -722,40 +726,40 @@ function setupPlayerNameEditing() {
     lastTap = currentTime;
   });
 
-  // Player 3 name editing
-  let lastTap3 = 0;
-  let tapTimer3;
+  // Player 2 name editing
+  let lastTap2 = 0;
+  let tapTimer2;
   
-  player3Name.addEventListener('touchend', function(e) {
+  player2Name.addEventListener('touchend', function(e) {
     if (roundComplete) return; // Don't allow editing during scoring phase
     
     const currentTime = new Date().getTime();
-    const tapLength = currentTime - lastTap3;
+    const tapLength = currentTime - lastTap2;
     
     if (tapLength < 500 && tapLength > 0) {
       // Double tap detected
       e.preventDefault();
-      startEditingName(player3Name, 'Player 3');
+      startEditingName(player2Name, 'Player 2');
     } else {
       // Single tap - wait for potential double tap
-      tapTimer3 = setTimeout(() => {
+      tapTimer2 = setTimeout(() => {
         // Single tap confirmed
       }, 500);
     }
-    lastTap3 = currentTime;
+    lastTap2 = currentTime;
   });
 
   // Desktop double-click for editing
+  player1Name.addEventListener('dblclick', function(e) {
+    if (roundComplete) return; // Don't allow editing during scoring phase
+    e.preventDefault();
+    startEditingName(player1Name, 'Player 1');
+  });
+
   player2Name.addEventListener('dblclick', function(e) {
     if (roundComplete) return; // Don't allow editing during scoring phase
     e.preventDefault();
     startEditingName(player2Name, 'Player 2');
-  });
-
-  player3Name.addEventListener('dblclick', function(e) {
-    if (roundComplete) return; // Don't allow editing during scoring phase
-    e.preventDefault();
-    startEditingName(player3Name, 'Player 3');
   });
 }
 
@@ -805,10 +809,10 @@ function startEditingName(nameElement, defaultName) {
     isEditingName = false;
     
     // Update stored names
-    if (nameElement === player2Name) {
+    if (nameElement === player1Name) {
+      player1NameText = newName;
+    } else if (nameElement === player2Name) {
       player2NameText = newName;
-    } else if (nameElement === player3Name) {
-      player3NameText = newName;
     }
   }
   
@@ -868,11 +872,11 @@ function exitToCategories(resetLightbar = true) {
   btnToggle.textContent = 'Show Answer';
   
   // Reset scores
+  player1Score = 0;
   player2Score = 0;
-  player3Score = 0;
   roundComplete = false;
+  player1ScoreEl.textContent = '0';
   player2ScoreEl.textContent = '0';
-  player3ScoreEl.textContent = '0';
   removeScorableState();
   
   // Hide modal
