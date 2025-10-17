@@ -861,7 +861,7 @@ function hideExitConfirmation() {
   confirmModal.classList.add('hidden');
 }
 
-function exitToCategories() {
+function exitToCategories(resetLightbar = true) {
   // Reset game state
   hideWinner();
   aEl.classList.remove('show');
@@ -878,8 +878,10 @@ function exitToCategories() {
   // Hide modal
   hideExitConfirmation();
   
-  // Reset lightboard when exiting quiz
-  sendToESP32({ action: 'reset' });
+  // Reset lightboard when exiting quiz (if requested)
+  if (resetLightbar) {
+    sendToESP32({ action: 'reset' });
+  }
   
   // Return to category selector
   showCategorySelector();
@@ -887,7 +889,8 @@ function exitToCategories() {
 
 // Modal event listeners
 document.getElementById('cancelExit').addEventListener('click', hideExitConfirmation);
-document.getElementById('confirmExit').addEventListener('click', exitToCategories);
+document.getElementById('confirmExitNoReset').addEventListener('click', () => exitToCategories(false));
+document.getElementById('confirmExitWithReset').addEventListener('click', () => exitToCategories(true));
 
 // Close modals when clicking overlay
 confirmModal.addEventListener('click', function(e) {
