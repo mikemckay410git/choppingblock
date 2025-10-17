@@ -1015,7 +1015,10 @@ function exitToCategories(keepNames = false, keepScores = false) {
   roundComplete = false;
   
   // Handle different exit options
-  if (!keepNames) {
+  if (keepNames) {
+    // Keep current player names - don't reset them
+    console.log('Keeping player names:', player1NameText, player2NameText);
+  } else {
     // Reset player names to defaults
     player1NameText = 'Player 1';
     player2NameText = 'Player 2';
@@ -1023,7 +1026,10 @@ function exitToCategories(keepNames = false, keepScores = false) {
     player2Name.textContent = player2NameText;
   }
   
-  if (!keepScores) {
+  if (keepScores) {
+    // Keep current scores and lightboard settings - don't reset them
+    console.log('Keeping scores and lightboard settings');
+  } else {
     // Reset scores
     player1Score = 0;
     player2Score = 0;
@@ -1059,7 +1065,7 @@ function exitToCategories(keepNames = false, keepScores = false) {
 // Modal event listeners
 document.getElementById('cancelExit').addEventListener('click', hideExitConfirmation);
 document.getElementById('confirmExitKeepNames').addEventListener('click', () => exitToCategories(true, false));
-document.getElementById('confirmExitKeepScores').addEventListener('click', () => exitToCategories(false, true));
+document.getElementById('confirmExitKeepScores').addEventListener('click', () => exitToCategories(true, true));
 
 // Close modals when clicking overlay
 confirmModal.addEventListener('click', function(e) {
