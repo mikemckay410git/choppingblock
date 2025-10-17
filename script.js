@@ -57,8 +57,29 @@ socket.on('esp32_status_message', (data) => {
 // Function to send commands to ESP32
 function sendToESP32(command) {
   if (esp32Enabled && esp32Connected) {
-    socket.emit('esp32_command', command);
-    console.log('Sent to ESP32:', command);
+    // Convert frontend command format to ESP32 expected format
+    let esp32Command;
+    if (command.action === 'reset') {
+      esp32Command = { cmd: 'reset' };
+    } else if (command.action === 'lightboardSettings') {
+      esp32Command = { 
+        cmd: 'lightboardSettings', 
+        mode: command.mode, 
+        p2Color: command.p2Color, 
+        p3Color: command.p3Color 
+      };
+    } else if (command.action === 'awardPoint') {
+      esp32Command = { 
+        cmd: 'awardPoint', 
+        player: command.player, 
+        multiplier: command.multiplier 
+      };
+    } else {
+      esp32Command = command; // Pass through as-is
+    }
+    
+    socket.emit('esp32_command', esp32Command);
+    console.log('Sent to ESP32:', esp32Command);
   } else {
     console.warn('ESP32 not available - command ignored:', command);
   }
@@ -573,6 +594,11 @@ function handlePlayerHit(playerNumber) {
   
   // Show winner immediately (ESP32 has already determined winner)
   showWinner(playerName);
+  
+  // Send reset command to ESP32 to reactivate game for next hit
+  setTimeout(() => {
+    sendToESP32({ action: 'reset', quizNav: true });
+  }, 100);
 }
 
 // Add scorable state to player tiles
