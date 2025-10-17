@@ -45,6 +45,24 @@ socket.on('esp32_data', (data) => {
   } else if (data.type === 'winner') {
     console.log(`Winner declared: ${data.winner}`);
     showWinner(data.winner);
+    // Also increment local score and award to lightboard
+    const p = (typeof data.winner === 'string') ? (data.winner.includes('2') ? 2 : data.winner.includes('3') ? 3 : null) : null;
+    const nowMs = Date.now();
+    if (p === 2 || p === 3) {
+      // Debounce duplicate awards within 250ms
+      if (lastAwardPlayer !== p || (nowMs - lastAwardAtMs) > 250) {
+        if (p === 2) {
+          player2Score += (damageMultiplierValue || 1);
+          player2ScoreEl.textContent = player2Score;
+        } else {
+          player3Score += (damageMultiplierValue || 1);
+          player3ScoreEl.textContent = player3Score;
+        }
+        sendToESP32({ action: 'awardPoint', player: p, multiplier: damageMultiplierValue || 1 });
+        lastAwardPlayer = p;
+        lastAwardAtMs = nowMs;
+      }
+    }
   }
 });
 
@@ -183,6 +201,10 @@ let lightboardGameMode = 1; // Default to Territory mode
 let lightboardP2ColorIndex = 0; // Red
 let lightboardP3ColorIndex = 1; // Blue
 let damageMultiplierValue = 3; // Default to triple damage
+
+// Debounce awarding to avoid duplicate points on multiple hit logs
+let lastAwardAtMs = 0;
+let lastAwardPlayer = null;
 
 // Player names with persistence
 let player2NameText = 'Player 2';
@@ -594,11 +616,21 @@ function handlePlayerHit(playerNumber) {
   
   // Show winner immediately (ESP32 has already determined winner)
   showWinner(playerName);
-  
-  // Send reset command to ESP32 to reactivate game for next hit
-  setTimeout(() => {
-    sendToESP32({ action: 'reset', quizNav: true });
-  }, 100);
+
+  // Award point to lightboard immediately on hit (debounced)
+  const nowMs = Date.now();
+  if (lastAwardPlayer !== playerNumber || (nowMs - lastAwardAtMs) > 250) {
+    if (playerNumber === 2) {
+      player2Score += (damageMultiplierValue || 1);
+      player2ScoreEl.textContent = player2Score;
+    } else if (playerNumber === 3) {
+      player3Score += (damageMultiplierValue || 1);
+      player3ScoreEl.textContent = player3Score;
+    }
+    sendToESP32({ action: 'awardPoint', player: playerNumber, multiplier: damageMultiplierValue || 1 });
+    lastAwardPlayer = playerNumber;
+    lastAwardAtMs = nowMs;
+  }
 }
 
 // Add scorable state to player tiles
