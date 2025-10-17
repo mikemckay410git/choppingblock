@@ -142,8 +142,8 @@ const unsigned long QUIZ_ACTION_DEBOUNCE_MS = 500; // 500ms debounce period
 
 // ===================== ESP-NOW Callbacks =====================
 void OnDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
-  Serial.print("Send Status: ");
-  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
+  // Debug: Serial.print("Send Status: ");
+  // Debug: Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
 }
 
 void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
@@ -192,7 +192,7 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
         winner = "Player 2";
         gameActive = false;
         sendToPi("{\"type\":\"winner\",\"winner\":\"Player 2\"}");
-        Serial.println("Winner declared: Player 2");
+        // Debug: Serial.println("Winner declared: Player 2");
       }
     } else if (player2Data.action == 3) {
       // Reset request from Player 2
@@ -208,8 +208,8 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       clockSynced = true;
       lastSyncTime = millis();
       
-      Serial.printf("Clock sync: offset=%ld us, roundTrip=%lu us\n", clockOffset, roundTrip);
       // Clock sync complete - no need to send to Pi
+      // Debug: Serial.printf("Clock sync: offset=%ld us, roundTrip=%lu us\n", clockOffset, roundTrip);
     }
     } else if (player2Data.playerId == 3) {
     // Learn Player 3 MAC dynamically to avoid manual entry issues
@@ -251,7 +251,7 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
         winner = "Player 3";
         gameActive = false;
         sendToPi("{\"type\":\"winner\",\"winner\":\"Player 3\"}");
-        Serial.println("Winner declared: Player 3");
+        // Debug: Serial.println("Winner declared: Player 3");
       }
     } else if (player2Data.action == 3) {
       // Reset request from Player 3
@@ -267,8 +267,8 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       player3ClockSynced = true;
       lastPlayer3SyncTime = millis();
       
-      Serial.printf("Player 3 Clock sync: offset=%ld us, roundTrip=%lu us\n", player3ClockOffset, roundTrip);
       // Clock sync complete - no need to send to Pi
+      // Debug: Serial.printf("Player 3 Clock sync: offset=%ld us, roundTrip=%lu us\n", player3ClockOffset, roundTrip);
     }
     }
   } else if (len == sizeof(struct_lightboard_message)) {
@@ -360,7 +360,7 @@ void awardPointToPlayer(uint8_t playerId) {
   }
   
   if (!lightboardConnected) {
-    Serial.println("Lightboard not connected - cannot award point");
+    // Debug: Serial.println("Lightboard not connected - cannot award point");
     return;
   }
   
@@ -402,7 +402,7 @@ void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier) {
   }
   
   if (!lightboardConnected) {
-    Serial.println("Lightboard not connected - cannot award points");
+    // Debug: Serial.println("Lightboard not connected - cannot award points");
     return;
   }
   
@@ -475,7 +475,7 @@ void resetGame() {
   // Send reset notification to Pi
   sendToPi("{\"type\":\"reset\"}");
   
-  Serial.println("Game reset");
+  // Debug: Serial.println("Game reset");
 }
 
 void resetGameForQuiz() {
@@ -489,7 +489,7 @@ void resetGameForQuiz() {
   // Send reset notification to Pi
   sendToPi("{\"type\":\"reset\"}");
   
-  Serial.println("Game reset for quiz navigation");
+  // Debug: Serial.println("Game reset for quiz navigation");
 }
 
 // ===================== Clock Synchronization =====================
@@ -705,7 +705,7 @@ void loop(){
   // Check for Pi connection timeout
   if (piConnected && (millis() - lastPiHeartbeat > PI_HEARTBEAT_TIMEOUT)) {
     piConnected = false;
-    Serial.println("Pi connection lost");
+    // Debug: Serial.println("Pi connection lost");
   }
 
   // Check for connection timeout

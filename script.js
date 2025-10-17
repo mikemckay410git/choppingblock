@@ -599,10 +599,10 @@ function handlePlayerHit(playerNumber) {
   // Show winner immediately (ESP32 has already determined winner)
   showWinner(playerName);
   
-  // Award point to lightboard immediately on hit (debounced)
+  // Update local score display (ESP32 handles actual awarding)
   const nowMs = Date.now();
   if (lastAwardPlayer !== playerNumber || (nowMs - lastAwardAtMs) > 250) {
-    console.log(`Auto-award on hit -> lightboard for Player ${playerNumber}`);
+    console.log(`Updating score display for Player ${playerNumber}`);
     if (playerNumber === 2) {
       player2Score += (damageMultiplierValue || 1);
       player2ScoreEl.textContent = player2Score;
@@ -610,15 +610,12 @@ function handlePlayerHit(playerNumber) {
       player3Score += (damageMultiplierValue || 1);
       player3ScoreEl.textContent = player3Score;
     }
-    sendToESP32({ action: 'awardPoint', player: playerNumber, multiplier: damageMultiplierValue || 1 });
+    // Note: ESP32 already handles awarding points, no need to send additional commands
     lastAwardPlayer = playerNumber;
     lastAwardAtMs = nowMs;
   }
   
-  // Send reset command to ESP32 to reactivate game for next hit
-  setTimeout(() => {
-    sendToESP32({ action: 'reset', quizNav: true });
-  }, 100);
+  // Note: ESP32 handles reset internally when hit is detected, no need to send additional reset
 }
 
 // Add scorable state to player tiles
