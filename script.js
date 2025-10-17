@@ -631,6 +631,9 @@ confirmReset.addEventListener('click', () => {
   fileList.innerHTML = '';
   loadedFiles.classList.add('hidden');
   
+  // Reload all quiz files
+  loadAllQuizzes();
+  
   // Show file input section
   showCategorySelector();
   
