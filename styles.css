@@ -664,6 +664,12 @@ button:active {
     display: flex;
     gap: 12px;
     justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.modal-actions:has(#confirmExitKeepNames) {
+    justify-content: space-between;
+    flex-wrap: wrap;
 }
 
 .modal-btn {

@@ -94,13 +94,15 @@
                     <h3>Exit Quiz?</h3>
                 </div>
                 <div class="modal-content">
-                    <p>Are you sure you want to exit this quiz and return to categories?</p>
-                    <p>Do you want to reset the lightbar?</p>
+                    <p>How would you like to exit the quiz?</p>
+                    <div style="margin: 16px 0; padding: 12px; background: rgba(255,255,255,.03); border-radius: 8px; border: 1px solid rgba(255,255,255,.06);">
+                        <p style="margin: 0; font-size: 13px; color: var(--muted);">Choose what to keep when exiting:</p>
+                    </div>
                 </div>
                 <div class="modal-actions">
                     <button class="modal-btn cancel" id="cancelExit">Cancel</button>
-                    <button class="modal-btn confirm" id="confirmExitNoReset">Exit (Keep Lightbar)</button>
-                    <button class="modal-btn confirm" id="confirmExitWithReset">Exit & Reset Lightbar</button>
+                    <button class="modal-btn confirm" id="confirmExitKeepNames">Keep Names Only</button>
+                    <button class="modal-btn confirm" id="confirmExitKeepScores">Keep Scores & Lightbar</button>
                 </div>
             </div>
         </div>
@@ -118,6 +120,7 @@
                         <li>Player scores</li>
                         <li>Player names</li>
                         <li>Current quiz progress</li>
+                        <li>Lightboard settings and score</li>
                     </ul>
                     <p style="color: #fca5a5; font-weight: 600;">This action cannot be undone.</p>
                 </div>

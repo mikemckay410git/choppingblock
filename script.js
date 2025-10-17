@@ -163,7 +163,7 @@ const player2ScoreEl = document.getElementById('player2Score');
 
 // Reset button
 const resetAllData = document.getElementById('resetAllData');
-const confirmModal = document.getElementById('confirmModal');
+const resetModal = document.getElementById('resetModal');
 const cancelReset = document.getElementById('cancelReset');
 const confirmReset = document.getElementById('confirmReset');
 
@@ -500,26 +500,131 @@ function toggleAnswer() {
   btnToggle.textContent = aEl.classList.contains('show') ? 'Hide Answer' : 'Show Answer';
 }
 
+// === PERSISTENCE FUNCTIONS ===
+function savePersistedData() {
+  try {
+    // Save player names
+    localStorage.setItem('player1Name', player1NameText);
+    localStorage.setItem('player2Name', player2NameText);
+    
+    // Save scores
+    localStorage.setItem('player1Score', player1Score.toString());
+    localStorage.setItem('player2Score', player2Score.toString());
+    
+    // Save lightboard settings
+    localStorage.setItem('lightboardGameMode', lightboardGameMode.toString());
+    localStorage.setItem('lightboardP1ColorIndex', lightboardP1ColorIndex.toString());
+    localStorage.setItem('lightboardP2ColorIndex', lightboardP2ColorIndex.toString());
+    localStorage.setItem('damageMultiplierValue', damageMultiplierValue.toString());
+    
+    // Save categories
+    localStorage.setItem('quizCategories', JSON.stringify(availableCategories));
+    
+    // Save current quiz state
+    if (currentCategory) {
+      localStorage.setItem('currentCategory', currentCategory);
+      localStorage.setItem('currentQuestionIndex', currentQuestionIndex.toString());
+      if (order.length > 0) {
+        localStorage.setItem('savedOrder', JSON.stringify(order));
+      }
+    }
+  } catch (error) {
+    console.error('Error saving persisted data:', error);
+  }
+}
+
+function loadPersistedData() {
+  try {
+    // Load player names
+    const savedPlayer1Name = localStorage.getItem('player1Name');
+    const savedPlayer2Name = localStorage.getItem('player2Name');
+    if (savedPlayer1Name) player1NameText = savedPlayer1Name;
+    if (savedPlayer2Name) player2NameText = savedPlayer2Name;
+    
+    // Load scores
+    const savedPlayer1Score = localStorage.getItem('player1Score');
+    const savedPlayer2Score = localStorage.getItem('player2Score');
+    if (savedPlayer1Score) player1Score = parseInt(savedPlayer1Score);
+    if (savedPlayer2Score) player2Score = parseInt(savedPlayer2Score);
+    
+    // Load lightboard settings
+    const savedMode = localStorage.getItem('lightboardGameMode');
+    const savedP1Color = localStorage.getItem('lightboardP1ColorIndex');
+    const savedP2Color = localStorage.getItem('lightboardP2ColorIndex');
+    const savedMultiplier = localStorage.getItem('damageMultiplierValue');
+    
+    if (savedMode !== null) lightboardGameMode = parseInt(savedMode);
+    if (savedP1Color !== null) lightboardP1ColorIndex = parseInt(savedP1Color);
+    if (savedP2Color !== null) lightboardP2ColorIndex = parseInt(savedP2Color);
+    if (savedMultiplier !== null) damageMultiplierValue = parseInt(savedMultiplier);
+    
+    // Load categories
+    const savedCategories = localStorage.getItem('quizCategories');
+    if (savedCategories) {
+      availableCategories = JSON.parse(savedCategories);
+    }
+    
+    // Update UI
+    player1Name.textContent = player1NameText;
+    player2Name.textContent = player2NameText;
+    player1ScoreEl.textContent = player1Score;
+    player2ScoreEl.textContent = player2Score;
+    
+    // Update lightboard settings UI
+    lightboardMode.value = lightboardGameMode;
+    lightboardP1Color.value = lightboardP1ColorIndex;
+    lightboardP2Color.value = lightboardP2ColorIndex;
+    damageMultiplier.value = damageMultiplierValue;
+    
+  } catch (error) {
+    console.error('Error loading persisted data:', error);
+  }
+}
+
 // === RESET FUNCTIONALITY ===
 resetAllData.addEventListener('click', () => {
-  confirmModal.classList.remove('hidden');
+  resetModal.classList.remove('hidden');
 });
 
 cancelReset.addEventListener('click', () => {
-  confirmModal.classList.add('hidden');
+  resetModal.classList.add('hidden');
 });
 
 confirmReset.addEventListener('click', () => {
-  // Reset all data
+  // Clear all localStorage data
+  localStorage.clear();
+  
+  // Reset all variables to default state
   QA = [];
   currentCategory = '';
   availableCategories = [];
   player1Score = 0;
   player2Score = 0;
+  player1NameText = 'Player 1';
+  player2NameText = 'Player 2';
+  currentQuestionIndex = 0;
+  savedOrder = null;
+  order = [];
+  idx = 0;
+  roundComplete = false;
+  
+  // Reset lightboard settings to defaults
+  lightboardGameMode = 1;
+  lightboardP1ColorIndex = 0;
+  lightboardP2ColorIndex = 1;
+  damageMultiplierValue = 3;
   
   // Update UI
+  player1Name.textContent = player1NameText;
+  player2Name.textContent = player2NameText;
   player1ScoreEl.textContent = '0';
   player2ScoreEl.textContent = '0';
+  
+  // Update lightboard settings UI
+  lightboardMode.value = lightboardGameMode;
+  lightboardP1Color.value = lightboardP1ColorIndex;
+  lightboardP2Color.value = lightboardP2ColorIndex;
+  damageMultiplier.value = damageMultiplierValue;
   
   // Reset file input
   fileInput.value = '';
@@ -530,12 +635,12 @@ confirmReset.addEventListener('click', () => {
   showCategorySelector();
   
   // Close modal
-  confirmModal.classList.add('hidden');
+  resetModal.classList.add('hidden');
   
-  // Send reset command to ESP32
+  // Send reset command to ESP32 (this will reset the lightboard)
   sendToESP32({ action: 'reset' });
   
-  console.log('All data reset');
+  console.log('All data reset including player names and lightboard settings');
 });
 
 // === LIGHTBOARD SETTINGS ===
@@ -574,6 +679,9 @@ confirmLightboard.addEventListener('click', () => {
   });
   
   lightboardModal.classList.add('hidden');
+  
+  // Save to localStorage
+  savePersistedData();
   
   console.log('Lightboard settings applied:', { newMode, newP1Color, newP2Color, newMultiplier });
 });
@@ -814,6 +922,9 @@ function startEditingName(nameElement, defaultName) {
     } else if (nameElement === player2Name) {
       player2NameText = newName;
     }
+    
+    // Save to localStorage
+    savePersistedData();
   }
   
   input.addEventListener('blur', finishEditing);
@@ -865,27 +976,57 @@ function hideExitConfirmation() {
   confirmModal.classList.add('hidden');
 }
 
-function exitToCategories(resetLightbar = true) {
+function exitToCategories(keepNames = false, keepScores = false) {
   // Reset game state
   hideWinner();
   aEl.classList.remove('show');
   btnToggle.textContent = 'Show Answer';
   
-  // Reset scores
-  player1Score = 0;
-  player2Score = 0;
-  roundComplete = false;
-  player1ScoreEl.textContent = '0';
-  player2ScoreEl.textContent = '0';
+  // Reset quiz progress
   removeScorableState();
+  currentQuestionIndex = 0;
+  savedOrder = null;
+  order = [];
+  idx = 0;
+  roundComplete = false;
+  
+  // Handle different exit options
+  if (!keepNames) {
+    // Reset player names to defaults
+    player1NameText = 'Player 1';
+    player2NameText = 'Player 2';
+    player1Name.textContent = player1NameText;
+    player2Name.textContent = player2NameText;
+  }
+  
+  if (!keepScores) {
+    // Reset scores
+    player1Score = 0;
+    player2Score = 0;
+    player1ScoreEl.textContent = '0';
+    player2ScoreEl.textContent = '0';
+    
+    // Reset lightboard settings to defaults
+    lightboardGameMode = 1;
+    lightboardP1ColorIndex = 0;
+    lightboardP2ColorIndex = 1;
+    damageMultiplierValue = 3;
+    
+    // Update lightboard settings UI
+    lightboardMode.value = lightboardGameMode;
+    lightboardP1Color.value = lightboardP1ColorIndex;
+    lightboardP2Color.value = lightboardP2ColorIndex;
+    damageMultiplier.value = damageMultiplierValue;
+    
+    // Send reset command to ESP32 (this will reset the lightboard)
+    sendToESP32({ action: 'reset' });
+  }
   
   // Hide modal
   hideExitConfirmation();
   
-  // Reset lightboard when exiting quiz (if requested)
-  if (resetLightbar) {
-    sendToESP32({ action: 'reset' });
-  }
+  // Save current state to localStorage
+  savePersistedData();
   
   // Return to category selector
   showCategorySelector();
@@ -893,8 +1034,8 @@ function exitToCategories(resetLightbar = true) {
 
 // Modal event listeners
 document.getElementById('cancelExit').addEventListener('click', hideExitConfirmation);
-document.getElementById('confirmExitNoReset').addEventListener('click', () => exitToCategories(false));
-document.getElementById('confirmExitWithReset').addEventListener('click', () => exitToCategories(true));
+document.getElementById('confirmExitKeepNames').addEventListener('click', () => exitToCategories(true, false));
+document.getElementById('confirmExitKeepScores').addEventListener('click', () => exitToCategories(false, true));
 
 // Close modals when clicking overlay
 confirmModal.addEventListener('click', function(e) {
@@ -1029,6 +1170,9 @@ function loadDemoData() {
 
 // Initialize quiz on load
 document.addEventListener('DOMContentLoaded', function() {
+  // Load persisted data
+  loadPersistedData();
+  
   // Setup player name editing
   setupPlayerNameEditing();
   
