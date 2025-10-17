@@ -668,8 +668,15 @@ button:active {
 }
 
 .modal-actions:has(#confirmExitKeepNames) {
-    justify-content: space-between;
+    justify-content: space-evenly;
     flex-wrap: wrap;
+    gap: 8px;
+}
+
+.modal-actions:has(#confirmExitKeepNames) .modal-btn {
+    flex: 1;
+    min-width: 120px;
+    text-align: center;
 }
 
 .modal-btn {
@@ -737,6 +744,16 @@ button:active {
     
     .modal-actions {
         flex-direction: column;
+    }
+    
+    .modal-actions:has(#confirmExitKeepNames) {
+        gap: 12px;
+    }
+    
+    .modal-actions:has(#confirmExitKeepNames) .modal-btn {
+        flex: none;
+        width: 100%;
+        min-width: auto;
     }
     
     .modal-btn {
