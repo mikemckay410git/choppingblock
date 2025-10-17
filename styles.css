@@ -338,21 +338,45 @@ button:active {
 
 .settings-select {
     width: 100%;
-    padding: 10px 12px;
+    padding: 12px 40px 12px 16px;
     border: 1px solid rgba(255,255,255,.14);
-    border-radius: 8px;
-    background: rgba(255,255,255,.06);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
     color: var(--ink);
     font-size: 14px;
     font-weight: 500;
     transition: all 0.2s ease;
+    appearance: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.05);
+    position: relative;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23aab6d3' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 12px center;
+    background-repeat: no-repeat;
+    background-size: 16px;
+}
+
+.settings-select:hover {
+    background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.08));
+    border-color: rgba(255,255,255,.2);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.08);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23cfe1ff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
 }
 
 .settings-select:focus {
     outline: none;
     border-color: var(--accent);
-    background: rgba(255,255,255,.1);
-    box-shadow: 0 0 0 2px rgba(99,102,241,.2);
+    background: linear-gradient(180deg, rgba(99,102,241,.15), rgba(99,102,241,.08));
+    box-shadow: 0 0 0 2px rgba(99,102,241,.2), 0 6px 16px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.1);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236366f1' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+}
+
+.settings-select option {
+    background: var(--card);
+    color: var(--ink);
+    padding: 8px 12px;
+    font-weight: 500;
 }
 
 .loaded-files {
