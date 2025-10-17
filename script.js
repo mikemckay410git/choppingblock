@@ -44,7 +44,12 @@ socket.on('esp32_data', (data) => {
     handlePlayerHit(data.player);
   } else if (data.type === 'winner') {
     console.log(`Winner declared: ${data.winner}`);
-    showWinner(data.winner);
+    // Only process winner if round is not already complete
+    if (!roundComplete) {
+      showWinner(data.winner);
+    } else {
+      console.log(`Winner message for ${data.winner} ignored - round already complete`);
+    }
   }
 });
 
@@ -468,6 +473,9 @@ function next() {
     idx = 0; 
     render(); 
   }
+  // Reset game state when navigating to new question
+  hideWinner();
+  removeScorableState();
 }
 
 function prev() {
@@ -478,6 +486,9 @@ function prev() {
     idx = order.length - 1; 
     render(); 
   }
+  // Reset game state when navigating to new question
+  hideWinner();
+  removeScorableState();
 }
 
 function toggleAnswer() {
@@ -585,10 +596,6 @@ function awardPoint(player) {
   hideWinner();
   aEl.classList.remove('show');
   btnToggle.textContent = 'Show Answer';
-  
-  // Send reset command to ESP32 to rearm for next round
-  sendToESP32({ action: 'reset' });
-  
   // Add a small delay before advancing to next question to prevent flashing
   setTimeout(() => {
     next();
@@ -599,6 +606,12 @@ function awardPoint(player) {
 function handlePlayerHit(playerNumber) {
   const playerName = playerNumber === 2 ? 'Player 2' : 'Player 3';
   console.log(`ESP32 detected hit from ${playerName}`);
+  
+  // Check if a round is already complete (winner already declared)
+  if (roundComplete) {
+    console.log(`Hit from ${playerName} ignored - round already complete`);
+    return;
+  }
   
   // Show winner immediately (ESP32 has already determined winner)
   showWinner(playerName);

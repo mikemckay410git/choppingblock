@@ -177,25 +177,22 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
     if (player2Data.action == 1) {
       // Heartbeat - just update connection status (no need to send to Pi)
     } else if (player2Data.action == 2) {
-      // Hit detected by Player 2 - only process if game is active
+      // Hit detected by Player 2
+      // Convert Player 2's timestamp to our time reference
+      uint32_t adjustedTime = player2Data.hitTime + clockOffset;
+      player2HitTime = adjustedTime;
+      Serial.printf("Player 2 hit detected at %lu (adjusted from %lu) with strength %d\n", 
+                   adjustedTime, player2Data.hitTime, player2Data.hitStrength);
+      
+      // Send hit notification to Pi
+      sendToPi("{\"type\":\"hit\",\"player\":2,\"time\":" + String(adjustedTime) + ",\"strength\":" + String(player2Data.hitStrength) + "}");
+      
+      // Declare winner immediately if round active
       if (gameActive) {
-        // Convert Player 2's timestamp to our time reference
-        uint32_t adjustedTime = player2Data.hitTime + clockOffset;
-        player2HitTime = adjustedTime;
-        Serial.printf("Player 2 hit detected at %lu (adjusted from %lu) with strength %d\n", 
-                     adjustedTime, player2Data.hitTime, player2Data.hitStrength);
-        
-        // Send hit notification to Pi
-        sendToPi("{\"type\":\"hit\",\"player\":2,\"time\":" + String(adjustedTime) + ",\"strength\":" + String(player2Data.hitStrength) + "}");
-        
-        // Declare winner immediately
         winner = "Player 2";
         gameActive = false;
         sendToPi("{\"type\":\"winner\",\"winner\":\"Player 2\"}");
         // Debug: Serial.println("Winner declared: Player 2");
-      } else {
-        // Game not active - ignore hit (scoring phase)
-        // Debug: Serial.println("Player 2 hit ignored - game not active");
       }
     } else if (player2Data.action == 3) {
       // Reset request from Player 2
@@ -239,25 +236,22 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
     if (player2Data.action == 1) {
       // Heartbeat - just update connection status (no need to send to Pi)
     } else if (player2Data.action == 2) {
-      // Hit detected by Player 3 - only process if game is active
+      // Hit detected by Player 3
+      // Convert Player 3's timestamp to our time reference
+      uint32_t adjustedTime = player2Data.hitTime + player3ClockOffset;
+      player3HitTime = adjustedTime;
+      Serial.printf("Player 3 hit detected at %lu (adjusted from %lu) with strength %d\n", 
+                   adjustedTime, player2Data.hitTime, player2Data.hitStrength);
+      
+      // Send hit notification to Pi
+      sendToPi("{\"type\":\"hit\",\"player\":3,\"time\":" + String(adjustedTime) + ",\"strength\":" + String(player2Data.hitStrength) + "}");
+      
+      // Declare winner immediately if round active
       if (gameActive) {
-        // Convert Player 3's timestamp to our time reference
-        uint32_t adjustedTime = player2Data.hitTime + player3ClockOffset;
-        player3HitTime = adjustedTime;
-        Serial.printf("Player 3 hit detected at %lu (adjusted from %lu) with strength %d\n", 
-                     adjustedTime, player2Data.hitTime, player2Data.hitStrength);
-        
-        // Send hit notification to Pi
-        sendToPi("{\"type\":\"hit\",\"player\":3,\"time\":" + String(adjustedTime) + ",\"strength\":" + String(player2Data.hitStrength) + "}");
-        
-        // Declare winner immediately
         winner = "Player 3";
         gameActive = false;
         sendToPi("{\"type\":\"winner\",\"winner\":\"Player 3\"}");
         // Debug: Serial.println("Winner declared: Player 3");
-      } else {
-        // Game not active - ignore hit (scoring phase)
-        // Debug: Serial.println("Player 3 hit ignored - game not active");
       }
     } else if (player2Data.action == 3) {
       // Reset request from Player 3
