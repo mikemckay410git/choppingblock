@@ -42,22 +42,23 @@ socket.on('esp32_data', (data) => {
   if (data.type === 'hit') {
     console.log(`Player ${data.player} hit detected! Time: ${data.time}, Strength: ${data.strength}`);
     handlePlayerHit(data.player);
+    // Auto-award on hit (debounced), some firmwares don't emit winner immediately
+    const nowMs = Date.now();
+    if (lastAwardPlayer !== data.player || (nowMs - lastAwardAtMs) > 250) {
+      console.log('Auto-award on hit -> lightboard');
+      sendToESP32({ action: 'awardPoint', player: data.player, multiplier: damageMultiplierValue || 1 });
+      lastAwardPlayer = data.player;
+      lastAwardAtMs = nowMs;
+    }
   } else if (data.type === 'winner') {
     console.log(`Winner declared: ${data.winner}`);
     showWinner(data.winner);
-    // Also increment local score and award to lightboard
+    // Immediately reflect on lightboard by awarding a point
     const p = (typeof data.winner === 'string') ? (data.winner.includes('2') ? 2 : data.winner.includes('3') ? 3 : null) : null;
-    const nowMs = Date.now();
     if (p === 2 || p === 3) {
-      // Debounce duplicate awards within 250ms
+      const nowMs = Date.now();
       if (lastAwardPlayer !== p || (nowMs - lastAwardAtMs) > 250) {
-        if (p === 2) {
-          player2Score += (damageMultiplierValue || 1);
-          player2ScoreEl.textContent = player2Score;
-        } else {
-          player3Score += (damageMultiplierValue || 1);
-          player3ScoreEl.textContent = player3Score;
-        }
+        console.log('Award on winner -> lightboard');
         sendToESP32({ action: 'awardPoint', player: p, multiplier: damageMultiplierValue || 1 });
         lastAwardPlayer = p;
         lastAwardAtMs = nowMs;
@@ -616,21 +617,11 @@ function handlePlayerHit(playerNumber) {
   
   // Show winner immediately (ESP32 has already determined winner)
   showWinner(playerName);
-
-  // Award point to lightboard immediately on hit (debounced)
-  const nowMs = Date.now();
-  if (lastAwardPlayer !== playerNumber || (nowMs - lastAwardAtMs) > 250) {
-    if (playerNumber === 2) {
-      player2Score += (damageMultiplierValue || 1);
-      player2ScoreEl.textContent = player2Score;
-    } else if (playerNumber === 3) {
-      player3Score += (damageMultiplierValue || 1);
-      player3ScoreEl.textContent = player3Score;
-    }
-    sendToESP32({ action: 'awardPoint', player: playerNumber, multiplier: damageMultiplierValue || 1 });
-    lastAwardPlayer = playerNumber;
-    lastAwardAtMs = nowMs;
-  }
+  
+  // Send reset command to ESP32 to reactivate game for next hit
+  setTimeout(() => {
+    sendToESP32({ action: 'reset', quizNav: true });
+  }, 100);
 }
 
 // Add scorable state to player tiles
