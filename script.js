@@ -666,6 +666,10 @@ function showWinner(player) {
     player3Tile.classList.add('winner');
   }
   
+  // Automatically reveal answer when winner tile is shown
+  aEl.classList.add('show');
+  btnToggle.textContent = 'Hide Answer';
+  
   // Enable scoring immediately
   addScorableState();
 }
@@ -674,6 +678,10 @@ function hideWinner() {
   player2Tile.classList.remove('winner');
   player3Tile.classList.remove('winner');
   removeScorableState();
+  
+  // Hide answer when winner tile is hidden
+  aEl.classList.remove('show');
+  btnToggle.textContent = 'Show Answer';
 }
 
 // === EVENT LISTENERS ===
