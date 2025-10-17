@@ -186,10 +186,11 @@ io.on("connection", (socket) => {
 esp32Bridge.startSerialCommunication();
 
 const PORT = 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
   console.log('ESP32 Bridge server started!');
   console.log('Web interface: http://localhost:3000');
+  console.log('Network access: http://[PI_IP]:3000');
   console.log('Socket.IO server: ws://localhost:3000');
   console.log('ESP32 connection is optional - server will run with or without ESP32');
   console.log('Press Ctrl+C to stop');

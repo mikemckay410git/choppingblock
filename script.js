@@ -1,5 +1,6 @@
 // Socket.IO client for ESP32 communication
-const socket = io('http://localhost:3000');
+// Automatically connect to the same host as the current page
+const socket = io();
 
 // Connection status indicator
 const connDot = document.getElementById('connDot');
@@ -36,7 +37,15 @@ socket.on('esp32_status', (status) => {
 
 socket.on('esp32_data', (data) => {
   console.log('Received from ESP32:', data);
-  // Handle ESP32 data here if needed
+  
+  // Handle different types of ESP32 messages
+  if (data.type === 'hit') {
+    console.log(`Player ${data.player} hit detected! Time: ${data.time}, Strength: ${data.strength}`);
+    handlePlayerHit(data.player);
+  } else if (data.type === 'winner') {
+    console.log(`Winner declared: ${data.winner}`);
+    showWinner(data.winner);
+  }
 });
 
 socket.on('esp32_status_message', (data) => {
@@ -555,6 +564,15 @@ function awardPoint(player) {
   setTimeout(() => {
     next();
   }, 120);
+}
+
+// Handle player hits from ESP32
+function handlePlayerHit(playerNumber) {
+  const playerName = playerNumber === 2 ? 'Player 2' : 'Player 3';
+  console.log(`ESP32 detected hit from ${playerName}`);
+  
+  // Show winner immediately (ESP32 has already determined winner)
+  showWinner(playerName);
 }
 
 // Add scorable state to player tiles
