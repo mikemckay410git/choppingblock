@@ -578,14 +578,14 @@ confirmLightboard.addEventListener('click', () => {
 function awardPoint(player) {
   if (!roundComplete) return;
   
-  // Update score based on damage multiplier
+  // Award single point to player (damage multiplier only affects lightboard)
   if (player === 'Player 2') {
-    player2Score += damageMultiplierValue;
+    player2Score += 1;
     player2ScoreEl.textContent = player2Score;
     // Send message to ESP32 to award points to Player 2
     sendToESP32({ action: 'awardPoint', player: 2, multiplier: damageMultiplierValue });
   } else if (player === 'Player 3') {
-    player3Score += damageMultiplierValue;
+    player3Score += 1;
     player3ScoreEl.textContent = player3Score;
     // Send message to ESP32 to award points to Player 3
     sendToESP32({ action: 'awardPoint', player: 3, multiplier: damageMultiplierValue });
