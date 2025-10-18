@@ -785,12 +785,10 @@ function hideWinner() {
 // === EVENT LISTENERS ===
 btnNext.addEventListener('click', () => {
   next();
-  sendToESP32({ action: 'reset', quizNav: true });
 });
 
 btnPrev.addEventListener('click', () => {
   prev();
-  sendToESP32({ action: 'reset', quizNav: true });
 });
 
 btnToggle.addEventListener('click', toggleAnswer);
@@ -974,12 +972,10 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowRight') { 
     e.preventDefault(); 
     next(); 
-    sendToESP32({ action: 'reset', quizNav: true });
   }
   else if (e.key === 'ArrowLeft') { 
     e.preventDefault(); 
     prev(); 
-    sendToESP32({ action: 'reset', quizNav: true });
   }
   else if (e.key === ' ' || e.code === 'Space') { 
     e.preventDefault(); 
