@@ -4,6 +4,8 @@ import { Server } from "socket.io";
 import cors from "cors";
 import { SerialPort } from "serialport";
 import { ReadlineParser } from "@serialport/parser-readline";
+import fs from "fs";
+import path from "path";
 
 const app = express();
 const server = http.createServer(app);
@@ -207,6 +209,28 @@ const esp32Bridge = new ESP32Bridge('/dev/ttyUSB0', 115200);
 // Example endpoint
 app.get("/api", (req, res) => {
   res.json({ message: "Quizboard backend running" });
+});
+
+// Quiz files listing endpoint
+app.get("/api/quiz-files", (req, res) => {
+  try {
+    const quizesDir = path.join(process.cwd(), 'Quizes');
+    
+    // Check if Quizes directory exists
+    if (!fs.existsSync(quizesDir)) {
+      return res.json([]);
+    }
+    
+    // Read directory and filter for CSV files
+    const files = fs.readdirSync(quizesDir)
+      .filter(file => file.toLowerCase().endsWith('.csv'))
+      .sort(); // Sort alphabetically
+    
+    res.json(files);
+  } catch (error) {
+    console.error('Error reading quiz files:', error);
+    res.status(500).json({ error: 'Failed to read quiz files' });
+  }
 });
 
 // Health check endpoint

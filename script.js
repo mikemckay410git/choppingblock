@@ -1092,29 +1092,31 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
+// Function to dynamically get list of CSV files from Quizes folder
+async function getQuizFiles() {
+  try {
+    // Get directory listing from the server
+    const response = await fetch('/api/quiz-files');
+    if (response.ok) {
+      const files = await response.json();
+      console.log(`Found ${files.length} quiz files:`, files);
+      return files.map(file => `Quizes/${file}`);
+    } else {
+      console.warn('Failed to get quiz files from server:', response.status);
+      return [];
+    }
+  } catch (error) {
+    console.error('Error getting quiz files:', error);
+    // Return empty array if detection fails
+    return [];
+  }
+}
+
 // Preload all CSV files from Quizes folder
 async function loadAllQuizzes() {
   try {
-    // List of CSV files in the Quizes folder
-    const quizFiles = [
-      'Quizes/Animals.csv',
-      'Quizes/Barbie LITDH.csv',
-      'Quizes/Bluey.csv', 
-      'Quizes/Cats & Dogs.csv',
-      'Quizes/Colours.csv',
-      'Quizes/Disney.csv',
-      'Quizes/Easy Maths.csv',
-      'Quizes/General.csv',
-      'Quizes/GenZ.csv',
-      'Quizes/Harry Potter.csv',
-      'Quizes/KPOP Demon Hunters.csv',
-      'Quizes/Millennial.csv',
-      'Quizes/Minecraft.csv',
-      'Quizes/New Zealand.csv',
-      'Quizes/NZ Roadcode.csv',
-      'Quizes/Scouts.csv',
-      'Quizes/Zootopia.csv'
-    ];
+    // Dynamically get list of CSV files from the Quizes folder
+    const quizFiles = await getQuizFiles();
     
     availableCategories = [];
     fileList.innerHTML = '';
