@@ -1098,6 +1098,7 @@ async function loadAllQuizzes() {
     // List of CSV files in the Quizes folder
     const quizFiles = [
       'Quizes/Animals.csv',
+      'Quizes/Barbie LITDH.csv',
       'Quizes/Bluey.csv', 
       'Quizes/Cats & Dogs.csv',
       'Quizes/Colours.csv',
