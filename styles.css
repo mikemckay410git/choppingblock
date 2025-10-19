@@ -460,13 +460,7 @@ button:active {
 }
 
 .file-list li {
-    background: rgba(255,255,255,.03);
-    border: 1px solid rgba(255,255,255,.06);
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 11px;
-    color: var(--muted);
-    opacity: 0.8;
+    display: none;
 }
 
 .file-list .success {
