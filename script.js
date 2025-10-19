@@ -544,7 +544,7 @@ function playMusic() {
   
   const currentQuestion = QA[order[idx]];
   if (!currentQuestion.audioFile) {
-    musicStatus.textContent = 'No audio file for this question';
+    musicStatus.textContent = '';
     return;
   }
   
@@ -557,7 +557,7 @@ function playMusic() {
   );
   
   if (!currentCategoryData || currentCategoryData.type !== 'music') {
-    musicStatus.textContent = 'Music quiz data not found';
+    musicStatus.textContent = '';
     return;
   }
   
@@ -572,41 +572,43 @@ function playMusic() {
   currentAudio = new Audio(audioPath);
   
   currentAudio.addEventListener('loadstart', () => {
-    musicStatus.textContent = 'Loading...';
+    musicStatus.textContent = '';
     playMusicBtn.textContent = '⏳ Loading...';
     playMusicBtn.disabled = true;
   });
   
   currentAudio.addEventListener('canplay', () => {
-    musicStatus.textContent = 'Ready to play';
-    playMusicBtn.textContent = '🎵 Play Song';
-    playMusicBtn.disabled = false;
+    if (!isMusicPlaying) {
+      musicStatus.textContent = '';
+      playMusicBtn.textContent = '🎵 Play Song';
+      playMusicBtn.disabled = false;
+    }
   });
   
   currentAudio.addEventListener('play', () => {
     isMusicPlaying = true;
     playMusicBtn.textContent = '⏸️ Stop Song';
     playMusicBtn.classList.add('playing');
-    musicStatus.textContent = 'Playing...';
+    musicStatus.textContent = '';
   });
   
   currentAudio.addEventListener('pause', () => {
     isMusicPlaying = false;
     playMusicBtn.textContent = '🎵 Play Song';
     playMusicBtn.classList.remove('playing');
-    musicStatus.textContent = 'Paused';
+    musicStatus.textContent = '';
   });
   
   currentAudio.addEventListener('ended', () => {
     isMusicPlaying = false;
     playMusicBtn.textContent = '🎵 Play Song';
     playMusicBtn.classList.remove('playing');
-    musicStatus.textContent = 'Finished';
+    musicStatus.textContent = '';
   });
   
   currentAudio.addEventListener('error', (e) => {
     console.error('Audio error:', e);
-    musicStatus.textContent = 'Error loading audio';
+    musicStatus.textContent = '';
     playMusicBtn.textContent = '🎵 Play Song';
     playMusicBtn.disabled = false;
     playMusicBtn.classList.remove('playing');
@@ -615,7 +617,7 @@ function playMusic() {
   // Start playing
   currentAudio.play().catch(error => {
     console.error('Error playing audio:', error);
-    musicStatus.textContent = 'Error playing audio';
+    musicStatus.textContent = '';
     playMusicBtn.textContent = '🎵 Play Song';
     playMusicBtn.disabled = false;
   });
@@ -634,7 +636,7 @@ function stopMusic() {
     playMusicBtn.disabled = false;
   }
   if (musicStatus) {
-    musicStatus.textContent = 'Ready to play';
+    musicStatus.textContent = '';
   }
 }
 
