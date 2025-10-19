@@ -41,6 +41,19 @@ socket.on('esp32_data', (data) => {
   // Handle different types of ESP32 messages
   if (data.type === 'hit') {
     console.log(`Player ${data.player} hit detected! Time: ${data.time}, Strength: ${data.strength}`);
+    
+    // Deduplication: check if this is a duplicate hit
+    if (data.time && data.time === lastProcessedHitTime && data.player === lastProcessedHitPlayer) {
+      console.log(`Duplicate hit from Player ${data.player} ignored (time: ${data.time})`);
+      return;
+    }
+    
+    // Update deduplication tracking
+    if (data.time) {
+      lastProcessedHitTime = data.time;
+      lastProcessedHitPlayer = data.player;
+    }
+    
     // Map backend player numbers to frontend player numbers
     const frontendPlayer = data.player === 2 ? 1 : 2; // Backend Player 2->Frontend Player 1, Backend Player 3->Frontend Player 2
     handlePlayerHit(frontendPlayer);
@@ -206,6 +219,10 @@ let damageMultiplierValue = 3; // Default to triple damage
 // Debounce awarding to avoid duplicate points on multiple hit logs
 let lastAwardAtMs = 0;
 let lastAwardPlayer = null;
+
+// Hit deduplication to prevent processing duplicate hit messages
+let lastProcessedHitTime = 0;
+let lastProcessedHitPlayer = null;
 
 // Player names with persistence
 let player1NameText = 'Player 1';
@@ -885,6 +902,12 @@ function handlePlayerHit(playerNumber) {
   const playerName = playerNumber === 1 ? 'Player 1' : 'Player 2';
   console.log(`ESP32 detected hit from ${playerName}`);
   
+  // Check if quiz is actually in play
+  if (!currentCategory || QA.length === 0 || quizDisplay.classList.contains('hidden')) {
+    console.log(`Hit from ${playerName} ignored - quiz not in play`);
+    return;
+  }
+  
   // Check if a round is already complete (winner already declared)
   if (roundComplete) {
     console.log(`Hit from ${playerName} ignored - round already complete`);
@@ -945,6 +968,10 @@ function hideWinner() {
   player1Tile.classList.remove('winner');
   player2Tile.classList.remove('winner');
   removeScorableState();
+  
+  // Reset hit deduplication tracking for new round
+  lastProcessedHitTime = 0;
+  lastProcessedHitPlayer = null;
   
   // Hide answer when winner tile is hidden
   aEl.classList.remove('show');
