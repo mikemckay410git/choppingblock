@@ -374,10 +374,11 @@ function createCategoryButtons(categories) {
 
   // Add individual category buttons
   buttonsHTML += categories.map(category => {
-    const musicEmoji = category.type === 'music' ? '🎵 ' : '';
+    const musicEmoji = category.type === 'music' ? '<div class="category-music-icon">🎵</div>' : '';
     return `
       <div class="category-btn" data-filename="${category.filename}">
-        <div style="font-size: 18px; margin-bottom: 4px;">${musicEmoji}${category.name}</div>
+        ${musicEmoji}
+        <div style="font-size: 18px; margin-bottom: 4px;">${category.name}</div>
         <div style="font-size: 12px; color: var(--muted);">${category.questions.length} questions</div>
       </div>
     `;

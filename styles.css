@@ -510,6 +510,7 @@ button:active {
     cursor: pointer;
     transition: all 0.2s ease;
     font-weight: 600;
+    position: relative;
 }
 
 .category-btn:hover {
@@ -521,6 +522,14 @@ button:active {
 .category-btn.selected {
     background: linear-gradient(180deg, rgba(155,225,255,.25), rgba(155,225,255,.15));
     border-color: var(--accent2);
+}
+
+.category-music-icon {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 16px;
+    opacity: 0.8;
 }
 
 /* Game Status in Quiz Mode */
