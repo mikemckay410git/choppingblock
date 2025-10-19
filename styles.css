@@ -575,10 +575,6 @@ button:active {
     transition: color 0.2s ease;
 }
 
-.player-tile.winner .player-name {
-    cursor: inherit;
-}
-
 .player-name:hover {
     /* No hover effects */
 }
