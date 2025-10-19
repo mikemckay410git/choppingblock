@@ -260,7 +260,16 @@ function handleFileSelect(event) {
           const questions = csvData.map(row => {
             const question = row.Question || row.question || row.Q || row.q || Object.values(row)[0];
             const answer = row.Answer || row.answer || row.A || row.a || Object.values(row)[1];
-            return { q: question, a: answer };
+            const audioFile = row.Audio || row.audio || row.AudioFile || row.audioFile || Object.values(row)[2];
+            
+            const questionObj = { q: question, a: answer };
+            
+            // Add audio file reference if it exists
+            if (audioFile) {
+              questionObj.audioFile = audioFile;
+            }
+            
+            return questionObj;
           }).filter(qa => qa.q && qa.a);
           
           if (questions.length > 0) {
@@ -412,13 +421,10 @@ function loadCategory(filename) {
   currentQuizType = category.type || 'regular';
   quizTitle.textContent = currentCategory;
   
-  // Show/hide music controls based on quiz type
-  if (currentQuizType === 'music') {
-    musicControls.classList.remove('hidden');
-  } else {
-    musicControls.classList.add('hidden');
-    stopMusic(); // Stop any playing music when switching to regular quiz
-  }
+  // Music controls visibility will be handled per-question in render()
+  // Initially hide them, they'll be shown if the first question has audio
+  musicControls.classList.add('hidden');
+  stopMusic();
   
   showQuizDisplay();
   setOrder(true);
@@ -451,13 +457,10 @@ function loadCombinedCategories(categories) {
   currentQuizType = hasMusicQuiz ? 'music' : 'regular';
   quizTitle.textContent = currentCategory;
   
-  // Show/hide music controls based on whether any category is music
-  if (currentQuizType === 'music') {
-    musicControls.classList.remove('hidden');
-  } else {
-    musicControls.classList.add('hidden');
-    stopMusic(); // Stop any playing music when switching to regular quiz
-  }
+  // Music controls visibility will be handled per-question in render()
+  // Initially hide them, they'll be shown if the first question has audio
+  musicControls.classList.add('hidden');
+  stopMusic();
   
   showQuizDisplay();
   setOrder(true);
@@ -498,6 +501,14 @@ function render(hideAnswer = true) {
     categoryBadge.classList.remove('hidden');
   } else {
     categoryBadge.classList.add('hidden');
+  }
+  
+  // Show/hide music controls based on whether current question has audio file
+  if (qa.audioFile) {
+    musicControls.classList.remove('hidden');
+  } else {
+    musicControls.classList.add('hidden');
+    stopMusic(); // Stop any playing music when switching to non-music question
   }
   
   if (hideAnswer) {
@@ -544,7 +555,7 @@ function toggleAnswer() {
 
 // === MUSIC QUIZ FUNCTIONS ===
 function playMusic() {
-  if (currentQuizType !== 'music' || QA.length === 0) return;
+  if (QA.length === 0) return;
   
   const currentQuestion = QA[order[idx]];
   if (!currentQuestion.audioFile) {
@@ -560,7 +571,7 @@ function playMusic() {
     cat.questions === QA || cat.name === currentCategory
   );
   
-  if (!currentCategoryData || currentCategoryData.type !== 'music') {
+  if (!currentCategoryData) {
     musicStatus.textContent = '';
     return;
   }
@@ -1323,8 +1334,8 @@ async function loadAllQuizzes() {
           
           const questionObj = { q: question, a: answer };
           
-          // Add audio file reference for music quizzes
-          if (quizItem.type === 'music' && audioFile) {
+          // Add audio file reference if it exists (regardless of category type)
+          if (audioFile) {
             questionObj.audioFile = audioFile;
           }
           
