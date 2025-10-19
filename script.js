@@ -1138,6 +1138,11 @@ function startEditingName(nameElement, defaultName) {
 
 // Keyboard shortcuts
 window.addEventListener('keydown', (e) => {
+  // Don't process shortcuts if user is editing a name
+  if (isEditingName) {
+    return;
+  }
+  
   if (e.key === 'ArrowRight') { 
     e.preventDefault(); 
     next(); 
