@@ -118,24 +118,6 @@ class ESP32Bridge {
       // Handle non-JSON messages (like debug output)
       console.log('Non-JSON message from ESP32:', message);
 
-      // Parse common hit/winner lines and emit structured events
-      // Examples:
-      // "Player 2 hit detected at 1913756204 (adjusted from 2166662304) with strength 2"
-      // "Winner declared: Player 2"
-      const hitMatch = message.match(/^Player\s+(2|3)\s+hit detected.*strength\s+(\d+)/i);
-      if (hitMatch) {
-        const playerNum = parseInt(hitMatch[1], 10);
-        const strength = parseInt(hitMatch[2], 10);
-        this.io.emit('esp32_data', { type: 'hit', player: playerNum, strength });
-        // Note: ESP32 already handles awarding points, no need to duplicate here
-      }
-
-      const winnerMatch = message.match(/^Winner declared:\s*(Player\s*[23]|Tie)/i);
-      if (winnerMatch) {
-        const winner = winnerMatch[1].replace(/\s+/, ' ');
-        this.io.emit('esp32_data', { type: 'winner', winner });
-      }
-      
       // Forward important status messages to frontend
       if (message.includes('heartbeat') || 
           message.includes('Clock sync') || 
