@@ -551,8 +551,25 @@ function playMusic() {
   // Stop any currently playing music
   stopMusic();
   
+  // Find the current category to get the folder path
+  const currentCategoryData = availableCategories.find(cat => 
+    cat.questions === QA || cat.name === currentCategory
+  );
+  
+  if (!currentCategoryData || currentCategoryData.type !== 'music') {
+    musicStatus.textContent = 'Music quiz data not found';
+    return;
+  }
+  
+  // Construct the full path to the audio file
+  // The audio file should be in the same folder as the CSV
+  const categoryFolder = currentCategoryData.filename.replace('.csv', '');
+  const audioPath = `Quizes/${categoryFolder}/${currentQuestion.audioFile}`;
+  
+  console.log('Loading audio file:', audioPath);
+  
   // Create new audio element
-  currentAudio = new Audio(currentQuestion.audioFile);
+  currentAudio = new Audio(audioPath);
   
   currentAudio.addEventListener('loadstart', () => {
     musicStatus.textContent = 'Loading...';
