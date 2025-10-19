@@ -578,10 +578,11 @@ function playMusic() {
   });
   
   currentAudio.addEventListener('canplay', () => {
+    musicStatus.textContent = '';
+    playMusicBtn.disabled = false;
+    // Only update button text if not already playing
     if (!isMusicPlaying) {
-      musicStatus.textContent = '';
       playMusicBtn.textContent = '🎵 Play Song';
-      playMusicBtn.disabled = false;
     }
   });
   
@@ -615,7 +616,13 @@ function playMusic() {
   });
   
   // Start playing
-  currentAudio.play().catch(error => {
+  currentAudio.play().then(() => {
+    // Audio started playing successfully
+    isMusicPlaying = true;
+    playMusicBtn.textContent = '⏸️ Stop Song';
+    playMusicBtn.classList.add('playing');
+    musicStatus.textContent = '';
+  }).catch(error => {
     console.error('Error playing audio:', error);
     musicStatus.textContent = '';
     playMusicBtn.textContent = '🎵 Play Song';
@@ -943,7 +950,9 @@ btnExit.addEventListener('click', showExitConfirmation);
 card.addEventListener('click', toggleAnswer);
 
 // Music quiz event listener
-playMusicBtn.addEventListener('click', () => {
+playMusicBtn.addEventListener('click', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
   if (isMusicPlaying) {
     stopMusic();
   } else {
