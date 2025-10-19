@@ -138,6 +138,11 @@ let availableCategories = [];
 let player1Score = 0;
 let player2Score = 0;
 
+// Music quiz state
+let currentQuizType = 'regular'; // 'regular' or 'music'
+let currentAudio = null;
+let isMusicPlaying = false;
+
 // DOM Elements
 const fileInput = document.getElementById('csvFile');
 const fileInputSection = document.getElementById('fileInputSection');
@@ -160,6 +165,11 @@ const btnExit = document.getElementById('exitBtn');
 const card = document.getElementById('card');
 const player1ScoreEl = document.getElementById('player1Score');
 const player2ScoreEl = document.getElementById('player2Score');
+
+// Music quiz elements
+const musicControls = document.getElementById('musicControls');
+const playMusicBtn = document.getElementById('playMusicBtn');
+const musicStatus = document.getElementById('musicStatus');
 
 // Reset button
 const resetAllData = document.getElementById('resetAllData');
@@ -395,7 +405,16 @@ function loadCategory(filename) {
 
   QA = category.questions;
   currentCategory = category.name;
+  currentQuizType = category.type || 'regular';
   quizTitle.textContent = currentCategory;
+  
+  // Show/hide music controls based on quiz type
+  if (currentQuizType === 'music') {
+    musicControls.classList.remove('hidden');
+  } else {
+    musicControls.classList.add('hidden');
+    stopMusic(); // Stop any playing music when switching to regular quiz
+  }
   
   showQuizDisplay();
   setOrder(true);
@@ -407,6 +426,7 @@ function loadCombinedCategories(categories) {
   // Combine all questions from all categories
   QA = [];
   const categoryNames = [];
+  let hasMusicQuiz = false;
   
   categories.forEach(category => {
     // Add category information to each question
@@ -416,10 +436,24 @@ function loadCombinedCategories(categories) {
     }));
     QA = QA.concat(questionsWithCategory);
     categoryNames.push(category.name);
+    
+    // Check if any category is a music quiz
+    if (category.type === 'music') {
+      hasMusicQuiz = true;
+    }
   });
 
   currentCategory = `Mixed: ${categoryNames.join(', ')}`;
+  currentQuizType = hasMusicQuiz ? 'music' : 'regular';
   quizTitle.textContent = currentCategory;
+  
+  // Show/hide music controls based on whether any category is music
+  if (currentQuizType === 'music') {
+    musicControls.classList.remove('hidden');
+  } else {
+    musicControls.classList.add('hidden');
+    stopMusic(); // Stop any playing music when switching to regular quiz
+  }
   
   showQuizDisplay();
   setOrder(true);
@@ -480,6 +514,8 @@ function next() {
   // Reset game state when navigating to new question
   hideWinner();
   removeScorableState();
+  // Stop music when navigating to new question
+  stopMusic();
 }
 
 function prev() {
@@ -493,11 +529,96 @@ function prev() {
   // Reset game state when navigating to new question
   hideWinner();
   removeScorableState();
+  // Stop music when navigating to new question
+  stopMusic();
 }
 
 function toggleAnswer() {
   aEl.classList.toggle('show');
   btnToggle.textContent = aEl.classList.contains('show') ? 'Hide Answer' : 'Show Answer';
+}
+
+// === MUSIC QUIZ FUNCTIONS ===
+function playMusic() {
+  if (currentQuizType !== 'music' || QA.length === 0) return;
+  
+  const currentQuestion = QA[order[idx]];
+  if (!currentQuestion.audioFile) {
+    musicStatus.textContent = 'No audio file for this question';
+    return;
+  }
+  
+  // Stop any currently playing music
+  stopMusic();
+  
+  // Create new audio element
+  currentAudio = new Audio(currentQuestion.audioFile);
+  
+  currentAudio.addEventListener('loadstart', () => {
+    musicStatus.textContent = 'Loading...';
+    playMusicBtn.textContent = '⏳ Loading...';
+    playMusicBtn.disabled = true;
+  });
+  
+  currentAudio.addEventListener('canplay', () => {
+    musicStatus.textContent = 'Ready to play';
+    playMusicBtn.textContent = '🎵 Play Song';
+    playMusicBtn.disabled = false;
+  });
+  
+  currentAudio.addEventListener('play', () => {
+    isMusicPlaying = true;
+    playMusicBtn.textContent = '⏸️ Stop Song';
+    playMusicBtn.classList.add('playing');
+    musicStatus.textContent = 'Playing...';
+  });
+  
+  currentAudio.addEventListener('pause', () => {
+    isMusicPlaying = false;
+    playMusicBtn.textContent = '🎵 Play Song';
+    playMusicBtn.classList.remove('playing');
+    musicStatus.textContent = 'Paused';
+  });
+  
+  currentAudio.addEventListener('ended', () => {
+    isMusicPlaying = false;
+    playMusicBtn.textContent = '🎵 Play Song';
+    playMusicBtn.classList.remove('playing');
+    musicStatus.textContent = 'Finished';
+  });
+  
+  currentAudio.addEventListener('error', (e) => {
+    console.error('Audio error:', e);
+    musicStatus.textContent = 'Error loading audio';
+    playMusicBtn.textContent = '🎵 Play Song';
+    playMusicBtn.disabled = false;
+    playMusicBtn.classList.remove('playing');
+  });
+  
+  // Start playing
+  currentAudio.play().catch(error => {
+    console.error('Error playing audio:', error);
+    musicStatus.textContent = 'Error playing audio';
+    playMusicBtn.textContent = '🎵 Play Song';
+    playMusicBtn.disabled = false;
+  });
+}
+
+function stopMusic() {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    currentAudio = null;
+  }
+  isMusicPlaying = false;
+  if (playMusicBtn) {
+    playMusicBtn.textContent = '🎵 Play Song';
+    playMusicBtn.classList.remove('playing');
+    playMusicBtn.disabled = false;
+  }
+  if (musicStatus) {
+    musicStatus.textContent = 'Ready to play';
+  }
 }
 
 // === PERSISTENCE FUNCTIONS ===
@@ -607,6 +728,10 @@ confirmReset.addEventListener('click', () => {
   order = [];
   idx = 0;
   roundComplete = false;
+  
+  // Reset music quiz state
+  currentQuizType = 'regular';
+  stopMusic();
   
   // Reset lightboard settings to defaults
   lightboardGameMode = 1;
@@ -768,6 +893,9 @@ function showWinner(player) {
   aEl.classList.add('show');
   btnToggle.textContent = 'Hide Answer';
   
+  // Stop music when answer is revealed (player hit)
+  stopMusic();
+  
   // Enable scoring immediately
   addScorableState();
 }
@@ -794,6 +922,15 @@ btnPrev.addEventListener('click', () => {
 btnToggle.addEventListener('click', toggleAnswer);
 btnExit.addEventListener('click', showExitConfirmation);
 card.addEventListener('click', toggleAnswer);
+
+// Music quiz event listener
+playMusicBtn.addEventListener('click', () => {
+  if (isMusicPlaying) {
+    stopMusic();
+  } else {
+    playMusic();
+  }
+});
 
 // Consolidated scoring event listener
 function handlePlayerClick(player) {
@@ -1010,6 +1147,10 @@ function exitToCategories(keepNames = false, keepScores = false, keepLightboardS
   idx = 0;
   roundComplete = false;
   
+  // Reset music quiz state
+  currentQuizType = 'regular';
+  stopMusic();
+  
   // Handle different exit options
   if (keepNames) {
     // Keep current player names - don't reset them
@@ -1092,15 +1233,15 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
-// Function to dynamically get list of CSV files from Quizes folder
+// Function to dynamically get list of quiz files from Quizes folder
 async function getQuizFiles() {
   try {
     // Get directory listing from the server
     const response = await fetch('/api/quiz-files');
     if (response.ok) {
-      const files = await response.json();
-      console.log(`Found ${files.length} quiz files:`, files);
-      return files.map(file => `Quizes/${file}`);
+      const quizItems = await response.json();
+      console.log(`Found ${quizItems.length} quiz items:`, quizItems);
+      return quizItems;
     } else {
       console.warn('Failed to get quiz files from server:', response.status);
       return [];
@@ -1112,24 +1253,24 @@ async function getQuizFiles() {
   }
 }
 
-// Preload all CSV files from Quizes folder
+// Preload all quiz files from Quizes folder
 async function loadAllQuizzes() {
   try {
-    // Dynamically get list of CSV files from the Quizes folder
-    const quizFiles = await getQuizFiles();
+    // Dynamically get list of quiz items from the Quizes folder
+    const quizItems = await getQuizFiles();
     
     availableCategories = [];
     fileList.innerHTML = '';
     
     let loadedCount = 0;
-    const totalFiles = quizFiles.length;
+    const totalItems = quizItems.length;
     
-    for (const filePath of quizFiles) {
+    for (const quizItem of quizItems) {
       try {
-        const response = await fetch(filePath);
+        const response = await fetch(quizItem.path);
         if (!response.ok) {
-          console.warn(`Failed to load ${filePath}: ${response.status}`);
-          addFileToList(filePath.split('/').pop(), 'Not found', 'error');
+          console.warn(`Failed to load ${quizItem.path}: ${response.status}`);
+          addFileToList(quizItem.name, 'Not found', 'error');
           loadedCount++;
           continue;
         }
@@ -1141,26 +1282,43 @@ async function loadAllQuizzes() {
         const questions = csvData.map(row => {
           const question = row.Question || row.question || row.Q || row.q || Object.values(row)[0];
           const answer = row.Answer || row.answer || row.A || row.a || Object.values(row)[1];
-          return { q: question, a: answer };
+          const audioFile = row.Audio || row.audio || row.AudioFile || row.audioFile || Object.values(row)[2];
+          
+          const questionObj = { q: question, a: answer };
+          
+          // Add audio file reference for music quizzes
+          if (quizItem.type === 'music' && audioFile) {
+            questionObj.audioFile = audioFile;
+          }
+          
+          return questionObj;
         }).filter(qa => qa.q && qa.a);
         
         if (questions.length > 0) {
-          const filename = filePath.split('/').pop();
-          const categoryName = filename.replace('.csv', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          availableCategories.push({
-            filename: filename,
+          const categoryName = quizItem.name.replace('.csv', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          const categoryData = {
+            filename: quizItem.name,
             name: categoryName,
-            questions: questions
-          });
+            questions: questions,
+            type: quizItem.type
+          };
+          
+          // Add audio files for music quizzes
+          if (quizItem.type === 'music' && quizItem.audioFiles) {
+            categoryData.audioFiles = quizItem.audioFiles;
+          }
+          
+          availableCategories.push(categoryData);
           
           // Add success message to file list
-          addFileToList(filename, `${questions.length} questions`, 'success');
+          const typeIndicator = quizItem.type === 'music' ? '🎵 ' : '';
+          addFileToList(quizItem.name, `${typeIndicator}${questions.length} questions`, 'success');
         } else {
-          addFileToList(filePath.split('/').pop(), 'No questions', 'error');
+          addFileToList(quizItem.name, 'No questions', 'error');
         }
       } catch (error) {
-        console.error(`Error loading ${filePath}:`, error);
-        addFileToList(filePath.split('/').pop(), 'Error', 'error');
+        console.error(`Error loading ${quizItem.path}:`, error);
+        addFileToList(quizItem.name, 'Error', 'error');
       }
       
       loadedCount++;

@@ -221,12 +221,52 @@ app.get("/api/quiz-files", (req, res) => {
       return res.json([]);
     }
     
-    // Read directory and filter for CSV files
-    const files = fs.readdirSync(quizesDir)
-      .filter(file => file.toLowerCase().endsWith('.csv'))
-      .sort(); // Sort alphabetically
+    const quizItems = [];
     
-    res.json(files);
+    // Read directory contents
+    const items = fs.readdirSync(quizesDir, { withFileTypes: true });
+    
+    for (const item of items) {
+      if (item.isFile() && item.name.toLowerCase().endsWith('.csv')) {
+        // Regular CSV quiz file
+        quizItems.push({
+          type: 'regular',
+          name: item.name,
+          path: `Quizes/${item.name}`
+        });
+      } else if (item.isDirectory()) {
+        // Check if it's a music quiz folder
+        const folderPath = path.join(quizesDir, item.name);
+        const csvFile = path.join(folderPath, `${item.name}.csv`);
+        
+        if (fs.existsSync(csvFile)) {
+          // Check if folder contains audio files
+          const audioFiles = fs.readdirSync(folderPath)
+            .filter(file => file.toLowerCase().endsWith('.mp3') || file.toLowerCase().endsWith('.wav'));
+          
+          if (audioFiles.length > 0) {
+            quizItems.push({
+              type: 'music',
+              name: item.name,
+              path: `Quizes/${item.name}/${item.name}.csv`,
+              audioFiles: audioFiles.map(file => `Quizes/${item.name}/${file}`)
+            });
+          } else {
+            // Folder with CSV but no audio files - treat as regular quiz
+            quizItems.push({
+              type: 'regular',
+              name: `${item.name}.csv`,
+              path: `Quizes/${item.name}/${item.name}.csv`
+            });
+          }
+        }
+      }
+    }
+    
+    // Sort alphabetically by name
+    quizItems.sort((a, b) => a.name.localeCompare(b.name));
+    
+    res.json(quizItems);
   } catch (error) {
     console.error('Error reading quiz files:', error);
     res.status(500).json({ error: 'Failed to read quiz files' });

@@ -163,6 +163,50 @@ h1 {
     z-index: 1;
 }
 
+/* Music Quiz Controls */
+.music-controls {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.music-btn {
+    background: linear-gradient(180deg, rgba(139,92,246,.25), rgba(139,92,246,.15)) !important;
+    border: 1px solid rgba(139,92,246,.3) !important;
+    color: #c4b5fd !important;
+    font-size: 12px !important;
+    padding: 6px 12px !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: auto !important;
+}
+
+.music-btn:hover {
+    background: linear-gradient(180deg, rgba(139,92,246,.35), rgba(139,92,246,.25)) !important;
+    transform: translateY(-1px);
+}
+
+.music-btn.playing {
+    background: linear-gradient(180deg, rgba(16,185,129,.25), rgba(16,185,129,.15)) !important;
+    border-color: rgba(16,185,129,.3) !important;
+    color: #6ee7b7 !important;
+}
+
+.music-status {
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    opacity: 0.8;
+}
+
 .controls { 
     display: grid; 
     grid-template-columns: 1fr 1fr 1fr; 
