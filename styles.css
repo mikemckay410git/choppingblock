@@ -562,6 +562,7 @@ button:active {
     filter: grayscale(0);
     transform: scale(1.05) !important;
     box-shadow: 0 8px 25px rgba(99,102,241,.3);
+    cursor: pointer;
 }
 
 .player-name {
@@ -572,6 +573,10 @@ button:active {
     cursor: pointer;
     user-select: none;
     transition: color 0.2s ease;
+}
+
+.player-tile.winner .player-name {
+    cursor: inherit;
 }
 
 .player-name:hover {
