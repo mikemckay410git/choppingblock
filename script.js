@@ -42,6 +42,12 @@ socket.on('esp32_data', (data) => {
   if (data.type === 'hit') {
     console.log(`Player ${data.player} hit detected! Time: ${data.time}, Strength: ${data.strength}`);
     
+    // Ignore hits without timestamp (duplicate/debug-originating events)
+    if (!data.time) {
+      console.log(`Ignoring hit without timestamp from Player ${data.player}`);
+      return;
+    }
+    
     // Deduplication: check if this is a duplicate hit
     if (data.time && data.time === lastProcessedHitTime && data.player === lastProcessedHitPlayer) {
       console.log(`Duplicate hit from Player ${data.player} ignored (time: ${data.time})`);

@@ -123,6 +123,12 @@ uint8_t lightboardWinner = 0; // 0=none, 2=Player2, 3=Player3
 // Quiz action debouncing
 unsigned long lastQuizActionTime = 0;
 const unsigned long QUIZ_ACTION_DEBOUNCE_MS = 500; // 500ms debounce period
+
+// Hit deduplication to prevent processing duplicate ESP-NOW messages
+uint32_t lastProcessedHitTime = 0;
+uint8_t lastProcessedHitPlayer = 0;
+const unsigned long HIT_DEBOUNCE_MS = 100; // 100ms debounce period
+unsigned long lastHitProcessTime = 0;
 // =======================================================
 
 // ===================== Serial Protocol =====================
@@ -180,6 +186,20 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       // Hit detected by Player 2
       // Convert Player 2's timestamp to our time reference
       uint32_t adjustedTime = player2Data.hitTime + clockOffset;
+      
+      // Deduplication: check if this is a duplicate hit
+      unsigned long now = millis();
+      if (adjustedTime == lastProcessedHitTime && player2Data.playerId == lastProcessedHitPlayer && 
+          (now - lastHitProcessTime) < HIT_DEBOUNCE_MS) {
+        Serial.printf("Duplicate hit from Player 2 ignored (time: %lu)\n", adjustedTime);
+        return;
+      }
+      
+      // Update deduplication tracking
+      lastProcessedHitTime = adjustedTime;
+      lastProcessedHitPlayer = player2Data.playerId;
+      lastHitProcessTime = now;
+      
       player2HitTime = adjustedTime;
       Serial.printf("Player 2 hit detected at %lu (adjusted from %lu) with strength %d\n", 
                    adjustedTime, player2Data.hitTime, player2Data.hitStrength);
@@ -239,6 +259,20 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       // Hit detected by Player 3
       // Convert Player 3's timestamp to our time reference
       uint32_t adjustedTime = player2Data.hitTime + player3ClockOffset;
+      
+      // Deduplication: check if this is a duplicate hit
+      unsigned long now = millis();
+      if (adjustedTime == lastProcessedHitTime && player2Data.playerId == lastProcessedHitPlayer && 
+          (now - lastHitProcessTime) < HIT_DEBOUNCE_MS) {
+        Serial.printf("Duplicate hit from Player 3 ignored (time: %lu)\n", adjustedTime);
+        return;
+      }
+      
+      // Update deduplication tracking
+      lastProcessedHitTime = adjustedTime;
+      lastProcessedHitPlayer = player2Data.playerId;
+      lastHitProcessTime = now;
+      
       player3HitTime = adjustedTime;
       Serial.printf("Player 3 hit detected at %lu (adjusted from %lu) with strength %d\n", 
                    adjustedTime, player2Data.hitTime, player2Data.hitStrength);
@@ -451,6 +485,11 @@ void resetGame() {
   player2HitTime = 0;
   player3HitTime = 0;
   gameActive = true;
+  
+  // Reset hit deduplication tracking
+  lastProcessedHitTime = 0;
+  lastProcessedHitPlayer = 0;
+  lastHitProcessTime = 0;
   
   // Reset lightboard state
   lightboardWinner = 0;
