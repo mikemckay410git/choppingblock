@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lightboard Emulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            background: rgba(255,255,255,0.1);
+            padding: 10px 20px;
+            border-radius: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-connected {
+            background: #4CAF50;
+            box-shadow: 0 0 10px #4CAF50;
+        }
+
+        .status-disconnected {
+            background: #f44336;
+            box-shadow: 0 0 10px #f44336;
+        }
+
+        .lightboard-container {
+            background: rgba(0,0,0,0.3);
+            padding: 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        .lightboard {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 4px;
+            justify-content: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            overflow-x: auto;
+            padding: 10px;
+        }
+
+        .led {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #333;
+            border: 2px solid #555;
+            transition: all 0.3s ease;
+            position: relative;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .led::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            right: 2px;
+            bottom: 2px;
+            border-radius: 50%;
+            background: inherit;
+            filter: brightness(1.2);
+            opacity: 0.7;
+        }
+
+        .led.active {
+            box-shadow: 0 0 20px currentColor, inset 0 2px 4px rgba(0,0,0,0.3);
+            border-color: rgba(255,255,255,0.5);
+        }
+
+        .led.player2 {
+            background: #ff0000;
+            color: #ff0000;
+        }
+
+        .led.player3 {
+            background: #0050ff;
+            color: #0050ff;
+        }
+
+        .led.green {
+            background: #00ff00;
+            color: #00ff00;
+        }
+
+        .led.magenta {
+            background: #ff00ff;
+            color: #ff00ff;
+        }
+
+        .led.orange {
+            background: #ff5000;
+            color: #ff5000;
+        }
+
+        .game-info {
+            margin-top: 20px;
+            text-align: center;
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .game-mode {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        .player-colors {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .player-color {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .color-swatch {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 25px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .celebration {
+            animation: celebration 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes celebration {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+
+        .demo-mode {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,165,0,0.8);
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        @media (max-width: 768px) {
+            .lightboard {
+                gap: 6px;
+            }
+            
+            .led {
+                width: 25px;
+                height: 25px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .status-bar {
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 Lightboard Emulator</h1>
+        <p>Real-time LED strip visualization</p>
+    </div>
+
+    <div class="status-bar">
+        <div class="status-item">
+            <span class="status-indicator status-disconnected" id="serverStatus"></span>
+            Server Connection
+        </div>
+        <div class="status-item">
+            <span class="status-indicator status-disconnected" id="esp32Status"></span>
+            ESP32 Bridge
+        </div>
+        <div class="status-item">
+            <span class="status-indicator status-disconnected" id="lightboardStatus"></span>
+            Physical Lightboard
+        </div>
+    </div>
+
+    <div class="lightboard-container">
+        <div class="lightboard" id="lightboard">
+            <!-- 38 LEDs will be generated by JavaScript -->
+        </div>
+        
+        <div class="game-info">
+            <div class="game-mode" id="gameMode">Mode: Territory</div>
+            <div class="player-colors">
+                <div class="player-color">
+                    <div class="color-swatch player2"></div>
+                    <span>Player 2</span>
+                </div>
+                <div class="player-color">
+                    <div class="color-swatch player3"></div>
+                    <span>Player 3</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" onclick="resetGame()">Reset Game</button>
+            <button class="btn" onclick="testPattern()">Test Pattern</button>
+            <button class="btn" onclick="demoMode()">Demo Mode</button>
+        </div>
+    </div>
+
+    <div class="demo-mode" id="demoModeIndicator" style="display: none;">
+        DEMO MODE
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+        
+        // Game state
+        let gameState = {
+            mode: 1,
+            p2ColorIndex: 0,
+            p3ColorIndex: 1,
+            p2Pos: -1,
+            p3Pos: 38,
+            nextLedPos: 0,
+            tugBoundary: 18,
+            p2RacePos: -1,
+            p3RacePos: -1,
+            celebrating: false,
+            winner: 0,
+            scoringSequence: []
+        };
+
+        // Celebration state
+        let celebrationState = {
+            active: false,
+            type: 0,
+            startTime: 0,
+            duration: 3000,
+            player2Wins: false,
+            winnerColor: { r: 255, g: 0, b: 0 }
+        };
+
+        // Available colors matching the ESP32 code
+        const colors = [
+            { name: 'Red', rgb: [255, 0, 0] },
+            { name: 'Blue', rgb: [0, 80, 255] },
+            { name: 'Green', rgb: [0, 255, 0] },
+            { name: 'Magenta', rgb: [255, 0, 255] },
+            { name: 'Orange', rgb: [255, 80, 0] }
+        ];
+
+        const gameModes = [
+            'Territory',
+            'Swap Sides', 
+            'Split Scoring',
+            'Score Order',
+            'Race',
+            'Tug O War'
+        ];
+
+        // Initialize the lightboard
+        function initLightboard() {
+            const lightboard = document.getElementById('lightboard');
+            lightboard.innerHTML = '';
+            
+            for (let i = 0; i < 38; i++) {
+                const led = document.createElement('div');
+                led.className = 'led';
+                led.id = `led-${i}`;
+                lightboard.appendChild(led);
+            }
+        }
+
+        // Update LED colors based on game state
+        function updateLightboard() {
+            // Don't update during celebrations
+            if (celebrationState.active) return;
+            
+            const leds = document.querySelectorAll('.led');
+            
+            // Clear all LEDs
+            leds.forEach(led => {
+                led.className = 'led';
+                led.style.background = '#333';
+            });
+
+            // Update based on game mode
+            switch (gameState.mode) {
+                case 1: // Territory
+                    updateTerritoryMode(leds);
+                    break;
+                case 2: // Swap Sides
+                    updateSwapSidesMode(leds);
+                    break;
+                case 3: // Split Scoring
+                    updateSplitScoringMode(leds);
+                    break;
+                case 4: // Score Order
+                    updateScoreOrderMode(leds);
+                    break;
+                case 5: // Race
+                    updateRaceMode(leds);
+                    break;
+                case 6: // Tug O War
+                    updateTugOfWarMode(leds);
+                    break;
+            }
+
+            // Update game info display
+            updateGameInfo();
+        }
+
+        function updateTerritoryMode(leds) {
+            // Player 2 fills from left, Player 3 fills from right
+            for (let i = 0; i <= gameState.p2Pos && i < 38; i++) {
+                if (leds[i]) {
+                    leds[i].className = 'led active player2';
+                    leds[i].style.background = `rgb(${colors[gameState.p2ColorIndex].rgb.join(',')})`;
+                }
+            }
+            for (let i = 37; i >= gameState.p3Pos && i >= 0; i--) {
+                if (leds[i]) {
+                    leds[i].className = 'led active player3';
+                    leds[i].style.background = `rgb(${colors[gameState.p3ColorIndex].rgb.join(',')})`;
+                }
+            }
+        }
+
+        function updateSwapSidesMode(leds) {
+            // Individual LED positions
+            if (gameState.p2Pos >= 0 && gameState.p2Pos < 38) {
+                leds[gameState.p2Pos].className = 'led active player2';
+                leds[gameState.p2Pos].style.background = `rgb(${colors[gameState.p2ColorIndex].rgb.join(',')})`;
+            }
+            if (gameState.p3Pos >= 0 && gameState.p3Pos < 38) {
+                leds[gameState.p3Pos].className = 'led active player3';
+                leds[gameState.p3Pos].style.background = `rgb(${colors[gameState.p3ColorIndex].rgb.join(',')})`;
+            }
+        }
+
+        function updateSplitScoringMode(leds) {
+            // Player 2 fills from center-left outward, Player 3 fills from center-right outward
+            const centerLeft = 18;
+            const centerRight = 19;
+            
+            for (let i = centerLeft; i >= gameState.p2Pos && i >= 0; i--) {
+                if (leds[i]) {
+                    leds[i].className = 'led active player2';
+                    leds[i].style.background = `rgb(${colors[gameState.p2ColorIndex].rgb.join(',')})`;
+                }
+            }
+            for (let i = centerRight; i <= gameState.p3Pos && i < 38; i++) {
+                if (leds[i]) {
+                    leds[i].className = 'led active player3';
+                    leds[i].style.background = `rgb(${colors[gameState.p3ColorIndex].rgb.join(',')})`;
+                }
+            }
+        }
+
+        function updateScoreOrderMode(leds) {
+            // Fill LEDs in sequence based on scoring order
+            for (let i = 0; i < gameState.nextLedPos && i < 38; i++) {
+                if (leds[i]) {
+                    const playerClass = gameState.scoringSequence && gameState.scoringSequence[i] === 3 ? 'player3' : 'player2';
+                    const colorIndex = gameState.scoringSequence && gameState.scoringSequence[i] === 3 ? gameState.p3ColorIndex : gameState.p2ColorIndex;
+                    leds[i].className = `led active ${playerClass}`;
+                    leds[i].style.background = `rgb(${colors[colorIndex].rgb.join(',')})`;
+                }
+            }
+        }
+
+        function updateRaceMode(leds) {
+            // Individual race positions
+            if (gameState.p2RacePos >= 0 && gameState.p2RacePos < 38) {
+                leds[gameState.p2RacePos].className = 'led active player2';
+                leds[gameState.p2RacePos].style.background = `rgb(${colors[gameState.p2ColorIndex].rgb.join(',')})`;
+            }
+            if (gameState.p3RacePos >= 0 && gameState.p3RacePos < 38) {
+                leds[gameState.p3RacePos].className = 'led active player3';
+                leds[gameState.p3RacePos].style.background = `rgb(${colors[gameState.p3ColorIndex].rgb.join(',')})`;
+            }
+        }
+
+        function updateTugOfWarMode(leds) {
+            // Tug of war boundary
+            for (let i = 0; i <= gameState.tugBoundary && i < 38; i++) {
+                if (leds[i]) {
+                    leds[i].className = 'led active player2';
+                    leds[i].style.background = `rgb(${colors[gameState.p2ColorIndex].rgb.join(',')})`;
+                }
+            }
+            for (let i = gameState.tugBoundary + 1; i < 38; i++) {
+                if (leds[i]) {
+                    leds[i].className = 'led active player3';
+                    leds[i].style.background = `rgb(${colors[gameState.p3ColorIndex].rgb.join(',')})`;
+                }
+            }
+        }
+
+        function updateGameInfo() {
+            document.getElementById('gameMode').textContent = `Mode: ${gameModes[gameState.mode - 1]}`;
+            
+            // Update player color swatches
+            const p2Swatch = document.querySelector('.player-color:first-child .color-swatch');
+            const p3Swatch = document.querySelector('.player-color:last-child .color-swatch');
+            
+            p2Swatch.style.background = `rgb(${colors[gameState.p2ColorIndex].rgb.join(',')})`;
+            p3Swatch.style.background = `rgb(${colors[gameState.p3ColorIndex].rgb.join(',')})`;
+        }
+
+        // Socket.IO event handlers
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            updateStatus('serverStatus', true);
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+            updateStatus('serverStatus', false);
+        });
+
+        socket.on('esp32_status', (data) => {
+            updateStatus('esp32Status', data.connected);
+            updateStatus('lightboardStatus', data.enabled);
+        });
+
+        socket.on('esp32_data', (data) => {
+            console.log('Received ESP32 data:', data);
+            
+            // Handle different data types
+            if (data.type === 'hit') {
+                // Handle hit data from players - just log, don't update lightboard
+                console.log(`Player ${data.player} hit detected at time ${data.time} with strength ${data.strength}`);
+            } else if (data.type === 'reset') {
+                // Handle reset
+                resetGameState();
+                updateLightboard();
+            } else if (data.type === 'winner') {
+                // Handle winner announcement
+                console.log('Winner:', data.winner);
+                // Could add celebration effect here
+            } else if (data.action === 2) { // Game state update
+                gameState.mode = data.gameMode || gameState.mode;
+                gameState.p2ColorIndex = data.p2ColorIndex || gameState.p2ColorIndex;
+                gameState.p3ColorIndex = data.p3ColorIndex || gameState.p3ColorIndex;
+                updateLightboard();
+            } else if (data.action === 3) { // Point update
+                handlePointUpdate(data.winner);
+            } else if (data.action === 4) { // Mode change
+                gameState.mode = data.gameMode || gameState.mode;
+                gameState.p2ColorIndex = data.p2ColorIndex || gameState.p2ColorIndex;
+                gameState.p3ColorIndex = data.p3ColorIndex || gameState.p3ColorIndex;
+                resetGameState();
+                updateLightboard();
+            } else if (data.action === 5) { // Reset
+                resetGameState();
+                updateLightboard();
+            }
+        });
+
+        // Listen for ESP32 commands (including awardPoint commands from quiz system)
+        socket.on('esp32_command', (command) => {
+            console.log('Received ESP32 command:', command);
+            
+            if (command.cmd === 'awardPoint') {
+                // Handle point award from quiz system
+                const player = command.player;
+                const multiplier = command.multiplier || 1;
+                
+                console.log(`🎯 Awarding ${multiplier} point(s) to Player ${player}`);
+                
+                // Award multiple points with small delay between each (like ESP32)
+                for (let i = 0; i < multiplier; i++) {
+                    setTimeout(() => {
+                        console.log(`💡 LED update ${i + 1}/${multiplier} for Player ${player}`);
+                        handlePointUpdate(player);
+                    }, i * 100); // 100ms delay between points
+                }
+            } else if (command.cmd === 'reset') {
+                console.log('🔄 Reset command received');
+                resetGameState();
+                updateLightboard();
+            } else if (command.cmd === 'lightboardSettings') {
+                console.log('⚙️ Lightboard settings updated:', command);
+                gameState.mode = command.mode || gameState.mode;
+                gameState.p2ColorIndex = command.p2Color || gameState.p2ColorIndex;
+                gameState.p3ColorIndex = command.p3Color || gameState.p3ColorIndex;
+                updateLightboard();
+            }
+        });
+
+
+        function handlePointUpdate(scoringPlayer) {
+            // Simulate the lightboard game logic
+            switch (gameState.mode) {
+                case 1: // Territory
+                    if (scoringPlayer === 2 && gameState.p2Pos < 37) {
+                        gameState.p2Pos++;
+                    } else if (scoringPlayer === 3 && gameState.p3Pos > 0) {
+                        gameState.p3Pos--;
+                    }
+                    break;
+                case 2: // Swap Sides
+                    if (scoringPlayer === 2 && gameState.p2Pos < 37) {
+                        gameState.p2Pos++;
+                    } else if (scoringPlayer === 3 && gameState.p3Pos > 0) {
+                        gameState.p3Pos--;
+                    }
+                    break;
+                case 3: // Split Scoring
+                    if (scoringPlayer === 2 && gameState.p2Pos > 0) {
+                        gameState.p2Pos--;
+                    } else if (scoringPlayer === 3 && gameState.p3Pos < 37) {
+                        gameState.p3Pos++;
+                    }
+                    break;
+                case 4: // Score Order
+                    if (gameState.nextLedPos < 38) {
+                        if (!gameState.scoringSequence) gameState.scoringSequence = [];
+                        gameState.scoringSequence[gameState.nextLedPos] = scoringPlayer;
+                        gameState.nextLedPos++;
+                    }
+                    break;
+                case 5: // Race
+                    if (scoringPlayer === 2 && gameState.p2RacePos < 37) {
+                        gameState.p2RacePos++;
+                    } else if (scoringPlayer === 3 && gameState.p3RacePos < 37) {
+                        gameState.p3RacePos++;
+                    }
+                    break;
+                case 6: // Tug O War
+                    if (scoringPlayer === 2 && gameState.tugBoundary < 37) {
+                        gameState.tugBoundary++;
+                    } else if (scoringPlayer === 3 && gameState.tugBoundary >= 0) {
+                        gameState.tugBoundary--;
+                    }
+                    break;
+            }
+            
+            updateLightboard();
+            
+            // Check for win conditions after each point update
+            checkWinConditions();
+        }
+
+        function checkWinConditions() {
+            let p2Wins = false;
+            let p3Wins = false;
+            
+            switch (gameState.mode) {
+                case 1: // Territory
+                    if (gameState.p2Pos >= gameState.p3Pos) {
+                        p2Wins = (gameState.p2Pos + 1 >= 38 - gameState.p3Pos);
+                        p3Wins = !p2Wins;
+                    }
+                    break;
+                    
+                case 2: // Swap Sides
+                    p2Wins = (gameState.p2Pos >= 37);
+                    p3Wins = (gameState.p3Pos <= 0);
+                    break;
+                    
+                case 3: // Split Scoring
+                    p2Wins = (gameState.p2Pos <= 0);
+                    p3Wins = (gameState.p3Pos >= 37);
+                    break;
+                    
+                case 4: // Score Order
+                    if (gameState.nextLedPos >= 38) {
+                        let p2Count = 0, p3Count = 0;
+                        for (let i = 0; i < 38; i++) {
+                            if (gameState.scoringSequence[i] === 2) p2Count++;
+                            else if (gameState.scoringSequence[i] === 3) p3Count++;
+                        }
+                        p2Wins = (p2Count > p3Count);
+                        p3Wins = !p2Wins;
+                    }
+                    break;
+                    
+                case 5: // Race
+                    p2Wins = (gameState.p2RacePos >= 37);
+                    p3Wins = (gameState.p3RacePos >= 37);
+                    break;
+                    
+                case 6: // Tug O War
+                    p2Wins = (gameState.tugBoundary >= 37);
+                    p3Wins = (gameState.tugBoundary < 0);
+                    break;
+            }
+            
+            if (p2Wins && !p3Wins) {
+                console.log('🎉 Player 2 wins! Starting celebration...');
+                startCelebration(true); // Player 2 wins
+            } else if (p3Wins && !p2Wins) {
+                console.log('🎉 Player 3 wins! Starting celebration...');
+                startCelebration(false); // Player 3 wins
+            }
+        }
+
+        function startCelebration(player2Wins) {
+            celebrationState.active = true;
+            celebrationState.player2Wins = player2Wins;
+            celebrationState.startTime = Date.now();
+            
+            // Set winner color
+            if (player2Wins) {
+                celebrationState.winnerColor = colors[gameState.p2ColorIndex];
+            } else {
+                celebrationState.winnerColor = colors[gameState.p3ColorIndex];
+            }
+            
+            // Cycle through celebration types
+            celebrationState.type = (celebrationState.type + 1) % 4;
+            
+            // Set duration based on celebration type
+            switch (celebrationState.type) {
+                case 0: celebrationState.duration = 2500; break; // Winner Chase
+                case 1: celebrationState.duration = 2500; break; // Center Ripple
+                case 2: celebrationState.duration = 2000; break; // Confetti
+                case 3: celebrationState.duration = 3000; break; // Breathe
+            }
+            
+            console.log(`🎊 Starting celebration type ${celebrationState.type} for ${player2Wins ? 'Player 2' : 'Player 3'}`);
+            
+            // Start celebration animation
+            updateCelebration();
+        }
+
+        function updateCelebration() {
+            if (!celebrationState.active) return;
+            
+            const now = Date.now();
+            const elapsed = now - celebrationState.startTime;
+            const progress = elapsed / celebrationState.duration;
+            
+            if (progress >= 1.0) {
+                // Celebration finished
+                celebrationState.active = false;
+                resetGameState();
+                updateLightboard();
+                console.log('🎊 Celebration finished, game reset');
+                return;
+            }
+            
+            const leds = document.querySelectorAll('.led');
+            
+            // Clear all LEDs
+            leds.forEach(led => {
+                led.className = 'led';
+                led.style.background = '#333';
+            });
+            
+            // Apply celebration animation based on type
+            switch (celebrationState.type) {
+                case 0: // Winner Chase
+                    updateWinnerChase(leds, now);
+                    break;
+                case 1: // Center Ripple
+                    updateCenterRipple(leds, progress);
+                    break;
+                case 2: // Confetti
+                    updateConfetti(leds, now);
+                    break;
+                case 3: // Breathe
+                    updateBreathe(leds, progress);
+                    break;
+            }
+            
+            // Continue animation
+            requestAnimationFrame(() => updateCelebration());
+        }
+
+        function updateWinnerChase(leds, now) {
+            const head = Math.floor((now / 20) % 38);
+            const color = celebrationState.winnerColor;
+            
+            for (let k = 0; k < 6; k++) {
+                let idx = head - k;
+                if (idx < 0) idx += 38;
+                
+                const brightness = Math.pow(0.75, k);
+                const r = Math.floor(color.rgb[0] * brightness);
+                const g = Math.floor(color.rgb[1] * brightness);
+                const b = Math.floor(color.rgb[2] * brightness);
+                
+                if (k === 0 && Math.floor(now / 200) % 2 === 0) {
+                    leds[idx].className = 'led active';
+                    leds[idx].style.background = 'rgb(255, 255, 255)';
+                } else {
+                    leds[idx].className = 'led active';
+                    leds[idx].style.background = `rgb(${r}, ${g}, ${b})`;
+                }
+            }
+        }
+
+        function updateCenterRipple(leds, progress) {
+            const centerLeft = 18;
+            const centerRight = 19;
+            const color = celebrationState.winnerColor;
+            
+            for (let i = 0; i < 38; i++) {
+                const dist = Math.min(Math.abs(i - centerLeft), Math.abs(i - centerRight));
+                const phase = (dist * 0.55) - (progress * 10);
+                const brightness = 0.5 + 0.5 * Math.sin(phase);
+                
+                const r = Math.floor(color.rgb[0] * 0.7 + 255 * 0.3);
+                const g = Math.floor(color.rgb[1] * 0.7 + 255 * 0.3);
+                const b = Math.floor(color.rgb[2] * 0.7 + 255 * 0.3);
+                
+                leds[i].className = 'led active';
+                leds[i].style.background = `rgb(${Math.floor(r * brightness)}, ${Math.floor(g * brightness)}, ${Math.floor(b * brightness)})`;
+            }
+        }
+
+        function updateConfetti(leds, now) {
+            // Simple confetti effect - random colored sparks
+            leds.forEach(led => {
+                led.className = 'led';
+                led.style.background = '#333';
+            });
+            
+            const sparks = 2 + (now % 3);
+            for (let s = 0; s < sparks; s++) {
+                const i = Math.floor(Math.random() * 38);
+                const isWhite = Math.random() < 0.3;
+                const color = celebrationState.winnerColor;
+                
+                leds[i].className = 'led active';
+                if (isWhite) {
+                    leds[i].style.background = 'rgb(255, 255, 255)';
+                } else {
+                    leds[i].style.background = `rgb(${color.rgb[0]}, ${color.rgb[1]}, ${color.rgb[2]})`;
+                }
+            }
+        }
+
+        function updateBreathe(leds, progress) {
+            const brightness = 0.5 + 0.5 * Math.sin(progress * 2 * Math.PI * 2);
+            const color = celebrationState.winnerColor;
+            
+            for (let i = 0; i < 38; i++) {
+                const r = Math.floor(color.rgb[0] * (1 - brightness) + 255 * brightness);
+                const g = Math.floor(color.rgb[1] * (1 - brightness) + 255 * brightness);
+                const b = Math.floor(color.rgb[2] * (1 - brightness) + 255 * brightness);
+                
+                leds[i].className = 'led active';
+                leds[i].style.background = `rgb(${r}, ${g}, ${b})`;
+            }
+        }
+
+        function resetGameState() {
+            gameState.p2Pos = -1;
+            gameState.p3Pos = 38;
+            gameState.nextLedPos = 0;
+            gameState.tugBoundary = 18;
+            gameState.p2RacePos = -1;
+            gameState.p3RacePos = -1;
+            gameState.scoringSequence = [];
+            gameState.celebrating = false;
+            gameState.winner = 0;
+            
+            // Stop any active celebration
+            celebrationState.active = false;
+        }
+
+        function updateStatus(elementId, connected) {
+            const indicator = document.getElementById(elementId);
+            if (connected) {
+                indicator.className = 'status-indicator status-connected';
+            } else {
+                indicator.className = 'status-indicator status-disconnected';
+            }
+        }
+
+        // Control functions
+        function resetGame() {
+            socket.emit('esp32_command', { cmd: 'reset' });
+            resetGameState();
+            updateLightboard();
+        }
+
+        function testPattern() {
+            const leds = document.querySelectorAll('.led');
+            leds.forEach((led, index) => {
+                setTimeout(() => {
+                    led.className = 'led active';
+                    led.style.background = `hsl(${(index * 10) % 360}, 100%, 50%)`;
+                }, index * 50);
+            });
+            
+            setTimeout(() => {
+                updateLightboard();
+            }, 2000);
+        }
+
+        function demoMode() {
+            const demoIndicator = document.getElementById('demoModeIndicator');
+            const isDemo = demoIndicator.style.display !== 'none';
+            
+            if (isDemo) {
+                demoIndicator.style.display = 'none';
+                updateLightboard();
+            } else {
+                demoIndicator.style.display = 'block';
+                startDemoAnimation();
+            }
+        }
+
+        function startDemoAnimation() {
+            const leds = document.querySelectorAll('.led');
+            let offset = 0;
+            
+            const animate = () => {
+                if (document.getElementById('demoModeIndicator').style.display === 'none') return;
+                
+                leds.forEach((led, index) => {
+                    const hue = (offset + (index * 256 / 38)) % 256;
+                    led.className = 'led active';
+                    led.style.background = `hsl(${hue}, 100%, 50%)`;
+                });
+                
+                offset = (offset + 2) % 256;
+                setTimeout(animate, 50);
+            };
+            
+            animate();
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initLightboard();
+            updateLightboard();
+        });
+    </script>
+</body>
+</html>

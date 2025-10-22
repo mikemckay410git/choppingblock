@@ -193,6 +193,11 @@ app.get("/api", (req, res) => {
   res.json({ message: "Quizboard backend running" });
 });
 
+// Lightboard emulator endpoint
+app.get("/lightboard", (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'lightboard.html'));
+});
+
 // Quiz files listing endpoint
 app.get("/api/quiz-files", (req, res) => {
   try {
@@ -287,6 +292,9 @@ io.on("connection", (socket) => {
   socket.on("esp32_command", (command) => {
     console.log('Received command from client:', command);
     esp32Bridge.sendToESP32(command);
+    
+    // Broadcast the command to all connected clients (including lightboard emulator)
+    io.emit('esp32_command', command);
   });
   
   socket.on("disconnect", () => {
