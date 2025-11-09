@@ -121,6 +121,31 @@ h1 {
     box-shadow: 0 6px 18px rgba(0,0,0,.35); 
 }
 
+.question-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.question-icon {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+    flex-shrink: 0;
+    border-radius: 8px;
+    background: rgba(255,255,255,.02);
+    padding: 4px;
+}
+
+.question-icon.hidden {
+    display: none;
+}
+
+.question-container .q {
+    flex: 1;
+    margin: 0;
+}
+
 .q { 
     font-size: clamp(20px, 3vw, 28px); 
     line-height: 1.3; 
