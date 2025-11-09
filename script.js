@@ -333,34 +333,26 @@ function handleFileSelect(event) {
             const questionObj = { q: question, a: answer };
             
             // Check if third column is a Level or an audio file
-            if (thirdColumn) {
-              if (isAudioFile(thirdColumn)) {
-                // It's an audio file
-                questionObj.audioFile = thirdColumn;
-              } else if (thirdColumn.includes('Level')) {
-                // It's a Level column
-                questionObj.level = thirdColumn;
-                questionObj.iconPath = getIconPath(thirdColumn);
-              } else {
-                // Try to detect: if it has an audio extension, treat as audio; otherwise treat as level
-                if (isAudioFile(thirdColumn)) {
-                  questionObj.audioFile = thirdColumn;
-                } else {
-                  // Also check explicit Audio column
-                  const audioFile = row.Audio || row.audio || row.AudioFile || row.audioFile;
-                  if (audioFile) {
-                    questionObj.audioFile = audioFile;
-                  }
-                  // Treat third column as level if it doesn't look like audio
-                  questionObj.level = thirdColumn;
-                  questionObj.iconPath = getIconPath(thirdColumn);
-                }
-              }
+            // IMPORTANT: Check for Level FIRST, before checking for audio files
+            if (thirdColumn && thirdColumn.includes('Level')) {
+              // It's a Level column - set level and icon, but NOT audioFile
+              questionObj.level = thirdColumn;
+              questionObj.iconPath = getIconPath(thirdColumn);
+              // Explicitly ensure audioFile is NOT set
+              questionObj.audioFile = undefined;
+            } else if (thirdColumn && isAudioFile(thirdColumn)) {
+              // It's an audio file
+              questionObj.audioFile = thirdColumn;
             } else {
-              // Check explicit Audio column
+              // Check explicit Audio column (in case it's in a different column)
               const audioFile = row.Audio || row.audio || row.AudioFile || row.audioFile;
               if (audioFile) {
                 questionObj.audioFile = audioFile;
+              }
+              // If third column exists but isn't Level or audio, treat as level
+              if (thirdColumn && !audioFile) {
+                questionObj.level = thirdColumn;
+                questionObj.iconPath = getIconPath(thirdColumn);
               }
             }
             
@@ -599,7 +591,8 @@ function render(hideAnswer = true) {
   }
   
   // Show/hide music controls based on whether current question has audio file
-  if (qa.audioFile) {
+  // Only show if audioFile exists AND is not undefined/null/empty
+  if (qa.audioFile && qa.audioFile.trim && qa.audioFile.trim() !== '') {
     musicControls.classList.remove('hidden');
   } else {
     musicControls.classList.add('hidden');
@@ -1453,34 +1446,26 @@ async function loadAllQuizzes() {
           const questionObj = { q: question, a: answer };
           
           // Check if third column is a Level or an audio file
-          if (thirdColumn) {
-            if (isAudioFile(thirdColumn)) {
-              // It's an audio file
-              questionObj.audioFile = thirdColumn;
-            } else if (thirdColumn.includes('Level')) {
-              // It's a Level column
-              questionObj.level = thirdColumn;
-              questionObj.iconPath = getIconPath(thirdColumn);
-            } else {
-              // Try to detect: if it has an audio extension, treat as audio; otherwise treat as level
-              if (isAudioFile(thirdColumn)) {
-                questionObj.audioFile = thirdColumn;
-              } else {
-                // Also check explicit Audio column
-                const audioFile = row.Audio || row.audio || row.AudioFile || row.audioFile;
-                if (audioFile) {
-                  questionObj.audioFile = audioFile;
-                }
-                // Treat third column as level if it doesn't look like audio
-                questionObj.level = thirdColumn;
-                questionObj.iconPath = getIconPath(thirdColumn);
-              }
-            }
+          // IMPORTANT: Check for Level FIRST, before checking for audio files
+          if (thirdColumn && thirdColumn.includes('Level')) {
+            // It's a Level column - set level and icon, but NOT audioFile
+            questionObj.level = thirdColumn;
+            questionObj.iconPath = getIconPath(thirdColumn);
+            // Explicitly ensure audioFile is NOT set
+            questionObj.audioFile = undefined;
+          } else if (thirdColumn && isAudioFile(thirdColumn)) {
+            // It's an audio file
+            questionObj.audioFile = thirdColumn;
           } else {
-            // Check explicit Audio column
+            // Check explicit Audio column (in case it's in a different column)
             const audioFile = row.Audio || row.audio || row.AudioFile || row.audioFile;
             if (audioFile) {
               questionObj.audioFile = audioFile;
+            }
+            // If third column exists but isn't Level or audio, treat as level
+            if (thirdColumn && !audioFile) {
+              questionObj.level = thirdColumn;
+              questionObj.iconPath = getIconPath(thirdColumn);
             }
           }
           
