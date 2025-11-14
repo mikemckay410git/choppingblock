@@ -13,14 +13,14 @@ class LightboardStateManager {
     return {
       gameState: {
         mode: 1,
-        p2ColorIndex: 0,
-        p3ColorIndex: 1,
-        p2Pos: -1,
-        p3Pos: 38,
+        p1ColorIndex: 0,
+        p2ColorIndex: 1,
+        p1Pos: -1,
+        p2Pos: 38,
         nextLedPos: 0,
         tugBoundary: 18,
+        p1RacePos: -1,
         p2RacePos: -1,
-        p3RacePos: -1,
         celebrating: false,
         winner: 0,
         scoringSequence: []
@@ -100,26 +100,26 @@ class LightboardStateManager {
     for (let i = 0; i < multiplier; i++) {
       switch (gameState.mode) {
         case 1: // Territory
-          if (scoringPlayer === 2 && gameState.p2Pos < 37) {
-            gameState.p2Pos++;
-          } else if (scoringPlayer === 3 && gameState.p3Pos > 0) {
-            gameState.p3Pos--;
+          if (scoringPlayer === 1 && gameState.p1Pos < 37) {
+            gameState.p1Pos++;
+          } else if (scoringPlayer === 2 && gameState.p2Pos > 0) {
+            gameState.p2Pos--;
           }
           break;
           
         case 2: // Swap Sides
-          if (scoringPlayer === 2 && gameState.p2Pos < 37) {
-            gameState.p2Pos++;
-          } else if (scoringPlayer === 3 && gameState.p3Pos > 0) {
-            gameState.p3Pos--;
+          if (scoringPlayer === 1 && gameState.p1Pos < 37) {
+            gameState.p1Pos++;
+          } else if (scoringPlayer === 2 && gameState.p2Pos > 0) {
+            gameState.p2Pos--;
           }
           break;
           
         case 3: // Split Scoring
-          if (scoringPlayer === 2 && gameState.p2Pos > 0) {
-            gameState.p2Pos--;
-          } else if (scoringPlayer === 3 && gameState.p3Pos < 37) {
-            gameState.p3Pos++;
+          if (scoringPlayer === 1 && gameState.p1Pos > 0) {
+            gameState.p1Pos--;
+          } else if (scoringPlayer === 2 && gameState.p2Pos < 37) {
+            gameState.p2Pos++;
           }
           break;
           
@@ -132,17 +132,17 @@ class LightboardStateManager {
           break;
           
         case 5: // Race
-          if (scoringPlayer === 2 && gameState.p2RacePos < 37) {
+          if (scoringPlayer === 1 && gameState.p1RacePos < 37) {
+            gameState.p1RacePos++;
+          } else if (scoringPlayer === 2 && gameState.p2RacePos < 37) {
             gameState.p2RacePos++;
-          } else if (scoringPlayer === 3 && gameState.p3RacePos < 37) {
-            gameState.p3RacePos++;
           }
           break;
           
         case 6: // Tug O War
-          if (scoringPlayer === 2 && gameState.tugBoundary < 37) {
+          if (scoringPlayer === 1 && gameState.tugBoundary < 37) {
             gameState.tugBoundary++;
-          } else if (scoringPlayer === 3 && gameState.tugBoundary >= 0) {
+          } else if (scoringPlayer === 2 && gameState.tugBoundary >= 0) {
             gameState.tugBoundary--;
           }
           break;
@@ -160,20 +160,20 @@ class LightboardStateManager {
     switch (mode) {
       case 1:
       case 2:
-        this.state.gameState.p2Pos = -1;
-        this.state.gameState.p3Pos = 38;
+        this.state.gameState.p1Pos = -1;
+        this.state.gameState.p2Pos = 38;
         break;
       case 3:
-        this.state.gameState.p2Pos = 18; // CENTER_LEFT + 1
-        this.state.gameState.p3Pos = 19; // CENTER_RIGHT - 1
+        this.state.gameState.p1Pos = 18; // CENTER_LEFT + 1
+        this.state.gameState.p2Pos = 19; // CENTER_RIGHT - 1
         break;
       case 4:
         this.state.gameState.nextLedPos = 0;
         this.state.gameState.scoringSequence = [];
         break;
       case 5:
+        this.state.gameState.p1RacePos = -1;
         this.state.gameState.p2RacePos = -1;
-        this.state.gameState.p3RacePos = -1;
         break;
       case 6:
         this.state.gameState.tugBoundary = 18; // CENTER_LEFT
@@ -191,23 +191,23 @@ class LightboardStateManager {
     
     // Reset settings to defaults
     this.state.gameState.mode = defaultState.mode;
+    this.state.gameState.p1ColorIndex = defaultState.p1ColorIndex;
     this.state.gameState.p2ColorIndex = defaultState.p2ColorIndex;
-    this.state.gameState.p3ColorIndex = defaultState.p3ColorIndex;
     
     // Reset game positions
     this.resetGame();
   }
 
   // Update lightboard settings (mode, colors)
-  updateSettings(mode, p2Color, p3Color) {
+  updateSettings(mode, p1Color, p2Color) {
     if (mode >= 1 && mode <= 6) {
       this.state.gameState.mode = mode;
     }
+    if (p1Color >= 0 && p1Color <= 4) {
+      this.state.gameState.p1ColorIndex = p1Color;
+    }
     if (p2Color >= 0 && p2Color <= 4) {
       this.state.gameState.p2ColorIndex = p2Color;
-    }
-    if (p3Color >= 0 && p3Color <= 4) {
-      this.state.gameState.p3ColorIndex = p3Color;
     }
     this.saveStateDebounced();
   }

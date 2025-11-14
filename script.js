@@ -60,9 +60,8 @@ socket.on('esp32_data', (data) => {
       lastProcessedHitPlayer = data.player;
     }
     
-    // Map backend player numbers to frontend player numbers
-    const frontendPlayer = data.player === 2 ? 1 : 2; // Backend Player 2->Frontend Player 1, Backend Player 3->Frontend Player 2
-    handlePlayerHit(frontendPlayer);
+    // Backend now uses Player 1 and Player 2 directly, no translation needed
+    handlePlayerHit(data.player);
   } else if (data.type === 'winner') {
     console.log(`Winner declared: ${data.winner}`);
     
@@ -72,13 +71,12 @@ socket.on('esp32_data', (data) => {
       return;
     }
     
-    // Map backend winner names to frontend winner names
-    const frontendWinner = data.winner === 'Player 2' ? 'Player 1' : 'Player 2';
+    // Backend now uses Player 1 and Player 2 directly, no translation needed
     // Only process winner if round is not already complete
     if (!roundComplete) {
-      showWinner(frontendWinner);
+      showWinner(data.winner);
     } else {
-      console.log(`Winner message for ${frontendWinner} ignored - round already complete`);
+      console.log(`Winner message for ${data.winner} ignored - round already complete`);
     }
   }
 });
@@ -100,13 +98,13 @@ function sendToESP32(command) {
       esp32Command = { 
         cmd: 'lightboardSettings', 
         mode: command.mode, 
-        p2Color: command.p1Color, // Map frontend Player 1 color to backend Player 2 color
-        p3Color: command.p2Color  // Map frontend Player 2 color to backend Player 3 color
+        p1Color: command.p1Color, // Backend now uses Player 1 and Player 2 directly
+        p2Color: command.p2Color
       };
     } else if (command.action === 'awardPoint') {
       esp32Command = { 
         cmd: 'awardPoint', 
-        player: command.player === 1 ? 2 : 3, // Map frontend Player 1->2, Player 2->3 for backend
+        player: command.player, // Backend now uses Player 1 and Player 2 directly, no translation needed
         multiplier: command.multiplier 
       };
     } else {
