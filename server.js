@@ -6,6 +6,7 @@ import { SerialPort } from "serialport";
 import { ReadlineParser } from "@serialport/parser-readline";
 import fs from "fs";
 import path from "path";
+import { lightboardState } from "./lightboard.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -114,60 +115,35 @@ class ESP32Bridge {
       
       // Check if this is a request for lightboard state
       if (data.type === 'lightboardStateRequest') {
-        // Read current state from JSON file
-        const statePath = path.join(process.cwd(), 'lightboard.json');
-        try {
-          let stateData;
-          if (fs.existsSync(statePath)) {
-            stateData = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-          } else {
-            // Return default state if file doesn't exist
-            stateData = {
-              gameState: {
-                mode: 1,
-                p2ColorIndex: 0,
-                p3ColorIndex: 1,
-                p2Pos: -1,
-                p3Pos: 38,
-                nextLedPos: 0,
-                tugBoundary: 18,
-                p2RacePos: -1,
-                p3RacePos: -1,
-                celebrating: false,
-                winner: 0,
-                scoringSequence: []
-              }
-            };
-          }
-          
-          // Send state back to ESP32
-          this.sendToESP32({
-            cmd: 'lightboardState',
-            gameState: stateData.gameState
-          });
-          console.log('Sent lightboard state to ESP32:', stateData.gameState);
-        } catch (error) {
-          console.error('Error reading lightboard state:', error);
-          // Send default state on error
-          this.sendToESP32({
-            cmd: 'lightboardState',
-            gameState: {
-              mode: 1,
-              p2ColorIndex: 0,
-              p3ColorIndex: 1,
-              p2Pos: -1,
-              p3Pos: 38,
-              nextLedPos: 0,
-              tugBoundary: 18,
-              p2RacePos: -1,
-              p3RacePos: -1,
-              celebrating: false,
-              winner: 0,
-              scoringSequence: []
-            }
-          });
-        }
+        // Get current state from state manager
+        const gameState = lightboardState.getGameState();
+        
+        // Send state back to ESP32
+        this.sendToESP32({
+          cmd: 'lightboardState',
+          gameState: gameState
+        });
+        console.log('Sent lightboard state to ESP32:', gameState);
         return; // Don't forward this request to clients
+      }
+      
+      // Update state when receiving point awards from ESP32
+      if (data.type === 'winner' && data.winner) {
+        // Extract player number from winner string (e.g., "Player 2" -> 2)
+        const playerMatch = data.winner.match(/Player (\d+)/);
+        if (playerMatch) {
+          const player = parseInt(playerMatch[1]);
+          if (player === 2 || player === 3) {
+            lightboardState.awardPoint(player, 1);
+            console.log(`Updated lightboard state: Player ${player} scored`);
+          }
+        }
+      }
+      
+      // Update state when receiving reset from ESP32
+      if (data.type === 'reset') {
+        lightboardState.resetGame();
+        console.log('Reset lightboard state from ESP32');
       }
       
       // Forward to all Socket.IO clients
@@ -260,30 +236,7 @@ app.get("/lightboard", (req, res) => {
 // Lightboard state endpoints
 app.get("/api/lightboard-state", (req, res) => {
   try {
-    const statePath = path.join(process.cwd(), 'lightboard.json');
-    
-    if (!fs.existsSync(statePath)) {
-      // Return default state if file doesn't exist
-      return res.json({
-        gameState: {
-          mode: 1,
-          p2ColorIndex: 0,
-          p3ColorIndex: 1,
-          p2Pos: -1,
-          p3Pos: 38,
-          nextLedPos: 0,
-          tugBoundary: 18,
-          p2RacePos: -1,
-          p3RacePos: -1,
-          celebrating: false,
-          winner: 0,
-          scoringSequence: []
-        }
-      });
-    }
-    
-    const stateData = fs.readFileSync(statePath, 'utf8');
-    const state = JSON.parse(stateData);
+    const state = lightboardState.getState();
     res.json(state);
   } catch (error) {
     console.error('Error reading lightboard state:', error);
@@ -293,10 +246,7 @@ app.get("/api/lightboard-state", (req, res) => {
 
 app.post("/api/lightboard-state", (req, res) => {
   try {
-    const statePath = path.join(process.cwd(), 'lightboard.json');
-    const stateData = JSON.stringify(req.body, null, 2);
-    
-    fs.writeFileSync(statePath, stateData, 'utf8');
+    lightboardState.updateState(req.body);
     res.json({ success: true });
   } catch (error) {
     console.error('Error saving lightboard state:', error);
@@ -397,6 +347,19 @@ io.on("connection", (socket) => {
   // Handle commands from client to ESP32
   socket.on("esp32_command", (command) => {
     console.log('Received command from client:', command);
+    
+    // Update lightboard state based on command
+    if (command.cmd === 'awardPoint' && command.player && command.multiplier) {
+      lightboardState.awardPoint(command.player, command.multiplier);
+      console.log(`Updated lightboard state: Player ${command.player} awarded ${command.multiplier} point(s)`);
+    } else if (command.cmd === 'reset') {
+      lightboardState.resetGame();
+      console.log('Reset lightboard state');
+    } else if (command.cmd === 'lightboardSettings' && command.mode !== undefined) {
+      lightboardState.updateSettings(command.mode, command.p2Color, command.p3Color);
+      console.log(`Updated lightboard settings: mode=${command.mode}, p2Color=${command.p2Color}, p3Color=${command.p3Color}`);
+    }
+    
     esp32Bridge.sendToESP32(command);
     
     // Broadcast the command to all connected clients (including lightboard emulator)
