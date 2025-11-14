@@ -144,10 +144,54 @@ function parseCSV(csv) {
     headers.forEach((header, index) => {
       row[header] = values[index] ? values[index].replace(/^"|"$/g, '') : '';
     });
+    // Also store raw values for Level column (third column)
+    if (values.length > 2) {
+      row.Level = values[2] ? values[2].replace(/^"|"$/g, '') : '';
+    }
     data.push(row);
   }
   
   return data;
+}
+
+// === LEVEL TO ICON MAPPING ===
+function getIconPath(levelText) {
+  if (!levelText || levelText.trim() === '') return null;
+  
+  // Handle special cases
+  if (levelText.includes('Paddling')) {
+    // Paddling uses different naming: "Paddling_Level_1.svg"
+    const levelMatch = levelText.match(/Level\s+(\d+)/i);
+    if (levelMatch) {
+      return `Images/Paddling_Level_${levelMatch[1]}.svg`;
+    }
+    return null;
+  }
+  
+  // Standard format: "Category Level N" -> "AS_Category_CN.jpg"
+  const match = levelText.match(/(.+?)\s+Level\s+(\d+)/i);
+  if (!match) return null;
+  
+  const category = match[1].trim();
+  const level = match[2];
+  
+  // Convert category name to image filename format
+  // "Camping" -> "Camping", "Air Activities" -> "Air_Activities"
+  const categoryFormatted = category.replace(/\s+/g, '_');
+  const imagePath = `Images/AS_${categoryFormatted}_C${level}.jpg`;
+  
+  return imagePath;
+}
+
+// === CHECK IF THIRD COLUMN IS AUDIO FILE ===
+function isAudioFile(value) {
+  if (!value || value.trim() === '') return false;
+  // Check if it contains "Level" - if so, it's not an audio file
+  if (value.includes('Level')) return false;
+  // Check if it looks like an audio file (has audio extension)
+  const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.wma'];
+  const lowerValue = value.toLowerCase();
+  return audioExtensions.some(ext => lowerValue.endsWith(ext));
 }
 
 // === APP STATE ===
@@ -176,6 +220,7 @@ const qEl = document.getElementById('q');
 const aEl = document.getElementById('a');
 const answerText = document.getElementById('answerText');
 const categoryBadge = document.getElementById('categoryBadge');
+const questionIcon = document.getElementById('questionIcon');
 const counterEl = document.getElementById('counter');
 const btnPrev = document.getElementById('prev');
 const btnNext = document.getElementById('next');
@@ -283,13 +328,32 @@ function handleFileSelect(event) {
           const questions = csvData.map(row => {
             const question = row.Question || row.question || row.Q || row.q || Object.values(row)[0];
             const answer = row.Answer || row.answer || row.A || row.a || Object.values(row)[1];
-            const audioFile = row.Audio || row.audio || row.AudioFile || row.audioFile || Object.values(row)[2];
+            const thirdColumn = row.Level || Object.values(row)[2] || '';
             
             const questionObj = { q: question, a: answer };
             
-            // Add audio file reference if it exists
-            if (audioFile) {
-              questionObj.audioFile = audioFile;
+            // Check if third column is a Level or an audio file
+            // IMPORTANT: Check for Level FIRST, before checking for audio files
+            if (thirdColumn && thirdColumn.includes('Level')) {
+              // It's a Level column - set level and icon, but NOT audioFile
+              questionObj.level = thirdColumn;
+              questionObj.iconPath = getIconPath(thirdColumn);
+              // Explicitly ensure audioFile is NOT set
+              questionObj.audioFile = undefined;
+            } else if (thirdColumn && isAudioFile(thirdColumn)) {
+              // It's an audio file
+              questionObj.audioFile = thirdColumn;
+            } else {
+              // Check explicit Audio column (in case it's in a different column)
+              const audioFile = row.Audio || row.audio || row.AudioFile || row.audioFile;
+              if (audioFile) {
+                questionObj.audioFile = audioFile;
+              }
+              // If third column exists but isn't Level or audio, treat as level
+              if (thirdColumn && !audioFile) {
+                questionObj.level = thirdColumn;
+                questionObj.iconPath = getIconPath(thirdColumn);
+              }
             }
             
             return questionObj;
@@ -527,11 +591,25 @@ function render(hideAnswer = true) {
   }
   
   // Show/hide music controls based on whether current question has audio file
-  if (qa.audioFile) {
+  // Only show if audioFile exists AND is not undefined/null/empty
+  if (qa.audioFile && qa.audioFile.trim && qa.audioFile.trim() !== '') {
     musicControls.classList.remove('hidden');
   } else {
     musicControls.classList.add('hidden');
     stopMusic(); // Stop any playing music when switching to non-music question
+  }
+  
+  // Show/hide question icon based on whether question has icon path
+  if (qa.iconPath) {
+    questionIcon.src = qa.iconPath;
+    questionIcon.alt = qa.level || 'Badge icon';
+    questionIcon.classList.remove('hidden');
+    // Handle image load errors gracefully
+    questionIcon.onerror = function() {
+      this.classList.add('hidden');
+    };
+  } else {
+    questionIcon.classList.add('hidden');
   }
   
   if (hideAnswer) {
@@ -1363,13 +1441,32 @@ async function loadAllQuizzes() {
         const questions = csvData.map(row => {
           const question = row.Question || row.question || row.Q || row.q || Object.values(row)[0];
           const answer = row.Answer || row.answer || row.A || row.a || Object.values(row)[1];
-          const audioFile = row.Audio || row.audio || row.AudioFile || row.audioFile || Object.values(row)[2];
+          const thirdColumn = row.Level || Object.values(row)[2] || '';
           
           const questionObj = { q: question, a: answer };
           
-          // Add audio file reference if it exists (regardless of category type)
-          if (audioFile) {
-            questionObj.audioFile = audioFile;
+          // Check if third column is a Level or an audio file
+          // IMPORTANT: Check for Level FIRST, before checking for audio files
+          if (thirdColumn && thirdColumn.includes('Level')) {
+            // It's a Level column - set level and icon, but NOT audioFile
+            questionObj.level = thirdColumn;
+            questionObj.iconPath = getIconPath(thirdColumn);
+            // Explicitly ensure audioFile is NOT set
+            questionObj.audioFile = undefined;
+          } else if (thirdColumn && isAudioFile(thirdColumn)) {
+            // It's an audio file
+            questionObj.audioFile = thirdColumn;
+          } else {
+            // Check explicit Audio column (in case it's in a different column)
+            const audioFile = row.Audio || row.audio || row.AudioFile || row.audioFile;
+            if (audioFile) {
+              questionObj.audioFile = audioFile;
+            }
+            // If third column exists but isn't Level or audio, treat as level
+            if (thirdColumn && !audioFile) {
+              questionObj.level = thirdColumn;
+              questionObj.iconPath = getIconPath(thirdColumn);
+            }
           }
           
           return questionObj;

@@ -249,6 +249,31 @@
       align-self: flex-start;
     }
 
+    .question-container {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .question-icon {
+      width: 60px;
+      height: 60px;
+      object-fit: contain;
+      flex-shrink: 0;
+      border-radius: 8px;
+      background: rgba(255,255,255,.02);
+      padding: 4px;
+    }
+
+    .question-icon.hidden {
+      display: none;
+    }
+
+    .question-container .q {
+      flex: 1;
+      margin: 0;
+    }
+
     .controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 16px; }
     button {
       -webkit-tap-highlight-color: transparent;
@@ -421,7 +446,10 @@
 
       <div class="card" id="card" aria-live="polite">
         <div class="category-badge hidden" id="categoryBadge"></div>
-        <p class="q" id="q">Loading…</p>
+        <div class="question-container">
+          <img id="questionIcon" class="question-icon hidden" src="" alt="">
+          <p class="q" id="q">Loading…</p>
+        </div>
         <p class="a" id="a"><strong>Answer:</strong> <span id="answerText"></span></p>
       </div>
 
@@ -478,10 +506,43 @@
         headers.forEach((header, index) => {
           row[header] = values[index] ? values[index].replace(/^"|"$/g, '') : '';
         });
+        // Also store raw values for Level column (third column)
+        if (values.length > 2) {
+          row.Level = values[2] ? values[2].replace(/^"|"$/g, '') : '';
+        }
         data.push(row);
       }
       
       return data;
+    }
+
+    // === LEVEL TO ICON MAPPING ===
+    function getIconPath(levelText) {
+      if (!levelText || levelText.trim() === '') return null;
+      
+      // Handle special cases
+      if (levelText.includes('Paddling')) {
+        // Paddling uses different naming: "Paddling_Level_1.svg"
+        const levelMatch = levelText.match(/Level\s+(\d+)/i);
+        if (levelMatch) {
+          return `Images/Paddling_Level_${levelMatch[1]}.svg`;
+        }
+        return null;
+      }
+      
+      // Standard format: "Category Level N" -> "AS_Category_CN.jpg"
+      const match = levelText.match(/(.+?)\s+Level\s+(\d+)/i);
+      if (!match) return null;
+      
+      const category = match[1].trim();
+      const level = match[2];
+      
+      // Convert category name to image filename format
+      // "Camping" -> "Camping", "Air Activities" -> "Air_Activities"
+      const categoryFormatted = category.replace(/\s+/g, '_');
+      const imagePath = `Images/AS_${categoryFormatted}_C${level}.jpg`;
+      
+      return imagePath;
     }
 
     // === APP STATE ===
@@ -510,6 +571,7 @@
     const aEl = document.getElementById('a');
     const answerText = document.getElementById('answerText');
     const categoryBadge = document.getElementById('categoryBadge');
+    const questionIcon = document.getElementById('questionIcon');
     const counterEl = document.getElementById('counter');
     const btnPrev = document.getElementById('prev');
     const btnNext = document.getElementById('next');
@@ -551,7 +613,14 @@
               const questions = csvData.map(row => {
                 const question = row.Question || row.question || row.Q || row.q || Object.values(row)[0];
                 const answer = row.Answer || row.answer || row.A || row.a || Object.values(row)[1];
-                return { q: question, a: answer };
+                const level = row.Level || Object.values(row)[2] || '';
+                const iconPath = getIconPath(level);
+                return { 
+                  q: question, 
+                  a: answer,
+                  level: level,
+                  iconPath: iconPath
+                };
               }).filter(qa => qa.q && qa.a);
               
               if (questions.length > 0) {
@@ -921,6 +990,19 @@
         categoryBadge.classList.remove('hidden');
       } else {
         categoryBadge.classList.add('hidden');
+      }
+      
+      // Show/hide question icon based on whether question has icon path
+      if (qa.iconPath) {
+        questionIcon.src = qa.iconPath;
+        questionIcon.alt = qa.level || 'Badge icon';
+        questionIcon.classList.remove('hidden');
+        // Handle image load errors gracefully
+        questionIcon.onerror = function() {
+          this.classList.add('hidden');
+        };
+      } else {
+        questionIcon.classList.add('hidden');
       }
       
       if (hideAnswer) {
