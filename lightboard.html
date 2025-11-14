@@ -265,6 +265,14 @@
             ESP32 Bridge
         </div>
         <div class="status-item">
+            <span class="status-indicator status-disconnected" id="player2Status"></span>
+            Player 2
+        </div>
+        <div class="status-item">
+            <span class="status-indicator status-disconnected" id="player3Status"></span>
+            Player 3
+        </div>
+        <div class="status-item">
             <span class="status-indicator status-disconnected" id="lightboardStatus"></span>
             Physical Lightboard
         </div>
@@ -512,6 +520,9 @@
 
         socket.on('esp32_status', (data) => {
             updateStatus('esp32Status', data.connected);
+            // Player connection statuses (via ESP-NOW from Bridge)
+            updateStatus('player2Status', data.player2Connected || false);
+            updateStatus('player3Status', data.player3Connected || false);
             // Physical lightboard connection status (via ESP-NOW from Bridge)
             updateStatus('lightboardStatus', data.lightboardConnected || false);
         });

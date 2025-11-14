@@ -31,6 +31,8 @@ class ESP32Bridge {
     this.io = io;
     this.enabled = false; // Track if serial is enabled
     this.lightboardConnected = false; // Track if physical lightboard is connected via ESP-NOW
+    this.player2Connected = false; // Track if Player 2 is connected via ESP-NOW
+    this.player3Connected = false; // Track if Player 3 is connected via ESP-NOW
     this.retryTimeout = null; // Track retry timeout for cleanup
     this.heartbeatInterval = null; // Track heartbeat interval timer
     // Removed debounce variables - ESP32 handles awarding internally
@@ -57,10 +59,14 @@ class ESP32Bridge {
         console.log(`Serial port ${this.serialPort} not found. ESP32 communication disabled.`);
         console.log('Server will run without ESP32 connection.');
         this.lightboardConnected = false;
+        this.player2Connected = false;
+        this.player3Connected = false;
         this.io.emit('esp32_status', { 
           connected: false, 
           enabled: false,
-          lightboardConnected: false
+          lightboardConnected: false,
+          player2Connected: false,
+          player3Connected: false
         });
         return;
       }
@@ -80,7 +86,9 @@ class ESP32Bridge {
         this.io.emit('esp32_status', { 
           connected: true, 
           enabled: true,
-          lightboardConnected: this.lightboardConnected
+          lightboardConnected: this.lightboardConnected,
+          player2Connected: this.player2Connected,
+          player3Connected: this.player3Connected
         });
         
         // Start sending periodic heartbeats to Bridge (every 2 seconds)
@@ -93,11 +101,15 @@ class ESP32Bridge {
         this.cleanup();
         this.enabled = false;
         this.lightboardConnected = false; // Reset lightboard connection status
+        this.player2Connected = false; // Reset player connections
+        this.player3Connected = false;
         // Notify all clients that ESP32 is disconnected
         this.io.emit('esp32_status', { 
           connected: false, 
           enabled: false,
-          lightboardConnected: false
+          lightboardConnected: false,
+          player2Connected: false,
+          player3Connected: false
         });
         // Retry connection after 5 seconds (longer delay for optional connection)
         this.retryTimeout = setTimeout(() => this.startSerialCommunication(), 5000);
@@ -121,11 +133,15 @@ class ESP32Bridge {
       this.cleanup();
       this.enabled = false;
       this.lightboardConnected = false;
+      this.player2Connected = false;
+      this.player3Connected = false;
       // Notify all clients that ESP32 is disconnected
       this.io.emit('esp32_status', { 
         connected: false, 
         enabled: false,
-        lightboardConnected: false
+        lightboardConnected: false,
+        player2Connected: false,
+        player3Connected: false
       });
       // Retry connection after 5 seconds (longer delay for optional connection)
       this.retryTimeout = setTimeout(() => this.startSerialCommunication(), 5000);
@@ -140,23 +156,45 @@ class ESP32Bridge {
       
       // Check if this is a status message with connection info
       if (data.type === 'status') {
-        // Update lightboard connection status from Bridge
+        // Update connection statuses from Bridge
+        let statusChanged = false;
+        
         if (data.lightboardConnected !== undefined) {
           const wasConnected = this.lightboardConnected;
           this.lightboardConnected = data.lightboardConnected;
-          
-          // Always emit status update when we receive status from Bridge
-          // This ensures initial state is set and clients are kept in sync
-          this.io.emit('esp32_status', { 
-            connected: this.serialConnection ? this.serialConnection.isOpen : false,
-            enabled: this.enabled,
-            lightboardConnected: this.lightboardConnected
-          });
-          
           if (wasConnected !== this.lightboardConnected) {
             console.log(`Lightboard connection status changed: ${this.lightboardConnected ? 'connected' : 'disconnected'}`);
+            statusChanged = true;
           }
         }
+        
+        if (data.player2Connected !== undefined) {
+          const wasConnected = this.player2Connected;
+          this.player2Connected = data.player2Connected;
+          if (wasConnected !== this.player2Connected) {
+            console.log(`Player 2 connection status changed: ${this.player2Connected ? 'connected' : 'disconnected'}`);
+            statusChanged = true;
+          }
+        }
+        
+        if (data.player3Connected !== undefined) {
+          const wasConnected = this.player3Connected;
+          this.player3Connected = data.player3Connected;
+          if (wasConnected !== this.player3Connected) {
+            console.log(`Player 3 connection status changed: ${this.player3Connected ? 'connected' : 'disconnected'}`);
+            statusChanged = true;
+          }
+        }
+        
+        // Always emit status update when we receive status from Bridge
+        // This ensures initial state is set and clients are kept in sync
+        this.io.emit('esp32_status', { 
+          connected: this.serialConnection ? this.serialConnection.isOpen : false,
+          enabled: this.enabled,
+          lightboardConnected: this.lightboardConnected,
+          player2Connected: this.player2Connected,
+          player3Connected: this.player3Connected
+        });
       }
       
       // Check if this is a request for lightboard state
@@ -424,7 +462,9 @@ io.on("connection", (socket) => {
   socket.emit('esp32_status', { 
     connected: esp32Bridge.serialConnection ? esp32Bridge.serialConnection.isOpen : false,
     enabled: esp32Bridge.enabled,
-    lightboardConnected: esp32Bridge.lightboardConnected
+    lightboardConnected: esp32Bridge.lightboardConnected,
+    player2Connected: esp32Bridge.player2Connected,
+    player3Connected: esp32Bridge.player3Connected
   });
   
   // Handle commands from client to ESP32
