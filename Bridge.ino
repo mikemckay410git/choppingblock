@@ -622,11 +622,19 @@ void processPiCommand(String command) {
         int newP3Color = doc["p3Color"];
         
         if (newMode >= 1 && newMode <= 6 && newP2Color >= 0 && newP2Color <= 4 && newP3Color >= 0 && newP3Color <= 4) {
+          bool modeChanged = (lightboardGameMode != newMode);
           lightboardGameMode = newMode;
           lightboardP2ColorIndex = newP2Color;
           lightboardP3ColorIndex = newP3Color;
           Serial.printf("Lightboard settings updated: mode=%d, p2Color=%d, p3Color=%d\n", newMode, newP2Color, newP3Color);
-          sendLightboardUpdate(4); // mode-change action
+          
+          if (modeChanged) {
+            // Mode changed - reset game positions
+            sendLightboardUpdate(4); // mode-change action
+          } else {
+            // Only colors changed - preserve game positions
+            sendLightboardUpdate(2); // game-state action (preserves positions)
+          }
         }
       }
       
