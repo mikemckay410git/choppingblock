@@ -578,9 +578,20 @@
                 saveState();
             } else if (command.cmd === 'lightboardSettings') {
                 console.log('⚙️ Lightboard settings updated:', command);
-                gameState.mode = command.mode ?? gameState.mode;
+                const oldMode = gameState.mode;
+                const newMode = command.mode ?? gameState.mode;
+                const modeChanged = (oldMode !== newMode);
+                
+                gameState.mode = newMode;
                 gameState.p2ColorIndex = command.p2Color !== undefined ? command.p2Color : gameState.p2ColorIndex;
                 gameState.p3ColorIndex = command.p3Color !== undefined ? command.p3Color : gameState.p3ColorIndex;
+                
+                // If mode changed, reset positions; otherwise preserve them
+                if (modeChanged) {
+                    console.log(`🔄 Mode changed from ${oldMode} to ${newMode} - resetting positions`);
+                    resetGameState();
+                }
+                
                 updateLightboard();
                 saveState();
             }
