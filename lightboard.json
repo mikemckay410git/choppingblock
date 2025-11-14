@@ -1,0 +1,17 @@
+{
+  "gameState": {
+    "mode": 1,
+    "p2ColorIndex": 0,
+    "p3ColorIndex": 1,
+    "p2Pos": -1,
+    "p3Pos": 38,
+    "nextLedPos": 0,
+    "tugBoundary": 18,
+    "p2RacePos": -1,
+    "p3RacePos": -1,
+    "celebrating": false,
+    "winner": 0,
+    "scoringSequence": []
+  }
+}
+

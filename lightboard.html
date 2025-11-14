@@ -535,6 +535,7 @@
                 gameState.p2ColorIndex = data.p2ColorIndex || gameState.p2ColorIndex;
                 gameState.p3ColorIndex = data.p3ColorIndex || gameState.p3ColorIndex;
                 updateLightboard();
+                saveState();
             } else if (data.action === 3) { // Point update
                 handlePointUpdate(data.winner);
             } else if (data.action === 4) { // Mode change
@@ -543,9 +544,11 @@
                 gameState.p3ColorIndex = data.p3ColorIndex || gameState.p3ColorIndex;
                 resetGameState();
                 updateLightboard();
+                saveState();
             } else if (data.action === 5) { // Reset
                 resetGameState();
                 updateLightboard();
+                saveState();
             }
         });
 
@@ -571,12 +574,14 @@
                 console.log('🔄 Reset command received');
                 resetGameState();
                 updateLightboard();
+                saveState();
             } else if (command.cmd === 'lightboardSettings') {
                 console.log('⚙️ Lightboard settings updated:', command);
                 gameState.mode = command.mode || gameState.mode;
                 gameState.p2ColorIndex = command.p2Color || gameState.p2ColorIndex;
                 gameState.p3ColorIndex = command.p3Color || gameState.p3ColorIndex;
                 updateLightboard();
+                saveState();
             }
         });
 
@@ -629,6 +634,7 @@
             }
             
             updateLightboard();
+            saveState();
             
             // Check for win conditions after each point update
             checkWinConditions();
@@ -729,6 +735,7 @@
                 celebrationState.active = false;
                 resetGameState();
                 updateLightboard();
+                saveState();
                 console.log('🎊 Celebration finished, game reset');
                 return;
             }
@@ -868,6 +875,7 @@
             socket.emit('esp32_command', { cmd: 'reset' });
             resetGameState();
             updateLightboard();
+            saveState();
         }
 
         function testPattern() {
@@ -917,9 +925,40 @@
             animate();
         }
 
+        // Load state from server
+        async function loadState() {
+            try {
+                const response = await fetch('/api/lightboard-state');
+                const data = await response.json();
+                if (data.gameState) {
+                    gameState = { ...gameState, ...data.gameState };
+                    console.log('✅ Loaded lightboard state from server');
+                }
+            } catch (error) {
+                console.error('Error loading lightboard state:', error);
+            }
+        }
+
+        // Save state to server
+        async function saveState() {
+            try {
+                await fetch('/api/lightboard-state', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ gameState })
+                });
+                console.log('💾 Saved lightboard state to server');
+            } catch (error) {
+                console.error('Error saving lightboard state:', error);
+            }
+        }
+
         // Initialize when page loads
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             initLightboard();
+            await loadState();
             updateLightboard();
         });
     </script>

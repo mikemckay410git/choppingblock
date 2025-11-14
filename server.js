@@ -17,6 +17,7 @@ const io = new Server(server, {
 });
 
 app.use(cors());
+app.use(express.json()); // Parse JSON request bodies
 app.use(express.static(".")); // serve files from home directory
 
 // ESP32 Serial Communication
@@ -196,6 +197,53 @@ app.get("/api", (req, res) => {
 // Lightboard emulator endpoint
 app.get("/lightboard", (req, res) => {
   res.sendFile(path.join(process.cwd(), 'lightboard.html'));
+});
+
+// Lightboard state endpoints
+app.get("/api/lightboard-state", (req, res) => {
+  try {
+    const statePath = path.join(process.cwd(), 'lightboard.json');
+    
+    if (!fs.existsSync(statePath)) {
+      // Return default state if file doesn't exist
+      return res.json({
+        gameState: {
+          mode: 1,
+          p2ColorIndex: 0,
+          p3ColorIndex: 1,
+          p2Pos: -1,
+          p3Pos: 38,
+          nextLedPos: 0,
+          tugBoundary: 18,
+          p2RacePos: -1,
+          p3RacePos: -1,
+          celebrating: false,
+          winner: 0,
+          scoringSequence: []
+        }
+      });
+    }
+    
+    const stateData = fs.readFileSync(statePath, 'utf8');
+    const state = JSON.parse(stateData);
+    res.json(state);
+  } catch (error) {
+    console.error('Error reading lightboard state:', error);
+    res.status(500).json({ error: 'Failed to read lightboard state' });
+  }
+});
+
+app.post("/api/lightboard-state", (req, res) => {
+  try {
+    const statePath = path.join(process.cwd(), 'lightboard.json');
+    const stateData = JSON.stringify(req.body, null, 2);
+    
+    fs.writeFileSync(statePath, stateData, 'utf8');
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error saving lightboard state:', error);
+    res.status(500).json({ error: 'Failed to save lightboard state' });
+  }
 });
 
 // Quiz files listing endpoint
