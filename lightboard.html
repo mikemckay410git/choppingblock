@@ -572,7 +572,8 @@
                 }
             } else if (command.cmd === 'reset') {
                 console.log('🔄 Reset command received');
-                resetGameState();
+                // Reset positions and settings to defaults (settings command will confirm/update if received)
+                resetAllSettings();
                 updateLightboard();
                 saveState();
             } else if (command.cmd === 'lightboardSettings') {
@@ -859,6 +860,16 @@
             
             // Stop any active celebration
             celebrationState.active = false;
+        }
+        
+        function resetAllSettings() {
+            // Reset settings to defaults
+            gameState.mode = 1;
+            gameState.p2ColorIndex = 0;
+            gameState.p3ColorIndex = 1;
+            
+            // Also reset game positions
+            resetGameState();
         }
 
         function updateStatus(elementId, connected) {

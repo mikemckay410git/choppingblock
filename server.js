@@ -356,14 +356,33 @@ io.on("connection", (socket) => {
       // Client-initiated reset (from "Reset All Data") - reset everything including settings
       lightboardState.resetAll();
       console.log('Reset all lightboard data including settings');
+      
+      // Get the reset state with default settings
+      const resetState = lightboardState.getGameState();
+      
+      // Send the reset command to ESP32
+      esp32Bridge.sendToESP32(command);
+      
+      // Also send the updated default settings to ESP32 and emulator
+      const settingsCommand = {
+        cmd: 'lightboardSettings',
+        mode: resetState.mode,
+        p2Color: resetState.p2ColorIndex,
+        p3Color: resetState.p3ColorIndex
+      };
+      esp32Bridge.sendToESP32(settingsCommand);
+      io.emit('esp32_command', settingsCommand);
+      
+      // Broadcast the reset command to all connected clients (including lightboard emulator)
+      io.emit('esp32_command', command);
+      return; // Don't send reset command again below
     } else if (command.cmd === 'lightboardSettings' && command.mode !== undefined) {
       lightboardState.updateSettings(command.mode, command.p2Color, command.p3Color);
       console.log(`Updated lightboard settings: mode=${command.mode}, p2Color=${command.p2Color}, p3Color=${command.p3Color}`);
     }
     
+    // Send command to ESP32 and broadcast to all clients (unless already handled above)
     esp32Bridge.sendToESP32(command);
-    
-    // Broadcast the command to all connected clients (including lightboard emulator)
     io.emit('esp32_command', command);
   });
   
