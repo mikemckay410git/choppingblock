@@ -1221,6 +1221,19 @@ function startEditingName(nameElement, defaultName) {
   nameElement.classList.add('editing');
   
   const currentName = nameElement.textContent;
+  
+  // Store the original width to prevent tile expansion
+  const originalWidth = nameElement.offsetWidth;
+  const parentTile = nameElement.closest('.player-tile');
+  
+  // Set a fixed width on the parent tile to prevent expansion
+  if (parentTile) {
+    const tileWidth = parentTile.offsetWidth;
+    parentTile.style.width = tileWidth + 'px';
+    parentTile.style.minWidth = tileWidth + 'px';
+    parentTile.style.maxWidth = tileWidth + 'px';
+  }
+  
   const input = document.createElement('input');
   input.type = 'text';
   input.value = currentName;
@@ -1231,7 +1244,9 @@ function startEditingName(nameElement, defaultName) {
     font-weight: 600;
     font-size: 16px;
     text-align: center;
-    width: 100%;
+    width: ${originalWidth}px;
+    max-width: ${originalWidth}px;
+    min-width: ${originalWidth}px;
     outline: none;
     font-family: inherit;
     -webkit-user-select: text;
@@ -1262,6 +1277,13 @@ function startEditingName(nameElement, defaultName) {
     nameElement.classList.remove('editing');
     isEditingName = false;
     
+    // Restore the parent tile's width constraints
+    if (parentTile) {
+      parentTile.style.width = '';
+      parentTile.style.minWidth = '';
+      parentTile.style.maxWidth = '';
+    }
+    
     // Update stored names
     if (nameElement === player1Name) {
       player1NameText = newName;
@@ -1282,6 +1304,13 @@ function startEditingName(nameElement, defaultName) {
       nameElement.textContent = currentName;
       nameElement.classList.remove('editing');
       isEditingName = false;
+      
+      // Restore the parent tile's width constraints
+      if (parentTile) {
+        parentTile.style.width = '';
+        parentTile.style.minWidth = '';
+        parentTile.style.maxWidth = '';
+      }
     }
   });
   
