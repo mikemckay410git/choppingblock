@@ -1218,21 +1218,35 @@ function startEditingName(nameElement, defaultName) {
   if (isEditingName) return;
   
   isEditingName = true;
-  nameElement.classList.add('editing');
   
   const currentName = nameElement.textContent;
-  
-  // Store the original width to prevent tile expansion
-  const originalWidth = nameElement.offsetWidth;
   const parentTile = nameElement.closest('.player-tile');
   
-  // Set a fixed width on the parent tile to prevent expansion
+  // CRITICAL: Measure tile width BEFORE making any changes
+  const tileWidth = parentTile ? parentTile.offsetWidth : 0;
+  
+  // Lock the parent tile width FIRST to prevent any expansion
   if (parentTile) {
-    const tileWidth = parentTile.offsetWidth;
-    parentTile.style.width = tileWidth + 'px';
-    parentTile.style.minWidth = tileWidth + 'px';
-    parentTile.style.maxWidth = tileWidth + 'px';
+    // Use !important via setProperty to override any CSS
+    parentTile.style.setProperty('width', tileWidth + 'px', 'important');
+    parentTile.style.setProperty('min-width', tileWidth + 'px', 'important');
+    parentTile.style.setProperty('max-width', tileWidth + 'px', 'important');
+    parentTile.style.setProperty('overflow', 'hidden', 'important');
+    parentTile.style.setProperty('flex-shrink', '0', 'important');
+    parentTile.style.setProperty('flex-grow', '0', 'important');
   }
+  
+  // Now add the editing class
+  nameElement.classList.add('editing');
+  
+  // Constrain the name element itself - measure after adding class
+  const nameWidth = nameElement.offsetWidth;
+  nameElement.style.setProperty('width', nameWidth + 'px', 'important');
+  nameElement.style.setProperty('max-width', nameWidth + 'px', 'important');
+  nameElement.style.setProperty('min-width', nameWidth + 'px', 'important');
+  nameElement.style.setProperty('overflow', 'hidden', 'important');
+  nameElement.style.setProperty('display', 'block', 'important');
+  nameElement.style.setProperty('box-sizing', 'border-box', 'important');
   
   const input = document.createElement('input');
   input.type = 'text';
@@ -1244,9 +1258,9 @@ function startEditingName(nameElement, defaultName) {
     font-weight: 600;
     font-size: 16px;
     text-align: center;
-    width: ${originalWidth}px;
-    max-width: ${originalWidth}px;
-    min-width: ${originalWidth}px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     outline: none;
     font-family: inherit;
     -webkit-user-select: text;
@@ -1254,6 +1268,7 @@ function startEditingName(nameElement, defaultName) {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    overflow: hidden;
   `;
   
   // Clear any existing content and add the input
@@ -1279,10 +1294,21 @@ function startEditingName(nameElement, defaultName) {
     
     // Restore the parent tile's width constraints
     if (parentTile) {
-      parentTile.style.width = '';
-      parentTile.style.minWidth = '';
-      parentTile.style.maxWidth = '';
+      parentTile.style.removeProperty('width');
+      parentTile.style.removeProperty('min-width');
+      parentTile.style.removeProperty('max-width');
+      parentTile.style.removeProperty('overflow');
+      parentTile.style.removeProperty('flex-shrink');
+      parentTile.style.removeProperty('flex-grow');
     }
+    
+    // Restore the name element's constraints
+    nameElement.style.removeProperty('width');
+    nameElement.style.removeProperty('max-width');
+    nameElement.style.removeProperty('min-width');
+    nameElement.style.removeProperty('overflow');
+    nameElement.style.removeProperty('display');
+    nameElement.style.removeProperty('box-sizing');
     
     // Update stored names
     if (nameElement === player1Name) {
@@ -1307,10 +1333,21 @@ function startEditingName(nameElement, defaultName) {
       
       // Restore the parent tile's width constraints
       if (parentTile) {
-        parentTile.style.width = '';
-        parentTile.style.minWidth = '';
-        parentTile.style.maxWidth = '';
+        parentTile.style.removeProperty('width');
+        parentTile.style.removeProperty('min-width');
+        parentTile.style.removeProperty('max-width');
+        parentTile.style.removeProperty('overflow');
+        parentTile.style.removeProperty('flex-shrink');
+        parentTile.style.removeProperty('flex-grow');
       }
+      
+      // Restore the name element's constraints
+      nameElement.style.removeProperty('width');
+      nameElement.style.removeProperty('max-width');
+      nameElement.style.removeProperty('min-width');
+      nameElement.style.removeProperty('overflow');
+      nameElement.style.removeProperty('display');
+      nameElement.style.removeProperty('box-sizing');
     }
   });
   
