@@ -30,6 +30,7 @@ class ESP32Bridge {
     this.parser = null;
     this.io = io;
     this.enabled = false; // Track if serial is enabled
+    this.lightboardConnected = false; // Track if physical lightboard is connected via ESP-NOW
     this.retryTimeout = null; // Track retry timeout for cleanup
     // Removed debounce variables - ESP32 handles awarding internally
   }
@@ -54,7 +55,12 @@ class ESP32Bridge {
       if (!portExists) {
         console.log(`Serial port ${this.serialPort} not found. ESP32 communication disabled.`);
         console.log('Server will run without ESP32 connection.');
-        this.io.emit('esp32_status', { connected: false, enabled: false });
+        this.lightboardConnected = false;
+        this.io.emit('esp32_status', { 
+          connected: false, 
+          enabled: false,
+          lightboardConnected: false
+        });
         return;
       }
       
@@ -70,15 +76,24 @@ class ESP32Bridge {
       this.serialConnection.on('open', () => {
         console.log(`Connected to ESP32 on ${this.serialPort}`);
         // Notify all clients that ESP32 is connected
-        this.io.emit('esp32_status', { connected: true, enabled: true });
+        this.io.emit('esp32_status', { 
+          connected: true, 
+          enabled: true,
+          lightboardConnected: this.lightboardConnected
+        });
       });
 
       this.serialConnection.on('error', (err) => {
         console.warn(`Serial connection error: ${err.message}`);
         this.cleanup();
         this.enabled = false;
+        this.lightboardConnected = false; // Reset lightboard connection status
         // Notify all clients that ESP32 is disconnected
-        this.io.emit('esp32_status', { connected: false, enabled: false });
+        this.io.emit('esp32_status', { 
+          connected: false, 
+          enabled: false,
+          lightboardConnected: false
+        });
         // Retry connection after 5 seconds (longer delay for optional connection)
         this.retryTimeout = setTimeout(() => this.startSerialCommunication(), 5000);
       });
@@ -100,8 +115,13 @@ class ESP32Bridge {
       console.log('Server will continue running without ESP32 connection.');
       this.cleanup();
       this.enabled = false;
+      this.lightboardConnected = false;
       // Notify all clients that ESP32 is disconnected
-      this.io.emit('esp32_status', { connected: false, enabled: false });
+      this.io.emit('esp32_status', { 
+        connected: false, 
+        enabled: false,
+        lightboardConnected: false
+      });
       // Retry connection after 5 seconds (longer delay for optional connection)
       this.retryTimeout = setTimeout(() => this.startSerialCommunication(), 5000);
     }
@@ -112,6 +132,25 @@ class ESP32Bridge {
       // Parse JSON message from ESP32
       const data = JSON.parse(message);
       console.log('Received from ESP32:', data);
+      
+      // Check if this is a status message with connection info
+      if (data.type === 'status') {
+        // Update lightboard connection status from Bridge
+        if (data.lightboardConnected !== undefined) {
+          const wasConnected = this.lightboardConnected;
+          this.lightboardConnected = data.lightboardConnected;
+          
+          // Emit status update if connection state changed
+          if (wasConnected !== this.lightboardConnected) {
+            this.io.emit('esp32_status', { 
+              connected: this.serialConnection ? this.serialConnection.isOpen : false,
+              enabled: this.enabled,
+              lightboardConnected: this.lightboardConnected
+            });
+            console.log(`Lightboard connection status: ${this.lightboardConnected ? 'connected' : 'disconnected'}`);
+          }
+        }
+      }
       
       // Check if this is a request for lightboard state
       if (data.type === 'lightboardStateRequest') {
@@ -341,7 +380,8 @@ io.on("connection", (socket) => {
   // Send current ESP32 status to new client
   socket.emit('esp32_status', { 
     connected: esp32Bridge.serialConnection ? esp32Bridge.serialConnection.isOpen : false,
-    enabled: esp32Bridge.enabled
+    enabled: esp32Bridge.enabled,
+    lightboardConnected: esp32Bridge.lightboardConnected
   });
   
   // Handle commands from client to ESP32

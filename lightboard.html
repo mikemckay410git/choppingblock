@@ -512,7 +512,8 @@
 
         socket.on('esp32_status', (data) => {
             updateStatus('esp32Status', data.connected);
-            updateStatus('lightboardStatus', data.enabled);
+            // Physical lightboard connection status (via ESP-NOW from Bridge)
+            updateStatus('lightboardStatus', data.lightboardConnected || false);
         });
 
         socket.on('esp32_data', (data) => {
