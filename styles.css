@@ -609,6 +609,16 @@ button:active {
     border-radius: 4px;
     padding: 2px 6px;
     outline: 2px solid var(--accent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.player-name.editing input {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .player-score {

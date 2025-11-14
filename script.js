@@ -1219,34 +1219,20 @@ function startEditingName(nameElement, defaultName) {
   
   isEditingName = true;
   
-  const currentName = nameElement.textContent;
   const parentTile = nameElement.closest('.player-tile');
+  const currentName = nameElement.textContent;
   
-  // CRITICAL: Measure tile width BEFORE making any changes
-  const tileWidth = parentTile ? parentTile.offsetWidth : 0;
-  
-  // Lock the parent tile width FIRST to prevent any expansion
+  // Lock the parent tile width BEFORE making any changes to prevent expansion
   if (parentTile) {
-    // Use !important via setProperty to override any CSS
-    parentTile.style.setProperty('width', tileWidth + 'px', 'important');
-    parentTile.style.setProperty('min-width', tileWidth + 'px', 'important');
-    parentTile.style.setProperty('max-width', tileWidth + 'px', 'important');
-    parentTile.style.setProperty('overflow', 'hidden', 'important');
-    parentTile.style.setProperty('flex-shrink', '0', 'important');
-    parentTile.style.setProperty('flex-grow', '0', 'important');
+    const tileWidth = parentTile.offsetWidth;
+    parentTile.style.width = tileWidth + 'px';
+    parentTile.style.minWidth = tileWidth + 'px';
+    parentTile.style.maxWidth = tileWidth + 'px';
+    parentTile.style.flexShrink = '0';
+    parentTile.style.flexGrow = '0';
   }
   
-  // Now add the editing class
   nameElement.classList.add('editing');
-  
-  // Constrain the name element itself - measure after adding class
-  const nameWidth = nameElement.offsetWidth;
-  nameElement.style.setProperty('width', nameWidth + 'px', 'important');
-  nameElement.style.setProperty('max-width', nameWidth + 'px', 'important');
-  nameElement.style.setProperty('min-width', nameWidth + 'px', 'important');
-  nameElement.style.setProperty('overflow', 'hidden', 'important');
-  nameElement.style.setProperty('display', 'block', 'important');
-  nameElement.style.setProperty('box-sizing', 'border-box', 'important');
   
   const input = document.createElement('input');
   input.type = 'text';
@@ -1260,7 +1246,6 @@ function startEditingName(nameElement, defaultName) {
     text-align: center;
     width: 100%;
     max-width: 100%;
-    min-width: 0;
     outline: none;
     font-family: inherit;
     -webkit-user-select: text;
@@ -1269,6 +1254,7 @@ function startEditingName(nameElement, defaultName) {
     padding: 0;
     box-sizing: border-box;
     overflow: hidden;
+    text-overflow: ellipsis;
   `;
   
   // Clear any existing content and add the input
@@ -1292,23 +1278,14 @@ function startEditingName(nameElement, defaultName) {
     nameElement.classList.remove('editing');
     isEditingName = false;
     
-    // Restore the parent tile's width constraints
+    // Restore the parent tile's flexible sizing
     if (parentTile) {
       parentTile.style.removeProperty('width');
       parentTile.style.removeProperty('min-width');
       parentTile.style.removeProperty('max-width');
-      parentTile.style.removeProperty('overflow');
       parentTile.style.removeProperty('flex-shrink');
       parentTile.style.removeProperty('flex-grow');
     }
-    
-    // Restore the name element's constraints
-    nameElement.style.removeProperty('width');
-    nameElement.style.removeProperty('max-width');
-    nameElement.style.removeProperty('min-width');
-    nameElement.style.removeProperty('overflow');
-    nameElement.style.removeProperty('display');
-    nameElement.style.removeProperty('box-sizing');
     
     // Update stored names
     if (nameElement === player1Name) {
@@ -1331,23 +1308,14 @@ function startEditingName(nameElement, defaultName) {
       nameElement.classList.remove('editing');
       isEditingName = false;
       
-      // Restore the parent tile's width constraints
+      // Restore the parent tile's flexible sizing
       if (parentTile) {
         parentTile.style.removeProperty('width');
         parentTile.style.removeProperty('min-width');
         parentTile.style.removeProperty('max-width');
-        parentTile.style.removeProperty('overflow');
         parentTile.style.removeProperty('flex-shrink');
         parentTile.style.removeProperty('flex-grow');
       }
-      
-      // Restore the name element's constraints
-      nameElement.style.removeProperty('width');
-      nameElement.style.removeProperty('max-width');
-      nameElement.style.removeProperty('min-width');
-      nameElement.style.removeProperty('overflow');
-      nameElement.style.removeProperty('display');
-      nameElement.style.removeProperty('box-sizing');
     }
   });
   
