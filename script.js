@@ -194,6 +194,29 @@ function isAudioFile(value) {
   return audioExtensions.some(ext => lowerValue.endsWith(ext));
 }
 
+// === PRELOAD IMAGES ===
+function preloadImages(questions) {
+  // Collect all unique icon paths from questions
+  const imagePaths = new Set();
+  questions.forEach(qa => {
+    if (qa.iconPath) {
+      imagePaths.add(qa.iconPath);
+    }
+  });
+  
+  // Preload each image by creating Image objects
+  imagePaths.forEach(imagePath => {
+    const img = new Image();
+    img.src = imagePath;
+    // Optional: log errors for debugging, but don't block
+    img.onerror = function() {
+      console.warn(`Failed to preload image: ${imagePath}`);
+    };
+  });
+  
+  console.log(`Preloaded ${imagePaths.size} images for faster loading`);
+}
+
 // === APP STATE ===
 let QA = [];
 let currentCategory = '';
@@ -508,6 +531,9 @@ function loadCategory(filename) {
   currentQuizType = category.type || 'regular';
   quizTitle.textContent = currentCategory;
   
+  // Preload all images for faster question transitions
+  preloadImages(QA);
+  
   // Music controls visibility will be handled per-question in render()
   // Initially hide them, they'll be shown if the first question has audio
   musicControls.classList.add('hidden');
@@ -543,6 +569,9 @@ function loadCombinedCategories(categories) {
   currentCategory = `Mixed: ${categoryNames.join(', ')}`;
   currentQuizType = hasMusicQuiz ? 'music' : 'regular';
   quizTitle.textContent = currentCategory;
+  
+  // Preload all images for faster question transitions
+  preloadImages(QA);
   
   // Music controls visibility will be handled per-question in render()
   // Initially hide them, they'll be shown if the first question has audio
