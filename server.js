@@ -31,8 +31,8 @@ class ESP32Bridge {
     this.io = io;
     this.enabled = false; // Track if serial is enabled
     this.lightboardConnected = false; // Track if physical lightboard is connected via ESP-NOW
+    this.player1Connected = false; // Track if Player 1 is connected via ESP-NOW
     this.player2Connected = false; // Track if Player 2 is connected via ESP-NOW
-    this.player3Connected = false; // Track if Player 3 is connected via ESP-NOW
     this.retryTimeout = null; // Track retry timeout for cleanup
     this.heartbeatInterval = null; // Track heartbeat interval timer
     // Removed debounce variables - ESP32 handles awarding internally
@@ -59,14 +59,14 @@ class ESP32Bridge {
         console.log(`Serial port ${this.serialPort} not found. ESP32 communication disabled.`);
         console.log('Server will run without ESP32 connection.');
         this.lightboardConnected = false;
+        this.player1Connected = false;
         this.player2Connected = false;
-        this.player3Connected = false;
         this.io.emit('esp32_status', { 
           connected: false, 
           enabled: false,
           lightboardConnected: false,
-          player2Connected: false,
-          player3Connected: false
+          player1Connected: false,
+          player2Connected: false
         });
         return;
       }
@@ -87,8 +87,8 @@ class ESP32Bridge {
           connected: true, 
           enabled: true,
           lightboardConnected: this.lightboardConnected,
-          player2Connected: this.player2Connected,
-          player3Connected: this.player3Connected
+          player1Connected: this.player1Connected,
+          player2Connected: this.player2Connected
         });
         
         // Start sending periodic heartbeats to Bridge (every 2 seconds)
@@ -101,15 +101,15 @@ class ESP32Bridge {
         this.cleanup();
         this.enabled = false;
         this.lightboardConnected = false; // Reset lightboard connection status
-        this.player2Connected = false; // Reset player connections
-        this.player3Connected = false;
+        this.player1Connected = false; // Reset player connections
+        this.player2Connected = false;
         // Notify all clients that ESP32 is disconnected
         this.io.emit('esp32_status', { 
           connected: false, 
           enabled: false,
           lightboardConnected: false,
-          player2Connected: false,
-          player3Connected: false
+          player1Connected: false,
+          player2Connected: false
         });
         // Retry connection after 5 seconds (longer delay for optional connection)
         this.retryTimeout = setTimeout(() => this.startSerialCommunication(), 5000);
@@ -168,20 +168,20 @@ class ESP32Bridge {
           }
         }
         
+        if (data.player1Connected !== undefined) {
+          const wasConnected = this.player1Connected;
+          this.player1Connected = data.player1Connected;
+          if (wasConnected !== this.player1Connected) {
+            console.log(`Player 1 connection status changed: ${this.player1Connected ? 'connected' : 'disconnected'}`);
+            statusChanged = true;
+          }
+        }
+        
         if (data.player2Connected !== undefined) {
           const wasConnected = this.player2Connected;
           this.player2Connected = data.player2Connected;
           if (wasConnected !== this.player2Connected) {
             console.log(`Player 2 connection status changed: ${this.player2Connected ? 'connected' : 'disconnected'}`);
-            statusChanged = true;
-          }
-        }
-        
-        if (data.player3Connected !== undefined) {
-          const wasConnected = this.player3Connected;
-          this.player3Connected = data.player3Connected;
-          if (wasConnected !== this.player3Connected) {
-            console.log(`Player 3 connection status changed: ${this.player3Connected ? 'connected' : 'disconnected'}`);
             statusChanged = true;
           }
         }
@@ -192,8 +192,8 @@ class ESP32Bridge {
           connected: this.serialConnection ? this.serialConnection.isOpen : false,
           enabled: this.enabled,
           lightboardConnected: this.lightboardConnected,
-          player2Connected: this.player2Connected,
-          player3Connected: this.player3Connected
+          player1Connected: this.player1Connected,
+          player2Connected: this.player2Connected
         });
       }
       
@@ -213,11 +213,11 @@ class ESP32Bridge {
       
       // Update state when receiving point awards from ESP32
       if (data.type === 'winner' && data.winner) {
-        // Extract player number from winner string (e.g., "Player 2" -> 2)
+        // Extract player number from winner string (e.g., "Player 1" -> 1)
         const playerMatch = data.winner.match(/Player (\d+)/);
         if (playerMatch) {
           const player = parseInt(playerMatch[1]);
-          if (player === 2 || player === 3) {
+          if (player === 1 || player === 2) {
             lightboardState.awardPoint(player, 1);
             console.log(`Updated lightboard state: Player ${player} scored`);
           }
@@ -463,8 +463,8 @@ io.on("connection", (socket) => {
     connected: esp32Bridge.serialConnection ? esp32Bridge.serialConnection.isOpen : false,
     enabled: esp32Bridge.enabled,
     lightboardConnected: esp32Bridge.lightboardConnected,
-    player2Connected: esp32Bridge.player2Connected,
-    player3Connected: esp32Bridge.player3Connected
+    player1Connected: esp32Bridge.player1Connected,
+    player2Connected: esp32Bridge.player2Connected
   });
   
   // Handle commands from client to ESP32
@@ -490,8 +490,8 @@ io.on("connection", (socket) => {
       const settingsCommand = {
         cmd: 'lightboardSettings',
         mode: resetState.mode,
-        p2Color: resetState.p2ColorIndex,
-        p3Color: resetState.p3ColorIndex
+        p1Color: resetState.p1ColorIndex,
+        p2Color: resetState.p2ColorIndex
       };
       esp32Bridge.sendToESP32(settingsCommand);
       io.emit('esp32_command', settingsCommand);
@@ -500,8 +500,8 @@ io.on("connection", (socket) => {
       io.emit('esp32_command', command);
       return; // Don't send reset command again below
     } else if (command.cmd === 'lightboardSettings' && command.mode !== undefined) {
-      lightboardState.updateSettings(command.mode, command.p2Color, command.p3Color);
-      console.log(`Updated lightboard settings: mode=${command.mode}, p2Color=${command.p2Color}, p3Color=${command.p3Color}`);
+      lightboardState.updateSettings(command.mode, command.p1Color, command.p2Color);
+      console.log(`Updated lightboard settings: mode=${command.mode}, p1Color=${command.p1Color}, p2Color=${command.p2Color}`);
     }
     
     // Send command to ESP32 and broadcast to all clients (unless already handled above)

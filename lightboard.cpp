@@ -29,16 +29,16 @@ typedef struct struct_lightboard_message {
   uint8_t  deviceId;     // 3=Lightboard
   uint8_t  action;       // 1=heartbeat, 2=game-state, 3=score-update, 4=mode-change, 5=reset, 6=state-restore, 7=state-request
   uint8_t  gameMode;     // 1-6 (Territory, Swap Sides, Split Scoring, Score Order, Race, Tug O War)
+  uint8_t  p1ColorIndex; // Player 1 color index
   uint8_t  p2ColorIndex; // Player 2 color index
-  uint8_t  p3ColorIndex; // Player 3 color index
+  int8_t   p1Pos;        // Player 1 position (-1 to NUM_LEDS)
   int8_t   p2Pos;        // Player 2 position (-1 to NUM_LEDS)
-  int8_t   p3Pos;        // Player 3 position (-1 to NUM_LEDS)
   uint8_t  nextLedPos;   // For Score Order mode
   uint8_t  tugBoundary;  // For Tug O War mode
+  uint8_t  p1RacePos;    // For Race mode
   uint8_t  p2RacePos;    // For Race mode
-  uint8_t  p3RacePos;    // For Race mode
   uint8_t  celebrating;  // Celebration state
-  uint8_t  winner;       // 0=none, 2=Player2, 3=Player3
+  uint8_t  winner;       // 0=none, 1=Player1, 2=Player2
 } struct_lightboard_message;
 
 struct_lightboard_message myData;
@@ -52,8 +52,8 @@ bool player1MacLearned = false;
 static bool wasConnected = false; // Track if we've been connected before
 
 // ---- Game state ----
-int p2Pos = -1;
-int p3Pos = NUM_LEDS;
+int p1Pos = -1;
+int p2Pos = NUM_LEDS;
 bool celebrating = false;
 
 // Mode 4: Score Order tracking
@@ -61,8 +61,8 @@ int nextLedPosition = 0;
 int scoringSequence[NUM_LEDS];
 
 // Mode 5: Race tracking
+int p1RacePos = -1;
 int p2RacePos = -1;
-int p3RacePos = -1;
 
 // Mode 6: Tug O War tracking
 int tugBoundary = CENTER_LEFT;
@@ -87,14 +87,14 @@ const PlayerColor availableColors[] = {
 const int NUM_COLORS = sizeof(availableColors) / sizeof(availableColors[0]);
 
 // Current player colors (indices into availableColors array)
-int p2ColorIndex = 0; // Red (default)
-int p3ColorIndex = 1; // Blue (default)
+int p1ColorIndex = 0; // Red (default)
+int p2ColorIndex = 1; // Blue (default)
 
 // Prototypes to placate Arduino preprocessor with custom return types
+PlayerColor getP1Color();
 PlayerColor getP2Color();
-PlayerColor getP3Color();
+uint32_t getP1ColorValue();
 uint32_t getP2ColorValue();
-uint32_t getP3ColorValue();
 void requestStateRestore();
 
 // ==================== Celebration Manager ====================
@@ -106,7 +106,7 @@ enum CelebrationType : uint8_t {
 };
 
 bool celActive = false;
-bool celP2Wins = false;
+bool celP1Wins = false;
 CelebrationType celType = CEL_WINNER_CHASE;
 
 uint32_t celStartMs = 0;
@@ -127,15 +127,15 @@ static inline uint32_t scaleColor(uint8_t r,uint8_t g,uint8_t b,float s){
   return strip.Color((uint8_t)(r*s),(uint8_t)(g*s),(uint8_t)(b*s));
 }
 
-void startCelebration(bool player2Wins) {
+void startCelebration(bool player1Wins) {
   celActive = true;
-  celP2Wins = player2Wins;
-  if (celP2Wins) { 
-    PlayerColor c = getP2Color();
+  celP1Wins = player1Wins;
+  if (celP1Wins) { 
+    PlayerColor c = getP1Color();
     winnerR=c.r; winnerG=c.g; winnerB=c.b; 
   }
   else { 
-    PlayerColor c = getP3Color();
+    PlayerColor c = getP2Color();
     winnerR=c.r; winnerG=c.g; winnerB=c.b; 
   }
 
@@ -232,16 +232,16 @@ bool updateCelebration() {
 inline uint32_t col(uint8_t r, uint8_t g, uint8_t b){ return strip.Color(r,g,b); }
 
 // Get current player colors
+PlayerColor getP1Color() { return availableColors[p1ColorIndex]; }
 PlayerColor getP2Color() { return availableColors[p2ColorIndex]; }
-PlayerColor getP3Color() { return availableColors[p3ColorIndex]; }
 
 // Get color as uint32_t for strip.setPixelColor
-uint32_t getP2ColorValue() { 
-  PlayerColor c = getP2Color(); 
+uint32_t getP1ColorValue() { 
+  PlayerColor c = getP1Color(); 
   return col(c.r, c.g, c.b); 
 }
-uint32_t getP3ColorValue() { 
-  PlayerColor c = getP3Color(); 
+uint32_t getP2ColorValue() { 
+  PlayerColor c = getP2Color(); 
   return col(c.r, c.g, c.b); 
 }
 
@@ -259,21 +259,21 @@ void requestStateRestore() {
 
 void paintProgress() {
   for (int i=0;i<NUM_LEDS;i++) strip.setPixelColor(i,0);
-  if (gameMode==2) { if(p2Pos>=0&&p2Pos<NUM_LEDS) strip.setPixelColor(p2Pos,getP2ColorValue()); if(p3Pos>=0&&p3Pos<NUM_LEDS) strip.setPixelColor(p3Pos,getP3ColorValue()); }
-  else if (gameMode==3) { if(p2Pos<=CENTER_LEFT) for(int i=CENTER_LEFT;i>=p2Pos&&i>=0;i--) strip.setPixelColor(i,getP2ColorValue()); if(p3Pos>=CENTER_RIGHT) for(int i=CENTER_RIGHT;i<=p3Pos&&i<NUM_LEDS;i++) strip.setPixelColor(i,getP3ColorValue()); }
-  else if (gameMode==4) { for(int i=0;i<nextLedPosition;i++){ if(scoringSequence[i]==2) strip.setPixelColor(i,getP2ColorValue()); else if(scoringSequence[i]==3) strip.setPixelColor(i,getP3ColorValue()); }}
-  else if (gameMode==5) { bool p2On=(p2RacePos>=0),p3On=(p3RacePos>=0); if(p2On&&p3On&&p2RacePos==p3RacePos) { PlayerColor c2=getP2Color(),c3=getP3Color(); strip.setPixelColor(p2RacePos,col((c2.r+c3.r)/2,(c2.g+c3.g)/2,(c2.b+c3.b)/2)); } else { if(p2On) strip.setPixelColor(p2RacePos,getP2ColorValue()); if(p3On) strip.setPixelColor(p3RacePos,getP3ColorValue()); }}
-  else if (gameMode==6) { for(int i=0;i<=tugBoundary&&i<NUM_LEDS;i++) strip.setPixelColor(i,getP2ColorValue()); for(int i=tugBoundary+1;i<NUM_LEDS;i++) strip.setPixelColor(i,getP3ColorValue()); }
-  else { for(int i=0;i<=p2Pos&&i<NUM_LEDS;i++) strip.setPixelColor(i,getP2ColorValue()); for(int i=NUM_LEDS-1;i>=p3Pos&&i>=0;i--) strip.setPixelColor(i,getP3ColorValue()); }
+  if (gameMode==2) { if(p1Pos>=0&&p1Pos<NUM_LEDS) strip.setPixelColor(p1Pos,getP1ColorValue()); if(p2Pos>=0&&p2Pos<NUM_LEDS) strip.setPixelColor(p2Pos,getP2ColorValue()); }
+  else if (gameMode==3) { if(p1Pos<=CENTER_LEFT) for(int i=CENTER_LEFT;i>=p1Pos&&i>=0;i--) strip.setPixelColor(i,getP1ColorValue()); if(p2Pos>=CENTER_RIGHT) for(int i=CENTER_RIGHT;i<=p2Pos&&i<NUM_LEDS;i++) strip.setPixelColor(i,getP2ColorValue()); }
+  else if (gameMode==4) { for(int i=0;i<nextLedPosition;i++){ if(scoringSequence[i]==1) strip.setPixelColor(i,getP1ColorValue()); else if(scoringSequence[i]==2) strip.setPixelColor(i,getP2ColorValue()); }}
+  else if (gameMode==5) { bool p1On=(p1RacePos>=0),p2On=(p2RacePos>=0); if(p1On&&p2On&&p1RacePos==p2RacePos) { PlayerColor c1=getP1Color(),c2=getP2Color(); strip.setPixelColor(p1RacePos,col((c1.r+c2.r)/2,(c1.g+c2.g)/2,(c1.b+c2.b)/2)); } else { if(p1On) strip.setPixelColor(p1RacePos,getP1ColorValue()); if(p2On) strip.setPixelColor(p2RacePos,getP2ColorValue()); }}
+  else if (gameMode==6) { for(int i=0;i<=tugBoundary&&i<NUM_LEDS;i++) strip.setPixelColor(i,getP1ColorValue()); for(int i=tugBoundary+1;i<NUM_LEDS;i++) strip.setPixelColor(i,getP2ColorValue()); }
+  else { for(int i=0;i<=p1Pos&&i<NUM_LEDS;i++) strip.setPixelColor(i,getP1ColorValue()); for(int i=NUM_LEDS-1;i>=p2Pos&&i>=0;i--) strip.setPixelColor(i,getP2ColorValue()); }
   strip.show();
 }
 
 void resetGame(){ 
   switch(gameMode){
-    case 1:case 2:p2Pos=-1;p3Pos=NUM_LEDS;break;
-    case 3:p2Pos=CENTER_LEFT+1;p3Pos=CENTER_RIGHT-1;break;
+    case 1:case 2:p1Pos=-1;p2Pos=NUM_LEDS;break;
+    case 3:p1Pos=CENTER_LEFT+1;p2Pos=CENTER_RIGHT-1;break;
     case 4:nextLedPosition=0;for(int i=0;i<NUM_LEDS;i++)scoringSequence[i]=0;break;
-    case 5:p2RacePos=-1;p3RacePos=-1;break;
+    case 5:p1RacePos=-1;p2RacePos=-1;break;
     case 6:tugBoundary=CENTER_LEFT;break;
   } 
   if(gameMode==6) paintProgress(); else clearStrip(); 
@@ -330,11 +330,11 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
     } else if (player1Data.action == 2) {
       // Game state update - only update essential settings (mode, colors)
       gameMode = player1Data.gameMode;
+      p1ColorIndex = player1Data.p1ColorIndex;
       p2ColorIndex = player1Data.p2ColorIndex;
-      p3ColorIndex = player1Data.p3ColorIndex;
       
-      Serial.printf("Game state update: mode=%d, p2Color=%d, p3Color=%d\n", 
-                   gameMode, p2ColorIndex, p3ColorIndex);
+      Serial.printf("Game state update: mode=%d, p1Color=%d, p2Color=%d\n", 
+                   gameMode, p1ColorIndex, p2ColorIndex);
       paintProgress();
       
     } else if (player1Data.action == 3) {
@@ -345,8 +345,8 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
     } else if (player1Data.action == 4) {
       // Mode change
       gameMode = player1Data.gameMode;
+      p1ColorIndex = player1Data.p1ColorIndex;
       p2ColorIndex = player1Data.p2ColorIndex;
-      p3ColorIndex = player1Data.p3ColorIndex;
       Serial.printf("Mode changed to: %d\n", gameMode);
       resetGame();
       
@@ -359,14 +359,14 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       // State restore - restore full game state from saved state
       Serial.println("State restore received - restoring lightboard game state");
       gameMode = player1Data.gameMode;
+      p1ColorIndex = player1Data.p1ColorIndex;
       p2ColorIndex = player1Data.p2ColorIndex;
-      p3ColorIndex = player1Data.p3ColorIndex;
+      p1Pos = player1Data.p1Pos;
       p2Pos = player1Data.p2Pos;
-      p3Pos = player1Data.p3Pos;
       nextLedPosition = player1Data.nextLedPos;
       tugBoundary = player1Data.tugBoundary;
+      p1RacePos = player1Data.p1RacePos;
       p2RacePos = player1Data.p2RacePos;
-      p3RacePos = player1Data.p3RacePos;
       celebrating = player1Data.celebrating;
       
       // Restore scoring sequence for mode 4 (Score Order)
@@ -375,8 +375,8 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
         // The sequence will be rebuilt as points are awarded
       }
       
-      Serial.printf("State restored: mode=%d, p2Pos=%d, p3Pos=%d, p2Color=%d, p3Color=%d\n",
-                   gameMode, p2Pos, p3Pos, p2ColorIndex, p3ColorIndex);
+      Serial.printf("State restored: mode=%d, p1Pos=%d, p2Pos=%d, p1Color=%d, p2Color=%d\n",
+                   gameMode, p1Pos, p2Pos, p1ColorIndex, p2ColorIndex);
       
       // Update display with restored state
       paintProgress();
@@ -493,36 +493,36 @@ void handlePointUpdate(uint8_t scoringPlayer) {
   switch (gameMode) {
     case 1: // Territory
       // Move the scoring player toward center
-      if (scoringPlayer == 2 && p2Pos < NUM_LEDS - 1) {
-        p2Pos++;
-      } else if (scoringPlayer == 3 && p3Pos > 0) {
-        p3Pos--;
+      if (scoringPlayer == 1 && p1Pos < NUM_LEDS - 1) {
+        p1Pos++;
+      } else if (scoringPlayer == 2 && p2Pos > 0) {
+        p2Pos--;
       }
       break;
       
     case 2: // Swap Sides
       // Move the scoring player toward center, but avoid collision
-      if (scoringPlayer == 2) {
-        if (p2Pos + 1 == p3Pos) {
-          p2Pos = p3Pos + 1; // Jump over if about to collide
-        } else if (p2Pos < NUM_LEDS - 1) {
-          p2Pos++;
+      if (scoringPlayer == 1) {
+        if (p1Pos + 1 == p2Pos) {
+          p1Pos = p2Pos + 1; // Jump over if about to collide
+        } else if (p1Pos < NUM_LEDS - 1) {
+          p1Pos++;
         }
-      } else if (scoringPlayer == 3) {
-        if (p3Pos - 1 == p2Pos) {
-          p3Pos = p2Pos - 1; // Jump over if about to collide
-        } else if (p3Pos > 0) {
-          p3Pos--;
+      } else if (scoringPlayer == 2) {
+        if (p2Pos - 1 == p1Pos) {
+          p2Pos = p1Pos - 1; // Jump over if about to collide
+        } else if (p2Pos > 0) {
+          p2Pos--;
         }
       }
       break;
       
     case 3: // Split Scoring
       // Move the scoring player away from center
-      if (scoringPlayer == 2 && p2Pos > 0) {
-        p2Pos--;
-      } else if (scoringPlayer == 3 && p3Pos < NUM_LEDS - 1) {
-        p3Pos++;
+      if (scoringPlayer == 1 && p1Pos > 0) {
+        p1Pos--;
+      } else if (scoringPlayer == 2 && p2Pos < NUM_LEDS - 1) {
+        p2Pos++;
       }
       break;
       
@@ -536,18 +536,18 @@ void handlePointUpdate(uint8_t scoringPlayer) {
       
     case 5: // Race
       // Move the scoring player forward
-      if (scoringPlayer == 2 && p2RacePos < NUM_LEDS - 1) {
+      if (scoringPlayer == 1 && p1RacePos < NUM_LEDS - 1) {
+        p1RacePos++;
+      } else if (scoringPlayer == 2 && p2RacePos < NUM_LEDS - 1) {
         p2RacePos++;
-      } else if (scoringPlayer == 3 && p3RacePos < NUM_LEDS - 1) {
-        p3RacePos++;
       }
       break;
       
     case 6: // Tug O War
       // Move boundary based on who scored
-      if (scoringPlayer == 2 && tugBoundary < NUM_LEDS - 1) {
+      if (scoringPlayer == 1 && tugBoundary < NUM_LEDS - 1) {
         tugBoundary++;
-      } else if (scoringPlayer == 3 && tugBoundary >= 0) {
+      } else if (scoringPlayer == 2 && tugBoundary >= 0) {
         tugBoundary--;
       }
       break;
@@ -561,58 +561,58 @@ void handlePointUpdate(uint8_t scoringPlayer) {
 }
 
 void checkWinConditions() {
+  bool p1Wins = false;
   bool p2Wins = false;
-  bool p3Wins = false;
   
   switch (gameMode) {
     case 1: // Territory
-      if (p2Pos >= p3Pos) {
-        p2Wins = (p2Pos + 1 >= NUM_LEDS - p3Pos);
-        p3Wins = !p2Wins;
+      if (p1Pos >= p2Pos) {
+        p1Wins = (p1Pos + 1 >= NUM_LEDS - p2Pos);
+        p2Wins = !p1Wins;
       }
       break;
       
     case 2: // Swap Sides
-      p2Wins = (p2Pos >= NUM_LEDS - 1);
-      p3Wins = (p3Pos <= 0);
+      p1Wins = (p1Pos >= NUM_LEDS - 1);
+      p2Wins = (p2Pos <= 0);
       break;
       
     case 3: // Split Scoring
-      p2Wins = (p2Pos <= 0);
-      p3Wins = (p3Pos >= NUM_LEDS - 1);
+      p1Wins = (p1Pos <= 0);
+      p2Wins = (p2Pos >= NUM_LEDS - 1);
       break;
       
     case 4: // Score Order
       if (nextLedPosition >= NUM_LEDS) {
-        int p2Count = 0, p3Count = 0;
+        int p1Count = 0, p2Count = 0;
         for (int i = 0; i < NUM_LEDS; i++) {
-          if (scoringSequence[i] == 2) p2Count++;
-          else if (scoringSequence[i] == 3) p3Count++;
+          if (scoringSequence[i] == 1) p1Count++;
+          else if (scoringSequence[i] == 2) p2Count++;
         }
-        p2Wins = (p2Count > p3Count);
-        p3Wins = !p2Wins;
+        p1Wins = (p1Count > p2Count);
+        p2Wins = !p1Wins;
       }
       break;
       
     case 5: // Race
+      p1Wins = (p1RacePos >= NUM_LEDS - 1);
       p2Wins = (p2RacePos >= NUM_LEDS - 1);
-      p3Wins = (p3RacePos >= NUM_LEDS - 1);
       break;
       
     case 6: // Tug O War
-      p2Wins = (tugBoundary >= NUM_LEDS - 1);
-      p3Wins = (tugBoundary < 0);
+      p1Wins = (tugBoundary >= NUM_LEDS - 1);
+      p2Wins = (tugBoundary < 0);
       break;
   }
   
-  if (p2Wins && !p3Wins) {
-    Serial.println("Lightboard: Player 2 wins! Starting celebration...");
-    startCelebration(true); // Player 2 wins
+  if (p1Wins && !p2Wins) {
+    Serial.println("Lightboard: Player 1 wins! Starting celebration...");
+    startCelebration(true); // Player 1 wins
     celebrating = true;
     Serial.printf("Celebration started: celActive=%d, celebrating=%d\n", celActive, celebrating);
-  } else if (p3Wins && !p2Wins) {
-    Serial.println("Lightboard: Player 3 wins! Starting celebration...");
-    startCelebration(false); // Player 3 wins
+  } else if (p2Wins && !p1Wins) {
+    Serial.println("Lightboard: Player 2 wins! Starting celebration...");
+    startCelebration(false); // Player 2 wins
     celebrating = true;
     Serial.printf("Celebration started: celActive=%d, celebrating=%d\n", celActive, celebrating);
   }

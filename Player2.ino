@@ -34,8 +34,8 @@ static const unsigned long DEADTIME_MS           = 120;  // ms quiet before reâ€
 // =======================================================
 
 // ===================== ESP-NOW Configuration =====================
-// Player 1 MAC address (hardcoded for reliability)
-uint8_t player1Address[] = {0x80, 0xF3, 0xDA, 0x4A, 0x2F, 0x98}; // Player 1 STA MAC
+// Bridge MAC address (hardcoded for reliability)
+uint8_t bridgeAddress[] = {0x80, 0xF3, 0xDA, 0x4A, 0x2F, 0x98}; // Bridge STA MAC
 const uint8_t ESPNOW_BROADCAST_ADDR[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
 typedef struct struct_message {
@@ -48,17 +48,17 @@ typedef struct struct_message {
 } struct_message;
 
 struct_message myData;
-struct_message player1Data;
+struct_message bridgeData;
 
 // Connection tracking
-bool player1Connected = false;
+bool bridgeConnected = false;
 unsigned long lastHeartbeat = 0;
 const unsigned long heartbeatTimeout = 2000; // 2 seconds
-bool player1MacLearned = false;
+bool bridgeMacLearned = false;
 
 // Clock synchronization (client only responds; host paces requests)
 bool clockSynced = false;
-int32_t clockOffset = 0; // Player1 time - Player2 time
+int32_t clockOffset = 0; // Bridge time - Player2 time
 uint32_t lastSyncTime = 0;
 // =======================================================
 
@@ -89,7 +89,7 @@ struct HitResult {
 // Game state
 bool gameActive = false;
 String winner = "none";
-uint32_t player1HitTime = 0;
+uint32_t bridgeHitTime = 0;
 uint32_t player2HitTime = 0;
 // =======================================================
 
@@ -262,58 +262,49 @@ void OnDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
 void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
   if (len != sizeof(struct_message)) return;
   
-  memcpy(&player1Data, data, sizeof(player1Data));
+  memcpy(&bridgeData, data, sizeof(bridgeData));
 
-  if (player1Data.playerId == 1) {
-    // Learn Player 1 MAC dynamically
-    if (info && !player1MacLearned) {
-      memcpy(player1Address, info->src_addr, 6);
+  if (bridgeData.playerId == 1) {
+    // Learn Bridge MAC dynamically
+    if (info && !bridgeMacLearned) {
+      memcpy(bridgeAddress, info->src_addr, 6);
       char macStr[18];
-      sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", player1Address[0],player1Address[1],player1Address[2],player1Address[3],player1Address[4],player1Address[5]);
-      Serial.printf("Discovered Player 1 MAC: %s\r\n", macStr);
-      esp_now_del_peer(player1Address);
+      sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", bridgeAddress[0],bridgeAddress[1],bridgeAddress[2],bridgeAddress[3],bridgeAddress[4],bridgeAddress[5]);
+      Serial.printf("Discovered Bridge MAC: %s\r\n", macStr);
+      esp_now_del_peer(bridgeAddress);
       esp_now_peer_info_t p = {};
-      memcpy(p.peer_addr, player1Address, 6);
+      memcpy(p.peer_addr, bridgeAddress, 6);
       p.channel = 0;
       p.encrypt = false;
       if (esp_now_add_peer(&p) == ESP_OK) {
-        player1MacLearned = true;
-        Serial.println("Player 1 peer added after discovery");
+        bridgeMacLearned = true;
+        Serial.println("Bridge peer added after discovery");
       } else {
-        Serial.println("Failed to add discovered Player 1 peer");
+        Serial.println("Failed to add discovered Bridge peer");
       }
     }
-    player1Connected = true;
+    bridgeConnected = true;
     lastHeartbeat = millis();
 
-    if (player1Data.action == 1) {
+    if (bridgeData.action == 1) {
       // Heartbeat - just update connection status
-      Serial.println("Player 1 heartbeat received");
-    } else if (player1Data.action == 2) {
-      // Hit detected by Player 1
-      // Convert Player 1's timestamp to our time reference
-      uint32_t adjustedTime = player1Data.hitTime + clockOffset;
-      player1HitTime = adjustedTime;
-      Serial.printf("Player 1 hit detected at %lu (adjusted from %lu) with strength %d\n", 
-                   adjustedTime, player1Data.hitTime, player1Data.hitStrength);
-      
-      // Determine winner if we have both hits
-      if (player2HitTime > 0) {
-        determineWinner();
-      }
-    } else if (player1Data.action == 3) {
-      // Reset request from Player 1
+      Serial.println("Bridge heartbeat received");
+    } else if (bridgeData.action == 2) {
+      // Hit detected by Bridge (shouldn't happen, bridge doesn't detect hits)
+      // This is kept for compatibility but shouldn't be used
+    } else if (bridgeData.action == 3) {
+      // Reset request from Bridge
       resetGame();
-    } else if (player1Data.action == 4) {
+    } else if (bridgeData.action == 4) {
       // Clock synchronization request
       uint32_t now = micros();
-      uint32_t roundTrip = now - player1Data.syncTime;
+      uint32_t roundTrip = now - bridgeData.syncTime;
       
       // Send back our current time and the round trip time
       myData.action = 4; // clock sync response
-      myData.syncTime = player1Data.syncTime; // echo back the original sync time
+      myData.syncTime = bridgeData.syncTime; // echo back the original sync time
       myData.roundTripTime = now; // our current time
-      esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
+      esp_now_send(bridgeAddress, (uint8_t*)&myData, sizeof(myData));
       
       Serial.printf("Clock sync response sent, roundTrip=%lu us\n", roundTrip);
     }
@@ -322,16 +313,16 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
 
 // ===================== Game Logic =====================
 void determineWinner() {
-  if (player1HitTime > 0 && player2HitTime > 0) {
+  if (bridgeHitTime > 0 && player2HitTime > 0) {
     // Calculate time difference in microseconds
-    int32_t timeDiff = (int32_t)player1HitTime - (int32_t)player2HitTime;
+    int32_t timeDiff = (int32_t)bridgeHitTime - (int32_t)player2HitTime;
     
     if (timeDiff < -100) { // Player 2 hit first (with 100us tolerance)
       winner = "Player 2";
       Serial.printf("Player 2 wins! Time diff: %ld us\n", -timeDiff);
-    } else if (timeDiff > 100) { // Player 1 hit first (with 100us tolerance)
-      winner = "Player 1";
-      Serial.printf("Player 1 wins! Time diff: %ld us\n", timeDiff);
+    } else if (timeDiff > 100) { // Bridge hit first (with 100us tolerance)
+      winner = "Bridge";
+      Serial.printf("Bridge wins! Time diff: %ld us\n", timeDiff);
     } else {
       winner = "Tie";
       Serial.printf("It's a tie! Time diff: %ld us\n", timeDiff);
@@ -341,7 +332,7 @@ void determineWinner() {
 
 void resetGame() {
   winner = "none";
-  player1HitTime = 0;
+  bridgeHitTime = 0;
   player2HitTime = 0;
   gameActive = true;
   
@@ -384,15 +375,15 @@ void setup(){
   esp_now_register_send_cb(OnDataSent);
   esp_now_register_recv_cb(OnDataRecv);
 
-  // Add Player 1 peer with known MAC address
+  // Add Bridge peer with known MAC address
   esp_now_peer_info_t peerInfo = {};
-  memcpy(peerInfo.peer_addr, player1Address, 6);
+  memcpy(peerInfo.peer_addr, bridgeAddress, 6);
   peerInfo.channel = 0; // follow current channel
   peerInfo.encrypt = false;
   if (esp_now_add_peer(&peerInfo) == ESP_OK) {
-    Serial.println("Player 1 peer added successfully");
+    Serial.println("Bridge peer added successfully");
   } else {
-    Serial.println("Failed to add Player 1 peer");
+    Serial.println("Failed to add Bridge peer");
   }
 
   myData.playerId = 2;
@@ -416,12 +407,12 @@ void setup(){
   // Initialize game state
   gameActive = true;
   winner = "none";
-  player1HitTime = 0;
+  bridgeHitTime = 0;
   player2HitTime = 0;
   clockSynced = false;
   clockOffset = 0;
   
-  Serial.println("Player 2 ready - waiting for Player 1 connection");
+  Serial.println("Player 2 ready - waiting for Bridge connection");
 }
 
 // ===================== Loop =====================
@@ -511,14 +502,14 @@ void loop(){
       player2HitTime = r.hitTime;
       Serial.printf("Player 2 hit detected at %lu with strength %d\n", player2HitTime, r.hitStrength);
       
-      // Send hit to Player 1
+      // Send hit to Bridge
       myData.action = 2; // hit detected
       myData.hitTime = r.hitTime;
       myData.hitStrength = r.hitStrength;
-      esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
+      esp_now_send(bridgeAddress, (uint8_t*)&myData, sizeof(myData));
       
       // Determine winner if we have both hits
-      if (player1HitTime > 0) {
+      if (bridgeHitTime > 0) {
         determineWinner();
       }
     }
@@ -545,22 +536,23 @@ void loop(){
   }
 
   // Check for connection timeout
-  if (player1Connected && (millis() - lastHeartbeat > heartbeatTimeout)) {
-    player1Connected = false;
+  if (bridgeConnected && (millis() - lastHeartbeat > heartbeatTimeout)) {
+    bridgeConnected = false;
     clockSynced = false; // Reset sync when connection lost
-    player1MacLearned = false; // Reset MAC learning to force rediscovery
-    Serial.println("Player 1 connection lost - resetting discovery");
+    bridgeMacLearned = false; // Reset MAC learning to force rediscovery
+    Serial.println("Bridge connection lost - resetting discovery");
   }
 
-  // Send heartbeat to Player 1
+  // Send heartbeat to Bridge
   static unsigned long lastHeartbeatSend = 0;
   if (millis() - lastHeartbeatSend >= 1000) {
     myData.action = 1; // heartbeat
-    esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
-    Serial.println("Sent heartbeat to Player 1");
+    esp_now_send(bridgeAddress, (uint8_t*)&myData, sizeof(myData));
+    Serial.println("Sent heartbeat to Bridge");
     lastHeartbeatSend = millis();
   }
 
   // Update LED based on connection status
-  digitalWrite(LED_PIN, player1Connected ? HIGH : LOW);
+  digitalWrite(LED_PIN, bridgeConnected ? HIGH : LOW);
 }
+

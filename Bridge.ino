@@ -12,16 +12,16 @@ static const unsigned long SERIAL_TIMEOUT_MS = 100;        // serial read timeou
 // =======================================================
 
 // ===================== ESP-NOW Configuration =====================
+// Player 1 MAC address (hardcoded for reliability)
+uint8_t player1Address[] = {0x6C, 0xC8, 0x40, 0x4E, 0xEC, 0x2C}; // Player 1 STA MAC
 // Player 2 MAC address (hardcoded for reliability)
-uint8_t player2Address[] = {0x6C, 0xC8, 0x40, 0x4E, 0xEC, 0x2C}; // Player 2 STA MAC
-// Player 3 MAC address (hardcoded for reliability)
-uint8_t player3Address[] = {0x80, 0xF3, 0xDA, 0x5E, 0x14, 0xC8}; // Player 3 STA MAC
+uint8_t player2Address[] = {0x80, 0xF3, 0xDA, 0x5E, 0x14, 0xC8}; // Player 2 STA MAC
 // Lightboard MAC address (will be learned dynamically)
 uint8_t lightboardAddress[] = {0x78, 0x1C, 0x3C, 0xB8, 0xD5, 0xA8}; // Lightboard STA MAC
 const uint8_t ESPNOW_BROADCAST_ADDR[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 
 typedef struct struct_message {
-  uint8_t  playerId;   // 1=Player1, 2=Player2, 3=Player3
+  uint8_t  playerId;   // 1=Player1, 2=Player2
   uint8_t  action;     // 1=heartbeat, 2=hit-detected, 3=reset-request, 4=clock-sync
   uint32_t hitTime;    // micros() timestamp of hit
   uint16_t hitStrength; // impact strength
@@ -30,34 +30,34 @@ typedef struct struct_message {
 } struct_message;
 
 typedef struct struct_lightboard_message {
-  uint8_t  deviceId;     // 1=Player1, 3=Lightboard
+  uint8_t  deviceId;     // 1=Bridge, 3=Lightboard
   uint8_t  action;       // 1=heartbeat, 2=game-state, 3=score-update, 4=mode-change, 5=reset, 6=state-restore, 7=state-request
   uint8_t  gameMode;     // 1-6 (Territory, Swap Sides, Split Scoring, Score Order, Race, Tug O War)
+  uint8_t  p1ColorIndex; // Player 1 color index
   uint8_t  p2ColorIndex; // Player 2 color index
-  uint8_t  p3ColorIndex; // Player 3 color index
+  int8_t   p1Pos;        // Player 1 position (-1 to NUM_LEDS)
   int8_t   p2Pos;        // Player 2 position (-1 to NUM_LEDS)
-  int8_t   p3Pos;        // Player 3 position (-1 to NUM_LEDS)
   uint8_t  nextLedPos;   // For Score Order mode
   uint8_t  tugBoundary;  // For Tug O War mode
+  uint8_t  p1RacePos;    // For Race mode
   uint8_t  p2RacePos;    // For Race mode
-  uint8_t  p3RacePos;    // For Race mode
   uint8_t  celebrating;  // Celebration state
-  uint8_t  winner;       // 0=none, 2=Player2, 3=Player3
+  uint8_t  winner;       // 0=none, 1=Player1, 2=Player2
 } struct_lightboard_message;
 
 struct_message myData;
+struct_message player1Data;
 struct_message player2Data;
-struct_message player3Data;
 struct_lightboard_message lightboardData;
 
 // Connection tracking
+bool player1Connected = false;
 bool player2Connected = false;
-bool player3Connected = false;
 unsigned long lastHeartbeat = 0;
-unsigned long lastPlayer3Heartbeat = 0;
+unsigned long lastPlayer2Heartbeat = 0;
 const unsigned long heartbeatTimeout = 2000; // 2 seconds
+bool player1MacLearned = false;
 bool player2MacLearned = false;
-bool player3MacLearned = false;
 
 // Lightboard connection tracking
 bool lightboardConnected = false;
@@ -67,11 +67,11 @@ bool lightboardMacLearned = false;
 
 // Clock synchronization
 bool clockSynced = false;
-bool player3ClockSynced = false;
-int32_t clockOffset = 0; // Player2 time - Player1 time
-int32_t player3ClockOffset = 0; // Player3 time - Player1 time
+bool player2ClockSynced = false;
+int32_t clockOffset = 0; // Player1 time - Bridge time
+int32_t player2ClockOffset = 0; // Player2 time - Bridge time
 uint32_t lastSyncTime = 0;
-uint32_t lastPlayer3SyncTime = 0;
+uint32_t lastPlayer2SyncTime = 0;
 const unsigned long SYNC_INTERVAL = 1000; // Sync at most once per second
 // =======================================================
 
@@ -104,22 +104,22 @@ unsigned long g_lastBroadcastMs = 0;
 // Game state
 bool gameActive = true;  // Start with game active
 String winner = "none";
-// Player 1 is host-only, no local hit time needed
+// Bridge is host-only, no local hit time needed
+uint32_t player1HitTime = 0;
 uint32_t player2HitTime = 0;
-uint32_t player3HitTime = 0;
 
 // Lightboard game state (for LED strip display)
 int lightboardGameMode = 1; // Default to Territory mode
-int lightboardP2ColorIndex = 0; // Red
-int lightboardP3ColorIndex = 1; // Blue
-int lightboardP2Pos = -1;
-int lightboardP3Pos = 38; // NUM_LEDS
+int lightboardP1ColorIndex = 0; // Red
+int lightboardP2ColorIndex = 1; // Blue
+int lightboardP1Pos = -1;
+int lightboardP2Pos = 38; // NUM_LEDS
 int lightboardNextLedPos = 0;
 int lightboardTugBoundary = 18; // CENTER_LEFT
+int lightboardP1RacePos = -1;
 int lightboardP2RacePos = -1;
-int lightboardP3RacePos = -1;
 bool lightboardCelebrating = false;
-uint8_t lightboardWinner = 0; // 0=none, 2=Player2, 3=Player3
+uint8_t lightboardWinner = 0; // 0=none, 1=Player1, 2=Player2
 
 // Quiz action debouncing
 unsigned long lastQuizActionTime = 0;
@@ -136,15 +136,15 @@ unsigned long lastHitProcessTime = 0;
 // Commands from Pi to ESP32 Bridge:
 // {"cmd":"heartbeat"} - Pi heartbeat
 // {"cmd":"reset"} - Reset game
-// {"cmd":"awardPoint","player":2,"multiplier":3} - Award points
-// {"cmd":"lightboardSettings","mode":1,"p2Color":0,"p3Color":1} - Update lightboard
+// {"cmd":"awardPoint","player":1,"multiplier":3} - Award points
+// {"cmd":"lightboardSettings","mode":1,"p1Color":0,"p2Color":1} - Update lightboard
 // {"cmd":"quizAction","action":"next"} - Quiz navigation
 //
 // Messages from ESP32 Bridge to Pi:
-// {"type":"status","player2Connected":true,"player3Connected":true,"lightboardConnected":true}
-// {"type":"winner","winner":"Player 2"}
-// {"type":"hit","player":2,"time":1234567890,"strength":100}
-// {"type":"error","message":"Player 2 disconnected"}
+// {"type":"status","player1Connected":true,"player2Connected":true,"lightboardConnected":true}
+// {"type":"winner","winner":"Player 1"}
+// {"type":"hit","player":1,"time":1234567890,"strength":100}
+// {"type":"error","message":"Player 1 disconnected"}
 // =======================================================
 
 // ===================== ESP-NOW Callbacks =====================
@@ -156,10 +156,83 @@ void OnDataSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
 void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
   // Handle different message types based on length
   if (len == sizeof(struct_message)) {
-    // Player 2 or Player 3 message
-    memcpy(&player2Data, data, sizeof(player2Data));
+    // Player 1 or Player 2 message
+    memcpy(&player1Data, data, sizeof(player1Data));
     
-    if (player2Data.playerId == 2) {
+    if (player1Data.playerId == 1) {
+    // Learn Player 1 MAC dynamically to avoid manual entry issues
+    if (info && !player1MacLearned) {
+      memcpy(player1Address, info->src_addr, 6);
+      char macStr[18];
+      sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", player1Address[0],player1Address[1],player1Address[2],player1Address[3],player1Address[4],player1Address[5]);
+      // Debug: Serial.printf("Discovered Player 1 MAC: %s\r\n", macStr);
+      esp_now_del_peer(player1Address); // ignore result
+      esp_now_peer_info_t p = {};
+      memcpy(p.peer_addr, player1Address, 6);
+      p.channel = 0;
+      p.encrypt = false;
+      if (esp_now_add_peer(&p) == ESP_OK) {
+        player1MacLearned = true;
+        // Debug: Serial.println("Player 1 peer added after discovery");
+      } else {
+        // Debug: Serial.println("Failed to add discovered Player 1 peer");
+      }
+    }
+    player1Connected = true;
+    lastHeartbeat = millis();
+
+    if (player1Data.action == 1) {
+      // Heartbeat - just update connection status (no need to send to Pi)
+    } else if (player1Data.action == 2) {
+      // Hit detected by Player 1
+      // Convert Player 1's timestamp to our time reference
+      uint32_t adjustedTime = player1Data.hitTime + clockOffset;
+      
+      // Deduplication: check if this is a duplicate hit
+      unsigned long now = millis();
+      if (adjustedTime == lastProcessedHitTime && player1Data.playerId == lastProcessedHitPlayer && 
+          (now - lastHitProcessTime) < HIT_DEBOUNCE_MS) {
+        Serial.printf("Duplicate hit from Player 1 ignored (time: %lu)\n", adjustedTime);
+        return;
+      }
+      
+      // Update deduplication tracking
+      lastProcessedHitTime = adjustedTime;
+      lastProcessedHitPlayer = player1Data.playerId;
+      lastHitProcessTime = now;
+      
+      player1HitTime = adjustedTime;
+      Serial.printf("Player 1 hit detected at %lu (adjusted from %lu) with strength %d\n", 
+                   adjustedTime, player1Data.hitTime, player1Data.hitStrength);
+      
+      // Send hit notification to Pi
+      sendToPi("{\"type\":\"hit\",\"player\":1,\"time\":" + String(adjustedTime) + ",\"strength\":" + String(player1Data.hitStrength) + "}");
+      
+      // Declare winner immediately if round active
+      if (gameActive) {
+        winner = "Player 1";
+        gameActive = false;
+        sendToPi("{\"type\":\"winner\",\"winner\":\"Player 1\"}");
+        // Debug: Serial.println("Winner declared: Player 1");
+      }
+    } else if (player1Data.action == 3) {
+      // Reset request from Player 1
+      resetGame();
+    } else if (player1Data.action == 4) {
+      // Clock synchronization response
+      uint32_t now = micros();
+      uint32_t roundTrip = now - player1Data.syncTime;
+      uint32_t player1Time = player1Data.roundTripTime;
+      
+      // Calculate clock offset: (Player1 time + roundTrip/2) - Bridge time
+      clockOffset = (player1Time + roundTrip/2) - now;
+      clockSynced = true;
+      lastSyncTime = millis();
+      
+      // Clock sync complete - no need to send to Pi
+      // Debug: Serial.printf("Clock sync: offset=%ld us, roundTrip=%lu us\n", clockOffset, roundTrip);
+    }
+    } else if (player1Data.playerId == 2) {
     // Learn Player 2 MAC dynamically to avoid manual entry issues
     if (info && !player2MacLearned) {
       memcpy(player2Address, info->src_addr, 6);
@@ -179,14 +252,17 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       }
     }
     player2Connected = true;
-    lastHeartbeat = millis();
+    lastPlayer2Heartbeat = millis();
+    
+    // Copy to player2Data for consistency
+    memcpy(&player2Data, &player1Data, sizeof(player1Data));
 
     if (player2Data.action == 1) {
       // Heartbeat - just update connection status (no need to send to Pi)
     } else if (player2Data.action == 2) {
       // Hit detected by Player 2
       // Convert Player 2's timestamp to our time reference
-      uint32_t adjustedTime = player2Data.hitTime + clockOffset;
+      uint32_t adjustedTime = player2Data.hitTime + player2ClockOffset;
       
       // Deduplication: check if this is a duplicate hit
       unsigned long now = millis();
@@ -224,86 +300,13 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       uint32_t roundTrip = now - player2Data.syncTime;
       uint32_t player2Time = player2Data.roundTripTime;
       
-      // Calculate clock offset: (Player2 time + roundTrip/2) - Player1 time
-      clockOffset = (player2Time + roundTrip/2) - now;
-      clockSynced = true;
-      lastSyncTime = millis();
+      // Calculate clock offset: (Player2 time + roundTrip/2) - Bridge time
+      player2ClockOffset = (player2Time + roundTrip/2) - now;
+      player2ClockSynced = true;
+      lastPlayer2SyncTime = millis();
       
       // Clock sync complete - no need to send to Pi
-      // Debug: Serial.printf("Clock sync: offset=%ld us, roundTrip=%lu us\n", clockOffset, roundTrip);
-    }
-    } else if (player2Data.playerId == 3) {
-    // Learn Player 3 MAC dynamically to avoid manual entry issues
-    if (info && !player3MacLearned) {
-      memcpy(player3Address, info->src_addr, 6);
-      char macStr[18];
-      sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", player3Address[0],player3Address[1],player3Address[2],player3Address[3],player3Address[4],player3Address[5]);
-      // Debug: Serial.printf("Discovered Player 3 MAC: %s\r\n", macStr);
-      esp_now_del_peer(player3Address); // ignore result
-      esp_now_peer_info_t p = {};
-      memcpy(p.peer_addr, player3Address, 6);
-      p.channel = 0;
-      p.encrypt = false;
-      if (esp_now_add_peer(&p) == ESP_OK) {
-        player3MacLearned = true;
-        // Debug: Serial.println("Player 3 peer added after discovery");
-      } else {
-        // Debug: Serial.println("Failed to add discovered Player 3 peer");
-      }
-    }
-    player3Connected = true;
-    lastPlayer3Heartbeat = millis();
-
-    if (player2Data.action == 1) {
-      // Heartbeat - just update connection status (no need to send to Pi)
-    } else if (player2Data.action == 2) {
-      // Hit detected by Player 3
-      // Convert Player 3's timestamp to our time reference
-      uint32_t adjustedTime = player2Data.hitTime + player3ClockOffset;
-      
-      // Deduplication: check if this is a duplicate hit
-      unsigned long now = millis();
-      if (adjustedTime == lastProcessedHitTime && player2Data.playerId == lastProcessedHitPlayer && 
-          (now - lastHitProcessTime) < HIT_DEBOUNCE_MS) {
-        Serial.printf("Duplicate hit from Player 3 ignored (time: %lu)\n", adjustedTime);
-        return;
-      }
-      
-      // Update deduplication tracking
-      lastProcessedHitTime = adjustedTime;
-      lastProcessedHitPlayer = player2Data.playerId;
-      lastHitProcessTime = now;
-      
-      player3HitTime = adjustedTime;
-      Serial.printf("Player 3 hit detected at %lu (adjusted from %lu) with strength %d\n", 
-                   adjustedTime, player2Data.hitTime, player2Data.hitStrength);
-      
-      // Send hit notification to Pi
-      sendToPi("{\"type\":\"hit\",\"player\":3,\"time\":" + String(adjustedTime) + ",\"strength\":" + String(player2Data.hitStrength) + "}");
-      
-      // Declare winner immediately if round active
-      if (gameActive) {
-        winner = "Player 3";
-        gameActive = false;
-        sendToPi("{\"type\":\"winner\",\"winner\":\"Player 3\"}");
-        // Debug: Serial.println("Winner declared: Player 3");
-      }
-    } else if (player2Data.action == 3) {
-      // Reset request from Player 3
-      resetGame();
-    } else if (player2Data.action == 4) {
-      // Clock synchronization response
-      uint32_t now = micros();
-      uint32_t roundTrip = now - player2Data.syncTime;
-      uint32_t player3Time = player2Data.roundTripTime;
-      
-      // Calculate clock offset: (Player3 time + roundTrip/2) - Player1 time
-      player3ClockOffset = (player3Time + roundTrip/2) - now;
-      player3ClockSynced = true;
-      lastPlayer3SyncTime = millis();
-      
-      // Clock sync complete - no need to send to Pi
-      // Debug: Serial.printf("Player 3 Clock sync: offset=%ld us, roundTrip=%lu us\n", player3ClockOffset, roundTrip);
+      // Debug: Serial.printf("Player 2 Clock sync: offset=%ld us, roundTrip=%lu us\n", player2ClockOffset, roundTrip);
     }
     }
   } else if (len == sizeof(struct_lightboard_message)) {
@@ -344,17 +347,17 @@ void sendLightboardUpdate(uint8_t action) {
   // Other actions require connection
   if (!lightboardConnected && action != 1) return;
   
-  lightboardData.deviceId = 1; // Player 1
+  lightboardData.deviceId = 1; // Bridge
   lightboardData.action = action;
   lightboardData.gameMode = lightboardGameMode;
+  lightboardData.p1ColorIndex = lightboardP1ColorIndex;
   lightboardData.p2ColorIndex = lightboardP2ColorIndex;
-  lightboardData.p3ColorIndex = lightboardP3ColorIndex;
+  lightboardData.p1Pos = lightboardP1Pos;
   lightboardData.p2Pos = lightboardP2Pos;
-  lightboardData.p3Pos = lightboardP3Pos;
   lightboardData.nextLedPos = lightboardNextLedPos;
   lightboardData.tugBoundary = lightboardTugBoundary;
+  lightboardData.p1RacePos = lightboardP1RacePos;
   lightboardData.p2RacePos = lightboardP2RacePos;
-  lightboardData.p3RacePos = lightboardP3RacePos;
   
   // Only send winner information for specific actions
   if (action == 2) {
@@ -381,9 +384,9 @@ void sendLightboardPointUpdate(uint8_t scoringPlayer) {
   // Send point update to lightboard with which player scored
   if (!lightboardConnected) return;
   
-  lightboardData.deviceId = 1; // Player 1
+  lightboardData.deviceId = 1; // Bridge
   lightboardData.action = 3; // point update
-  lightboardData.winner = scoringPlayer; // Send Player 2 or Player 3 directly
+  lightboardData.winner = scoringPlayer; // Send Player 1 or Player 2 directly
   
   esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
   // Debug: Serial.printf("Sent lightboard point update: Player %d scored\n", scoringPlayer);
@@ -393,31 +396,31 @@ void sendLightboardStateRestore() {
   // Send full state restore to lightboard (action 6 = state restore)
   if (!lightboardConnected) return;
   
-  lightboardData.deviceId = 1; // Player 1
+  lightboardData.deviceId = 1; // Bridge
   lightboardData.action = 6; // state restore
   lightboardData.gameMode = lightboardGameMode;
+  lightboardData.p1ColorIndex = lightboardP1ColorIndex;
   lightboardData.p2ColorIndex = lightboardP2ColorIndex;
-  lightboardData.p3ColorIndex = lightboardP3ColorIndex;
+  lightboardData.p1Pos = lightboardP1Pos;
   lightboardData.p2Pos = lightboardP2Pos;
-  lightboardData.p3Pos = lightboardP3Pos;
   lightboardData.nextLedPos = lightboardNextLedPos;
   lightboardData.tugBoundary = lightboardTugBoundary;
+  lightboardData.p1RacePos = lightboardP1RacePos;
   lightboardData.p2RacePos = lightboardP2RacePos;
-  lightboardData.p3RacePos = lightboardP3RacePos;
   lightboardData.celebrating = lightboardCelebrating;
   lightboardData.winner = lightboardWinner;
   
   esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
-  Serial.printf("Sent lightboard state restore: mode=%d, p2Pos=%d, p3Pos=%d\n", 
-               lightboardGameMode, lightboardP2Pos, lightboardP3Pos);
+  Serial.printf("Sent lightboard state restore: mode=%d, p1Pos=%d, p2Pos=%d\n", 
+               lightboardGameMode, lightboardP1Pos, lightboardP2Pos);
 }
 
 void awardPointToPlayer(uint8_t playerId) {
   // Award a point to the specified player on the lightboard
-  // playerId: 2 = Player 2, 3 = Player 3 (Player 1 is host only)
+  // playerId: 1 = Player 1, 2 = Player 2 (Bridge is host only)
   
-  if (playerId != 2 && playerId != 3) {
-    Serial.printf("Invalid player ID: %d. Must be 2 or 3 (Player 1 is host only).\n", playerId);
+  if (playerId != 1 && playerId != 2) {
+    Serial.printf("Invalid player ID: %d. Must be 1 or 2 (Bridge is host only).\n", playerId);
     return;
   }
   
@@ -430,12 +433,12 @@ void awardPointToPlayer(uint8_t playerId) {
   sendLightboardPointUpdate(playerId);
   
   // Update local game state
-  if (playerId == 2) {
+  if (playerId == 1) {
+    winner = "Player 1";
+    player1HitTime = micros(); // Use current time as hit time
+  } else if (playerId == 2) {
     winner = "Player 2";
     player2HitTime = micros(); // Use current time as hit time
-  } else if (playerId == 3) {
-    winner = "Player 3";
-    player3HitTime = micros(); // Use current time as hit time
   }
   
   // Send winner notification to Pi
@@ -449,12 +452,12 @@ void awardPointToPlayer(uint8_t playerId) {
 
 void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier) {
   // Award multiple points to the specified player on the lightboard
-  // playerId: 2 = Player 2, 3 = Player 3 (Player 1 is host only)
+  // playerId: 1 = Player 1, 2 = Player 2 (Bridge is host only)
   // multiplier: number of points to award
   
   
-  if (playerId != 2 && playerId != 3) {
-    Serial.printf("Invalid player ID: %d. Must be 2 or 3 (Player 1 is host only).\n", playerId);
+  if (playerId != 1 && playerId != 2) {
+    Serial.printf("Invalid player ID: %d. Must be 1 or 2 (Bridge is host only).\n", playerId);
     return;
   }
   
@@ -483,18 +486,18 @@ void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier) {
 
 // ===================== Game Logic =====================
 void determineWinner() {
-  if (player2HitTime > 0 && player3HitTime > 0) {
+  if (player1HitTime > 0 && player2HitTime > 0) {
     // Calculate time difference in microseconds
-    int32_t timeDiff = (int32_t)player2HitTime - (int32_t)player3HitTime;
+    int32_t timeDiff = (int32_t)player1HitTime - (int32_t)player2HitTime;
     
-    if (timeDiff < -100) { // Player 3 hit first (with 100us tolerance)
-      winner = "Player 3";
-      Serial.printf("Player 3 wins! Time diff: %ld us\n", -timeDiff);
-      
-      
-    } else if (timeDiff > 100) { // Player 2 hit first (with 100us tolerance)
+    if (timeDiff < -100) { // Player 2 hit first (with 100us tolerance)
       winner = "Player 2";
-      Serial.printf("Player 2 wins! Time diff: %ld us\n", timeDiff);
+      Serial.printf("Player 2 wins! Time diff: %ld us\n", -timeDiff);
+      
+      
+    } else if (timeDiff > 100) { // Player 1 hit first (with 100us tolerance)
+      winner = "Player 1";
+      Serial.printf("Player 1 wins! Time diff: %ld us\n", timeDiff);
       
       
     } else {
@@ -509,9 +512,9 @@ void determineWinner() {
 
 void resetGame() {
   winner = "none";
-  // Player 1 is host only - no need to reset player1HitTime
+  // Bridge is host only - no need to reset bridge hit time
+  player1HitTime = 0;
   player2HitTime = 0;
-  player3HitTime = 0;
   gameActive = true;
   
   // Reset hit deduplication tracking
@@ -522,19 +525,19 @@ void resetGame() {
   // Reset lightboard state
   lightboardWinner = 0;
   lightboardCelebrating = false;
-  lightboardP2Pos = -1;
-  lightboardP3Pos = 38;
+  lightboardP1Pos = -1;
+  lightboardP2Pos = 38;
   lightboardNextLedPos = 0;
   lightboardTugBoundary = 18;
+  lightboardP1RacePos = -1;
   lightboardP2RacePos = -1;
-  lightboardP3RacePos = -1;
+  
+  // Send reset to Player 1
+  myData.action = 3; // reset request
+  esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
   
   // Send reset to Player 2
-  myData.action = 3; // reset request
   esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
-  
-  // Send reset to Player 3
-  esp_now_send(player3Address, (uint8_t*)&myData, sizeof(myData));
   
   // Send reset to lightboard
   sendLightboardUpdate(5); // reset action
@@ -548,9 +551,9 @@ void resetGame() {
 void resetGameForQuiz() {
   // Light version of reset for quiz navigation - doesn't reset lightboard state
   winner = "none";
-  // Player 1 is host only - no need to reset player1HitTime
+  // Bridge is host only - no need to reset bridge hit time
+  player1HitTime = 0;
   player2HitTime = 0;
-  player3HitTime = 0;
   gameActive = true;
   
   // Send reset notification to Pi
@@ -561,20 +564,20 @@ void resetGameForQuiz() {
 
 // ===================== Clock Synchronization =====================
 void syncClock() {
-  if (player2Connected && (millis() - lastSyncTime >= SYNC_INTERVAL)) {
+  if (player1Connected && (millis() - lastSyncTime >= SYNC_INTERVAL)) {
+    myData.action = 4; // clock sync
+    myData.syncTime = micros();
+    myData.roundTripTime = 0;
+    esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
+    // Debug: Serial.println("Clock sync request sent to Player 1");
+  }
+  
+  if (player2Connected && (millis() - lastPlayer2SyncTime >= SYNC_INTERVAL)) {
     myData.action = 4; // clock sync
     myData.syncTime = micros();
     myData.roundTripTime = 0;
     esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
     // Debug: Serial.println("Clock sync request sent to Player 2");
-  }
-  
-  if (player3Connected && (millis() - lastPlayer3SyncTime >= SYNC_INTERVAL)) {
-    myData.action = 4; // clock sync
-    myData.syncTime = micros();
-    myData.roundTripTime = 0;
-    esp_now_send(player3Address, (uint8_t*)&myData, sizeof(myData));
-    // Debug: Serial.println("Clock sync request sent to Player 3");
   }
 }
 
@@ -596,11 +599,11 @@ void processPiCommand(String command) {
       // Debug: Serial.println("Pi heartbeat received");
       
       // Send status back to Pi
-      sendToPi("{\"type\":\"status\",\"player2Connected\":" + String(player2Connected ? "true" : "false") + 
-               ",\"player3Connected\":" + String(player3Connected ? "true" : "false") + 
+      sendToPi("{\"type\":\"status\",\"player1Connected\":" + String(player1Connected ? "true" : "false") + 
+               ",\"player2Connected\":" + String(player2Connected ? "true" : "false") + 
                ",\"lightboardConnected\":" + String(lightboardConnected ? "true" : "false") + 
                ",\"clockSynced\":" + String(clockSynced ? "true" : "false") + 
-               ",\"player3ClockSynced\":" + String(player3ClockSynced ? "true" : "false") + "}");
+               ",\"player2ClockSynced\":" + String(player2ClockSynced ? "true" : "false") + "}");
       
     } else if (cmd == "reset") {
       resetGame();
@@ -610,23 +613,23 @@ void processPiCommand(String command) {
         int player = doc["player"];
         int multiplier = doc["multiplier"];
         
-        if (player == 2 || player == 3) {
+        if (player == 1 || player == 2) {
           awardMultiplePointsToPlayer(player, multiplier);
         }
       }
       
     } else if (cmd == "lightboardSettings") {
-      if (doc.containsKey("mode") && doc.containsKey("p2Color") && doc.containsKey("p3Color")) {
+      if (doc.containsKey("mode") && doc.containsKey("p1Color") && doc.containsKey("p2Color")) {
         int newMode = doc["mode"];
+        int newP1Color = doc["p1Color"];
         int newP2Color = doc["p2Color"];
-        int newP3Color = doc["p3Color"];
         
-        if (newMode >= 1 && newMode <= 6 && newP2Color >= 0 && newP2Color <= 4 && newP3Color >= 0 && newP3Color <= 4) {
+        if (newMode >= 1 && newMode <= 6 && newP1Color >= 0 && newP1Color <= 4 && newP2Color >= 0 && newP2Color <= 4) {
           bool modeChanged = (lightboardGameMode != newMode);
           lightboardGameMode = newMode;
+          lightboardP1ColorIndex = newP1Color;
           lightboardP2ColorIndex = newP2Color;
-          lightboardP3ColorIndex = newP3Color;
-          Serial.printf("Lightboard settings updated: mode=%d, p2Color=%d, p3Color=%d\n", newMode, newP2Color, newP3Color);
+          Serial.printf("Lightboard settings updated: mode=%d, p1Color=%d, p2Color=%d\n", newMode, newP1Color, newP2Color);
           
           if (modeChanged) {
             // Mode changed - reset game positions
@@ -644,19 +647,19 @@ void processPiCommand(String command) {
         JsonObject gameState = doc["gameState"];
         
         if (gameState.containsKey("mode")) lightboardGameMode = gameState["mode"];
+        if (gameState.containsKey("p1ColorIndex")) lightboardP1ColorIndex = gameState["p1ColorIndex"];
         if (gameState.containsKey("p2ColorIndex")) lightboardP2ColorIndex = gameState["p2ColorIndex"];
-        if (gameState.containsKey("p3ColorIndex")) lightboardP3ColorIndex = gameState["p3ColorIndex"];
+        if (gameState.containsKey("p1Pos")) lightboardP1Pos = gameState["p1Pos"];
         if (gameState.containsKey("p2Pos")) lightboardP2Pos = gameState["p2Pos"];
-        if (gameState.containsKey("p3Pos")) lightboardP3Pos = gameState["p3Pos"];
         if (gameState.containsKey("nextLedPos")) lightboardNextLedPos = gameState["nextLedPos"];
         if (gameState.containsKey("tugBoundary")) lightboardTugBoundary = gameState["tugBoundary"];
+        if (gameState.containsKey("p1RacePos")) lightboardP1RacePos = gameState["p1RacePos"];
         if (gameState.containsKey("p2RacePos")) lightboardP2RacePos = gameState["p2RacePos"];
-        if (gameState.containsKey("p3RacePos")) lightboardP3RacePos = gameState["p3RacePos"];
         if (gameState.containsKey("celebrating")) lightboardCelebrating = gameState["celebrating"];
         if (gameState.containsKey("winner")) lightboardWinner = gameState["winner"];
         
-        Serial.printf("Lightboard state restored: mode=%d, p2Pos=%d, p3Pos=%d\n", 
-                     lightboardGameMode, lightboardP2Pos, lightboardP3Pos);
+        Serial.printf("Lightboard state restored: mode=%d, p1Pos=%d, p2Pos=%d\n", 
+                     lightboardGameMode, lightboardP1Pos, lightboardP2Pos);
         
         // Send full state restore to lightboard (action 6 = state restore)
         sendLightboardStateRestore();
@@ -719,26 +722,26 @@ void setup(){
   esp_now_register_send_cb(OnDataSent);
   esp_now_register_recv_cb(OnDataRecv);
 
-  // Add Player 2 peer with known MAC address
+  // Add Player 1 peer with known MAC address
   esp_now_peer_info_t peerInfo = {};
-  memcpy(peerInfo.peer_addr, player2Address, 6);
+  memcpy(peerInfo.peer_addr, player1Address, 6);
   peerInfo.channel = 0; // follow current channel
   peerInfo.encrypt = false;
   if (esp_now_add_peer(&peerInfo) == ESP_OK) {
+    Serial.println("Player 1 peer added successfully");
+  } else {
+    Serial.println("Failed to add Player 1 peer");
+  }
+
+  // Add Player 2 peer with known MAC address
+  esp_now_peer_info_t player2PeerInfo = {};
+  memcpy(player2PeerInfo.peer_addr, player2Address, 6);
+  player2PeerInfo.channel = 0; // follow current channel
+  player2PeerInfo.encrypt = false;
+  if (esp_now_add_peer(&player2PeerInfo) == ESP_OK) {
     Serial.println("Player 2 peer added successfully");
   } else {
     Serial.println("Failed to add Player 2 peer");
-  }
-
-  // Add Player 3 peer with known MAC address
-  esp_now_peer_info_t player3PeerInfo = {};
-  memcpy(player3PeerInfo.peer_addr, player3Address, 6);
-  player3PeerInfo.channel = 0; // follow current channel
-  player3PeerInfo.encrypt = false;
-  if (esp_now_add_peer(&player3PeerInfo) == ESP_OK) {
-    Serial.println("Player 3 peer added successfully");
-  } else {
-    Serial.println("Failed to add Player 3 peer");
   }
 
   // Add Lightboard peer with known MAC address
@@ -764,13 +767,13 @@ if (esp_now_add_peer(&lightboardPeerInfo) == ESP_OK) {
   // Initialize game state
   gameActive = true;  // Ensure game starts active
   winner = "none";
-  // Player 1 is host only - no need to initialize player1HitTime
+  // Bridge is host only - no need to initialize bridge hit time
+  player1HitTime = 0;
   player2HitTime = 0;
-  player3HitTime = 0;
   clockSynced = false;
-  player3ClockSynced = false;
+  player2ClockSynced = false;
   clockOffset = 0;
-  player3ClockOffset = 0;
+  player2ClockOffset = 0;
   
   Serial.println("ESP-NOW Bridge ready. Waiting for Pi connection...");
 }
@@ -808,20 +811,20 @@ void loop(){
   }
 
   // Check for connection timeout
-  if (player2Connected && (millis() - lastHeartbeat > heartbeatTimeout)) {
-    player2Connected = false;
+  if (player1Connected && (millis() - lastHeartbeat > heartbeatTimeout)) {
+    player1Connected = false;
     clockSynced = false; // Reset sync when connection lost
+    player1MacLearned = false; // Reset MAC learning to force rediscovery
+    // Debug: Serial.println("Player 1 connection lost - resetting discovery");
+    sendToPi("{\"type\":\"error\",\"message\":\"Player 1 disconnected\"}");
+  }
+  
+  if (player2Connected && (millis() - lastPlayer2Heartbeat > heartbeatTimeout)) {
+    player2Connected = false;
+    player2ClockSynced = false; // Reset sync when connection lost
     player2MacLearned = false; // Reset MAC learning to force rediscovery
     // Debug: Serial.println("Player 2 connection lost - resetting discovery");
     sendToPi("{\"type\":\"error\",\"message\":\"Player 2 disconnected\"}");
-  }
-  
-  if (player3Connected && (millis() - lastPlayer3Heartbeat > heartbeatTimeout)) {
-    player3Connected = false;
-    player3ClockSynced = false; // Reset sync when connection lost
-    player3MacLearned = false; // Reset MAC learning to force rediscovery
-    // Debug: Serial.println("Player 3 connection lost - resetting discovery");
-    sendToPi("{\"type\":\"error\",\"message\":\"Player 3 disconnected\"}");
   }
   
   // Check for lightboard connection timeout
@@ -833,22 +836,22 @@ void loop(){
     sendToPi("{\"type\":\"error\",\"message\":\"Lightboard disconnected\"}");
   }
 
-  // Send heartbeat to Player 2
+  // Send heartbeat to Player 1
   static unsigned long lastHeartbeatSend = 0;
   if (millis() - lastHeartbeatSend >= HEARTBEAT_INTERVAL_MS) {
     myData.action = 1; // heartbeat
-    esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
-    // Debug: Serial.println("Sent heartbeat to Player 2");
+    esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
+    // Debug: Serial.println("Sent heartbeat to Player 1");
     lastHeartbeatSend = millis();
   }
   
-  // Send heartbeat to Player 3
-  static unsigned long lastPlayer3HeartbeatSend = 0;
-  if (millis() - lastPlayer3HeartbeatSend >= HEARTBEAT_INTERVAL_MS) {
+  // Send heartbeat to Player 2
+  static unsigned long lastPlayer2HeartbeatSend = 0;
+  if (millis() - lastPlayer2HeartbeatSend >= HEARTBEAT_INTERVAL_MS) {
     myData.action = 1; // heartbeat
-    esp_now_send(player3Address, (uint8_t*)&myData, sizeof(myData));
-    // Debug: Serial.println("Sent heartbeat to Player 3");
-    lastPlayer3HeartbeatSend = millis();
+    esp_now_send(player2Address, (uint8_t*)&myData, sizeof(myData));
+    // Debug: Serial.println("Sent heartbeat to Player 2");
+    lastPlayer2HeartbeatSend = millis();
   }
   
   // Send heartbeat to lightboard (always try, even if MAC not learned yet)
