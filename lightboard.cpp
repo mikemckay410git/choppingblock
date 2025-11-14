@@ -27,7 +27,7 @@ uint8_t player1Address[] = {0x80, 0xF3, 0xDA, 0x4A, 0x2F, 0x98}; // Player 1 AP 
 
 typedef struct struct_lightboard_message {
   uint8_t  deviceId;     // 3=Lightboard
-  uint8_t  action;       // 1=heartbeat, 2=game-state, 3=score-update, 4=mode-change, 5=reset
+  uint8_t  action;       // 1=heartbeat, 2=game-state, 3=score-update, 4=mode-change, 5=reset, 6=state-restore, 7=state-request
   uint8_t  gameMode;     // 1-6 (Territory, Swap Sides, Split Scoring, Score Order, Race, Tug O War)
   uint8_t  p2ColorIndex; // Player 2 color index
   uint8_t  p3ColorIndex; // Player 3 color index
@@ -95,6 +95,7 @@ PlayerColor getP2Color();
 PlayerColor getP3Color();
 uint32_t getP2ColorValue();
 uint32_t getP3ColorValue();
+void requestStateRestore();
 
 // ==================== Celebration Manager ====================
 enum CelebrationType : uint8_t {
@@ -246,6 +247,16 @@ uint32_t getP3ColorValue() {
 
 void clearStrip(){ for (int i=0;i<NUM_LEDS;i++) strip.setPixelColor(i,0); strip.show(); }
 
+void requestStateRestore() {
+  // Send state request message to Bridge (action 7 = state request)
+  if (!player1MacLearned) return; // Can't send if we don't know the MAC yet
+  
+  myData.deviceId = 3; // Lightboard
+  myData.action = 7; // state request
+  esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
+  Serial.println("Sent state request to Bridge");
+}
+
 void paintProgress() {
   for (int i=0;i<NUM_LEDS;i++) strip.setPixelColor(i,0);
   if (gameMode==2) { if(p2Pos>=0&&p2Pos<NUM_LEDS) strip.setPixelColor(p2Pos,getP2ColorValue()); if(p3Pos>=0&&p3Pos<NUM_LEDS) strip.setPixelColor(p3Pos,getP3ColorValue()); }
@@ -308,7 +319,9 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
     // Clear demo mode and go black only on new connection
     if (wasDisconnected) {
       clearStrip();
-      Serial.println("Connection established - demo mode cleared");
+      Serial.println("Connection established - demo mode cleared, requesting state");
+      // Request state restore from Bridge
+      requestStateRestore();
     }
 
     if (player1Data.action == 1) {
@@ -341,6 +354,32 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       // Reset
       Serial.println("Reset received - resetting lightboard game state");
       resetGame();
+      
+    } else if (player1Data.action == 6) {
+      // State restore - restore full game state from saved state
+      Serial.println("State restore received - restoring lightboard game state");
+      gameMode = player1Data.gameMode;
+      p2ColorIndex = player1Data.p2ColorIndex;
+      p3ColorIndex = player1Data.p3ColorIndex;
+      p2Pos = player1Data.p2Pos;
+      p3Pos = player1Data.p3Pos;
+      nextLedPosition = player1Data.nextLedPos;
+      tugBoundary = player1Data.tugBoundary;
+      p2RacePos = player1Data.p2RacePos;
+      p3RacePos = player1Data.p3RacePos;
+      celebrating = player1Data.celebrating;
+      
+      // Restore scoring sequence for mode 4 (Score Order)
+      if (gameMode == 4) {
+        // Note: scoringSequence is not in the message, so we'll just restore positions
+        // The sequence will be rebuilt as points are awarded
+      }
+      
+      Serial.printf("State restored: mode=%d, p2Pos=%d, p3Pos=%d, p2Color=%d, p3Color=%d\n",
+                   gameMode, p2Pos, p3Pos, p2ColorIndex, p3ColorIndex);
+      
+      // Update display with restored state
+      paintProgress();
     }
   }
 }
@@ -618,6 +657,17 @@ void loop(){
       resetGame();
       paintProgress();
     }
+  }
+  
+  // Track previous connection state to detect transitions
+  static bool prevPlayer1Connected = false;
+  bool justConnected = !prevPlayer1Connected && player1Connected;
+  prevPlayer1Connected = player1Connected;
+  
+  // If we just left demo mode (transitioned from disconnected to connected), request state
+  if (justConnected) {
+    Serial.println("Left demo mode - requesting state restore");
+    requestStateRestore();
   }
   
   // Run demo mode when not connected

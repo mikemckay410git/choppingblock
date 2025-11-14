@@ -531,17 +531,17 @@
                 console.log('Winner:', data.winner);
                 // Could add celebration effect here
             } else if (data.action === 2) { // Game state update
-                gameState.mode = data.gameMode || gameState.mode;
-                gameState.p2ColorIndex = data.p2ColorIndex || gameState.p2ColorIndex;
-                gameState.p3ColorIndex = data.p3ColorIndex || gameState.p3ColorIndex;
+                gameState.mode = data.gameMode ?? gameState.mode;
+                gameState.p2ColorIndex = data.p2ColorIndex !== undefined ? data.p2ColorIndex : gameState.p2ColorIndex;
+                gameState.p3ColorIndex = data.p3ColorIndex !== undefined ? data.p3ColorIndex : gameState.p3ColorIndex;
                 updateLightboard();
                 saveState();
             } else if (data.action === 3) { // Point update
                 handlePointUpdate(data.winner);
             } else if (data.action === 4) { // Mode change
-                gameState.mode = data.gameMode || gameState.mode;
-                gameState.p2ColorIndex = data.p2ColorIndex || gameState.p2ColorIndex;
-                gameState.p3ColorIndex = data.p3ColorIndex || gameState.p3ColorIndex;
+                gameState.mode = data.gameMode ?? gameState.mode;
+                gameState.p2ColorIndex = data.p2ColorIndex !== undefined ? data.p2ColorIndex : gameState.p2ColorIndex;
+                gameState.p3ColorIndex = data.p3ColorIndex !== undefined ? data.p3ColorIndex : gameState.p3ColorIndex;
                 resetGameState();
                 updateLightboard();
                 saveState();
@@ -577,9 +577,9 @@
                 saveState();
             } else if (command.cmd === 'lightboardSettings') {
                 console.log('⚙️ Lightboard settings updated:', command);
-                gameState.mode = command.mode || gameState.mode;
-                gameState.p2ColorIndex = command.p2Color || gameState.p2ColorIndex;
-                gameState.p3ColorIndex = command.p3Color || gameState.p3ColorIndex;
+                gameState.mode = command.mode ?? gameState.mode;
+                gameState.p2ColorIndex = command.p2Color !== undefined ? command.p2Color : gameState.p2ColorIndex;
+                gameState.p3ColorIndex = command.p3Color !== undefined ? command.p3Color : gameState.p3ColorIndex;
                 updateLightboard();
                 saveState();
             }

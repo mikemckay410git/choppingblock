@@ -31,7 +31,7 @@ typedef struct struct_message {
 
 typedef struct struct_lightboard_message {
   uint8_t  deviceId;     // 1=Player1, 3=Lightboard
-  uint8_t  action;       // 1=heartbeat, 2=game-state, 3=score-update, 4=mode-change, 5=reset
+  uint8_t  action;       // 1=heartbeat, 2=game-state, 3=score-update, 4=mode-change, 5=reset, 6=state-restore, 7=state-request
   uint8_t  gameMode;     // 1-6 (Territory, Swap Sides, Split Scoring, Score Order, Race, Tug O War)
   uint8_t  p2ColorIndex; // Player 2 color index
   uint8_t  p3ColorIndex; // Player 3 color index
@@ -90,6 +90,7 @@ void syncClock();
 void sendLightboardUpdate(uint8_t action);
 void updateLightboardGameState();
 void sendLightboardPointUpdate(uint8_t scoringPlayer);
+void sendLightboardStateRestore();
 void awardPointToPlayer(uint8_t playerId);
 void awardMultiplePointsToPlayer(uint8_t playerId, int multiplier);
 void sendToPi(String message);
@@ -322,12 +323,16 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       if (lightboardData.action == 1) {
         // Heartbeat - just update connection status (no need to send to Pi)
         
-        // If this is a reconnection or first connection, resync the lightboard settings
+        // If this is a reconnection or first connection, request state from Pi
         if (wasDisconnected || !lightboardWasConnected) {
-          // Debug: Serial.println("Lightboard connected - resyncing settings");
-          // Send current game mode and player colors to resync
-          sendLightboardUpdate(4); // Send settings update
+          Serial.println("Lightboard connected - requesting state from Pi");
+          // Request lightboard state from Pi
+          sendToPi("{\"type\":\"lightboardStateRequest\"}");
         }
+      } else if (lightboardData.action == 7) {
+        // State request from lightboard - request state from Pi
+        Serial.println("Lightboard requested state - requesting from Pi");
+        sendToPi("{\"type\":\"lightboardStateRequest\"}");
       }
     }
   }
@@ -382,6 +387,29 @@ void sendLightboardPointUpdate(uint8_t scoringPlayer) {
   
   esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
   // Debug: Serial.printf("Sent lightboard point update: Player %d scored\n", scoringPlayer);
+}
+
+void sendLightboardStateRestore() {
+  // Send full state restore to lightboard (action 6 = state restore)
+  if (!lightboardConnected) return;
+  
+  lightboardData.deviceId = 1; // Player 1
+  lightboardData.action = 6; // state restore
+  lightboardData.gameMode = lightboardGameMode;
+  lightboardData.p2ColorIndex = lightboardP2ColorIndex;
+  lightboardData.p3ColorIndex = lightboardP3ColorIndex;
+  lightboardData.p2Pos = lightboardP2Pos;
+  lightboardData.p3Pos = lightboardP3Pos;
+  lightboardData.nextLedPos = lightboardNextLedPos;
+  lightboardData.tugBoundary = lightboardTugBoundary;
+  lightboardData.p2RacePos = lightboardP2RacePos;
+  lightboardData.p3RacePos = lightboardP3RacePos;
+  lightboardData.celebrating = lightboardCelebrating;
+  lightboardData.winner = lightboardWinner;
+  
+  esp_now_send(lightboardAddress, (uint8_t*)&lightboardData, sizeof(lightboardData));
+  Serial.printf("Sent lightboard state restore: mode=%d, p2Pos=%d, p3Pos=%d\n", 
+               lightboardGameMode, lightboardP2Pos, lightboardP3Pos);
 }
 
 void awardPointToPlayer(uint8_t playerId) {
@@ -600,6 +628,30 @@ void processPiCommand(String command) {
           Serial.printf("Lightboard settings updated: mode=%d, p2Color=%d, p3Color=%d\n", newMode, newP2Color, newP3Color);
           sendLightboardUpdate(4); // mode-change action
         }
+      }
+      
+    } else if (cmd == "lightboardState") {
+      // Received lightboard state from Pi - restore full game state
+      if (doc.containsKey("gameState")) {
+        JsonObject gameState = doc["gameState"];
+        
+        if (gameState.containsKey("mode")) lightboardGameMode = gameState["mode"];
+        if (gameState.containsKey("p2ColorIndex")) lightboardP2ColorIndex = gameState["p2ColorIndex"];
+        if (gameState.containsKey("p3ColorIndex")) lightboardP3ColorIndex = gameState["p3ColorIndex"];
+        if (gameState.containsKey("p2Pos")) lightboardP2Pos = gameState["p2Pos"];
+        if (gameState.containsKey("p3Pos")) lightboardP3Pos = gameState["p3Pos"];
+        if (gameState.containsKey("nextLedPos")) lightboardNextLedPos = gameState["nextLedPos"];
+        if (gameState.containsKey("tugBoundary")) lightboardTugBoundary = gameState["tugBoundary"];
+        if (gameState.containsKey("p2RacePos")) lightboardP2RacePos = gameState["p2RacePos"];
+        if (gameState.containsKey("p3RacePos")) lightboardP3RacePos = gameState["p3RacePos"];
+        if (gameState.containsKey("celebrating")) lightboardCelebrating = gameState["celebrating"];
+        if (gameState.containsKey("winner")) lightboardWinner = gameState["winner"];
+        
+        Serial.printf("Lightboard state restored: mode=%d, p2Pos=%d, p3Pos=%d\n", 
+                     lightboardGameMode, lightboardP2Pos, lightboardP3Pos);
+        
+        // Send full state restore to lightboard (action 6 = state restore)
+        sendLightboardStateRestore();
       }
       
     } else if (cmd == "quizAction") {

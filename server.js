@@ -112,6 +112,64 @@ class ESP32Bridge {
       const data = JSON.parse(message);
       console.log('Received from ESP32:', data);
       
+      // Check if this is a request for lightboard state
+      if (data.type === 'lightboardStateRequest') {
+        // Read current state from JSON file
+        const statePath = path.join(process.cwd(), 'lightboard.json');
+        try {
+          let stateData;
+          if (fs.existsSync(statePath)) {
+            stateData = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+          } else {
+            // Return default state if file doesn't exist
+            stateData = {
+              gameState: {
+                mode: 1,
+                p2ColorIndex: 0,
+                p3ColorIndex: 1,
+                p2Pos: -1,
+                p3Pos: 38,
+                nextLedPos: 0,
+                tugBoundary: 18,
+                p2RacePos: -1,
+                p3RacePos: -1,
+                celebrating: false,
+                winner: 0,
+                scoringSequence: []
+              }
+            };
+          }
+          
+          // Send state back to ESP32
+          this.sendToESP32({
+            cmd: 'lightboardState',
+            gameState: stateData.gameState
+          });
+          console.log('Sent lightboard state to ESP32:', stateData.gameState);
+        } catch (error) {
+          console.error('Error reading lightboard state:', error);
+          // Send default state on error
+          this.sendToESP32({
+            cmd: 'lightboardState',
+            gameState: {
+              mode: 1,
+              p2ColorIndex: 0,
+              p3ColorIndex: 1,
+              p2Pos: -1,
+              p3Pos: 38,
+              nextLedPos: 0,
+              tugBoundary: 18,
+              p2RacePos: -1,
+              p3RacePos: -1,
+              celebrating: false,
+              winner: 0,
+              scoringSequence: []
+            }
+          });
+        }
+        return; // Don't forward this request to clients
+      }
+      
       // Forward to all Socket.IO clients
       this.io.emit('esp32_data', data);
       
