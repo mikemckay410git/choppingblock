@@ -201,6 +201,9 @@ let availableCategories = [];
 let player1Score = 0;
 let player2Score = 0;
 
+// Image preloading cache
+let imageCache = new Map(); // Map of imagePath -> Image object
+
 // Music quiz state
 let currentQuizType = 'regular'; // 'regular' or 'music'
 let currentAudio = null;
@@ -495,6 +498,28 @@ function createCategoryButtons(categories) {
   });
 }
 
+// === IMAGE PRELOADING ===
+function preloadImages(questions) {
+  // Collect all unique icon paths
+  const iconPaths = new Set();
+  questions.forEach(qa => {
+    if (qa.iconPath) {
+      iconPaths.add(qa.iconPath);
+    }
+  });
+  
+  // Preload each image
+  iconPaths.forEach(iconPath => {
+    if (!imageCache.has(iconPath)) {
+      const img = new Image();
+      img.src = iconPath;
+      imageCache.set(iconPath, img);
+    }
+  });
+  
+  console.log(`Preloaded ${iconPaths.size} images`);
+}
+
 // === LOAD CATEGORY ===
 function loadCategory(filename) {
   const category = availableCategories.find(cat => cat.filename === filename);
@@ -507,6 +532,9 @@ function loadCategory(filename) {
   currentCategory = category.name;
   currentQuizType = category.type || 'regular';
   quizTitle.textContent = currentCategory;
+  
+  // Preload all images for this category
+  preloadImages(QA);
   
   // Music controls visibility will be handled per-question in render()
   // Initially hide them, they'll be shown if the first question has audio
@@ -543,6 +571,9 @@ function loadCombinedCategories(categories) {
   currentCategory = `Mixed: ${categoryNames.join(', ')}`;
   currentQuizType = hasMusicQuiz ? 'music' : 'regular';
   quizTitle.textContent = currentCategory;
+  
+  // Preload all images for combined categories
+  preloadImages(QA);
   
   // Music controls visibility will be handled per-question in render()
   // Initially hide them, they'll be shown if the first question has audio
@@ -600,7 +631,9 @@ function render(hideAnswer = true) {
   }
   
   // Show/hide question icon based on whether question has icon path
+  // Use preloaded image from cache for instant display
   if (qa.iconPath) {
+    // Preloading ensures images are in browser cache, so setting src should be instant
     questionIcon.src = qa.iconPath;
     questionIcon.alt = qa.level || 'Badge icon';
     questionIcon.classList.remove('hidden');
