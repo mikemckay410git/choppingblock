@@ -32,6 +32,7 @@ class ESP32Bridge {
     this.enabled = false; // Track if serial is enabled
     this.lightboardConnected = false; // Track if physical lightboard is connected via ESP-NOW
     this.retryTimeout = null; // Track retry timeout for cleanup
+    this.heartbeatInterval = null; // Track heartbeat interval timer
     // Removed debounce variables - ESP32 handles awarding internally
   }
 
@@ -81,6 +82,10 @@ class ESP32Bridge {
           enabled: true,
           lightboardConnected: this.lightboardConnected
         });
+        
+        // Start sending periodic heartbeats to Bridge (every 2 seconds)
+        // Bridge responds with status messages that include lightboard connection info
+        this.startHeartbeat();
       });
 
       this.serialConnection.on('error', (err) => {
@@ -140,14 +145,16 @@ class ESP32Bridge {
           const wasConnected = this.lightboardConnected;
           this.lightboardConnected = data.lightboardConnected;
           
-          // Emit status update if connection state changed
+          // Always emit status update when we receive status from Bridge
+          // This ensures initial state is set and clients are kept in sync
+          this.io.emit('esp32_status', { 
+            connected: this.serialConnection ? this.serialConnection.isOpen : false,
+            enabled: this.enabled,
+            lightboardConnected: this.lightboardConnected
+          });
+          
           if (wasConnected !== this.lightboardConnected) {
-            this.io.emit('esp32_status', { 
-              connected: this.serialConnection ? this.serialConnection.isOpen : false,
-              enabled: this.enabled,
-              lightboardConnected: this.lightboardConnected
-            });
-            console.log(`Lightboard connection status: ${this.lightboardConnected ? 'connected' : 'disconnected'}`);
+            console.log(`Lightboard connection status changed: ${this.lightboardConnected ? 'connected' : 'disconnected'}`);
           }
         }
       }
@@ -230,7 +237,43 @@ class ESP32Bridge {
     }
   }
 
+  startHeartbeat() {
+    // Stop any existing heartbeat
+    this.stopHeartbeat();
+    
+    // Send initial heartbeat immediately
+    this.sendHeartbeat();
+    
+    // Then send heartbeats every 2 seconds
+    this.heartbeatInterval = setInterval(() => {
+      this.sendHeartbeat();
+    }, 2000);
+  }
+  
+  stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+  
+  sendHeartbeat() {
+    if (!this.enabled || !this.serialConnection || !this.serialConnection.isOpen) {
+      return;
+    }
+    
+    try {
+      const message = JSON.stringify({ cmd: 'heartbeat' }) + '\n';
+      this.serialConnection.write(message);
+    } catch (error) {
+      console.error('Error sending heartbeat to Bridge:', error);
+    }
+  }
+
   cleanup() {
+    // Stop heartbeat
+    this.stopHeartbeat();
+    
     // Clear retry timeout
     if (this.retryTimeout) {
       clearTimeout(this.retryTimeout);
