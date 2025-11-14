@@ -152,7 +152,7 @@ class LightboardStateManager {
     this.saveStateDebounced();
   }
 
-  // Reset game state
+  // Reset game state (positions only, preserves settings)
   resetGame() {
     const mode = this.state.gameState.mode;
     const defaultState = this.getDefaultState().gameState;
@@ -183,6 +183,19 @@ class LightboardStateManager {
     this.state.gameState.celebrating = false;
     this.state.gameState.winner = 0;
     this.saveStateDebounced();
+  }
+
+  // Reset all data including settings (mode and colors)
+  resetAll() {
+    const defaultState = this.getDefaultState().gameState;
+    
+    // Reset settings to defaults
+    this.state.gameState.mode = defaultState.mode;
+    this.state.gameState.p2ColorIndex = defaultState.p2ColorIndex;
+    this.state.gameState.p3ColorIndex = defaultState.p3ColorIndex;
+    
+    // Reset game positions
+    this.resetGame();
   }
 
   // Update lightboard settings (mode, colors)

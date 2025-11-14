@@ -65,6 +65,13 @@ socket.on('esp32_data', (data) => {
     handlePlayerHit(frontendPlayer);
   } else if (data.type === 'winner') {
     console.log(`Winner declared: ${data.winner}`);
+    
+    // Check if quiz is actually in play - ignore winner messages when quiz is not open
+    if (!currentCategory || QA.length === 0 || quizDisplay.classList.contains('hidden')) {
+      console.log(`Winner message for ${data.winner} ignored - quiz not in play`);
+      return;
+    }
+    
     // Map backend winner names to frontend winner names
     const frontendWinner = data.winner === 'Player 2' ? 'Player 1' : 'Player 2';
     // Only process winner if round is not already complete
@@ -541,6 +548,9 @@ function loadCategory(filename) {
   musicControls.classList.add('hidden');
   stopMusic();
   
+  // Clear any winner state from previous quiz
+  hideWinner();
+  
   showQuizDisplay();
   setOrder(true);
   render(true);
@@ -579,6 +589,9 @@ function loadCombinedCategories(categories) {
   // Initially hide them, they'll be shown if the first question has audio
   musicControls.classList.add('hidden');
   stopMusic();
+  
+  // Clear any winner state from previous quiz
+  hideWinner();
   
   showQuizDisplay();
   setOrder(true);

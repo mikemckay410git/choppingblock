@@ -583,7 +583,13 @@ button:active {
     filter: grayscale(0);
     transform: scale(1.05) !important;
     box-shadow: 0 8px 25px rgba(99,102,241,.3);
-    cursor: pointer;
+    cursor: pointer !important;
+}
+
+.player-tile.winner .player-name,
+.player-tile.winner .player-score {
+    pointer-events: none;
+    cursor: pointer !important;
 }
 
 .player-name {
@@ -613,6 +619,7 @@ button:active {
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 100%;
+    pointer-events: auto;
 }
 
 .player-name.editing input {
@@ -629,8 +636,14 @@ button:active {
 }
 
 .player-tile.scorable {
-    cursor: pointer;
+    cursor: pointer !important;
     /* No size changes - only winner class should change size */
+}
+
+.player-tile.scorable .player-name,
+.player-tile.scorable .player-score {
+    pointer-events: none;
+    cursor: pointer !important;
 }
 
 .player-tile.scorable:hover {
@@ -641,21 +654,21 @@ button:active {
     /* No active effects */
 }
 
-.player-tile:not(.scorable) {
+.player-tile:not(.scorable):not(.winner) {
     cursor: default;
     transform: scale(0.9) !important;
 }
 
-.player-tile:not(.scorable):hover {
+.player-tile:not(.scorable):not(.winner):hover {
     transform: scale(0.9) !important;
     box-shadow: none !important;
 }
 
-.player-tile:not(.scorable):active {
+.player-tile:not(.scorable):not(.winner):active {
     transform: scale(0.9) !important;
 }
 
-.player-tile:not(.scorable) .player-name:hover {
+.player-tile:not(.scorable):not(.winner) .player-name:hover {
     color: var(--ink) !important;
 }
 

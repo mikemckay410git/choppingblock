@@ -353,8 +353,9 @@ io.on("connection", (socket) => {
       lightboardState.awardPoint(command.player, command.multiplier);
       console.log(`Updated lightboard state: Player ${command.player} awarded ${command.multiplier} point(s)`);
     } else if (command.cmd === 'reset') {
-      lightboardState.resetGame();
-      console.log('Reset lightboard state');
+      // Client-initiated reset (from "Reset All Data") - reset everything including settings
+      lightboardState.resetAll();
+      console.log('Reset all lightboard data including settings');
     } else if (command.cmd === 'lightboardSettings' && command.mode !== undefined) {
       lightboardState.updateSettings(command.mode, command.p2Color, command.p3Color);
       console.log(`Updated lightboard settings: mode=${command.mode}, p2Color=${command.p2Color}, p3Color=${command.p3Color}`);
