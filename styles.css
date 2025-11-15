@@ -184,18 +184,6 @@ h1 {
     z-index: 1;
 }
 
-/* When music controls are visible, position category badge below them */
-.quiz-card.has-both-controls .category-badge {
-    top: 60px;
-}
-
-/* Fallback using :has() selector for modern browsers */
-@supports selector(:has(*)) {
-    .quiz-card:has(.music-controls:not(.hidden)) .category-badge:not(.hidden) {
-        top: 60px;
-    }
-}
-
 /* Music Quiz Controls */
 .music-controls {
     position: absolute;
@@ -206,6 +194,18 @@ h1 {
     flex-direction: column;
     align-items: center;
     gap: 8px;
+}
+
+/* When category badge is visible, position music controls below it */
+.quiz-card.has-both-controls .music-controls {
+    top: 50px;
+}
+
+/* Fallback using :has() selector for modern browsers */
+@supports selector(:has(*)) {
+    .quiz-card:has(.category-badge:not(.hidden)) .music-controls:not(.hidden) {
+        top: 50px;
+    }
 }
 
 .music-btn {
