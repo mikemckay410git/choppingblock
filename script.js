@@ -946,11 +946,21 @@ function playMusic() {
   stopMusic();
   
   // Find the current category to get the folder path
-  const currentCategoryData = availableCategories.find(cat => 
-    cat.questions === QA || cat.name === currentCategory
-  );
+  // For custom mix quizzes, use the question's category property
+  // For regular quizzes, find by matching the QA array or category name
+  let currentCategoryData;
+  if (currentQuestion.category && currentCategory && currentCategory.startsWith('Custom Mix:')) {
+    // Custom mix quiz - find category by the question's category property
+    currentCategoryData = availableCategories.find(cat => cat.name === currentQuestion.category);
+  } else {
+    // Regular quiz - find by matching QA array or category name
+    currentCategoryData = availableCategories.find(cat => 
+      cat.questions === QA || cat.name === currentCategory
+    );
+  }
   
   if (!currentCategoryData) {
+    console.warn('Could not find category data for audio file:', currentQuestion.audioFile);
     musicStatus.textContent = '';
     return;
   }
