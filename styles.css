@@ -587,19 +587,15 @@ button:active {
 }
 
 .category-btn:hover .category-name-container.needs-scroll .category-name-text {
-    animation: scroll-text-hover 5s linear infinite;
-    padding-right: 20px;
+    animation: scroll-text-hover 3s linear infinite;
 }
 
 @keyframes scroll-text-hover {
     0% {
         transform: translateX(0);
     }
-    85% {
+    100% {
         transform: translateX(calc(-1 * var(--scroll-distance, 0px)));
-    }
-    85.01%, 100% {
-        transform: translateX(0);
     }
 }
 
