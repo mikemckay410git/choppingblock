@@ -116,12 +116,12 @@
             border-color: rgba(255,255,255,0.5);
         }
 
-        .led.player2 {
+        .led.player1 {
             background: #ff0000;
             color: #ff0000;
         }
 
-        .led.player3 {
+        .led.player2 {
             background: #0050ff;
             color: #0050ff;
         }
@@ -265,12 +265,12 @@
             ESP32 Bridge
         </div>
         <div class="status-item">
-            <span class="status-indicator status-disconnected" id="player2Status"></span>
-            Player 2
+            <span class="status-indicator status-disconnected" id="player1Status"></span>
+            Player 1
         </div>
         <div class="status-item">
-            <span class="status-indicator status-disconnected" id="player3Status"></span>
-            Player 3
+            <span class="status-indicator status-disconnected" id="player2Status"></span>
+            Player 2
         </div>
         <div class="status-item">
             <span class="status-indicator status-disconnected" id="lightboardStatus"></span>
@@ -287,12 +287,12 @@
             <div class="game-mode" id="gameMode">Mode: Territory</div>
             <div class="player-colors">
                 <div class="player-color">
-                    <div class="color-swatch player2"></div>
-                    <span>Player 2</span>
+                    <div class="color-swatch player1"></div>
+                    <span>Player 1</span>
                 </div>
                 <div class="player-color">
-                    <div class="color-swatch player3"></div>
-                    <span>Player 3</span>
+                    <div class="color-swatch player2"></div>
+                    <span>Player 2</span>
                 </div>
             </div>
         </div>
@@ -316,14 +316,14 @@
         // Game state
         let gameState = {
             mode: 1,
-            p2ColorIndex: 0,
-            p3ColorIndex: 1,
-            p2Pos: -1,
-            p3Pos: 38,
+            p1ColorIndex: 0,
+            p2ColorIndex: 1,
+            p1Pos: -1,
+            p2Pos: 38,
             nextLedPos: 0,
             tugBoundary: 18,
+            p1RacePos: -1,
             p2RacePos: -1,
-            p3RacePos: -1,
             celebrating: false,
             winner: 0,
             scoringSequence: []
@@ -335,7 +335,7 @@
             type: 0,
             startTime: 0,
             duration: 3000,
-            player2Wins: false,
+            player1Wins: false,
             winnerColor: { r: 255, g: 0, b: 0 }
         };
 
@@ -410,48 +410,48 @@
         }
 
         function updateTerritoryMode(leds) {
-            // Player 2 fills from left, Player 3 fills from right
-            for (let i = 0; i <= gameState.p2Pos && i < 38; i++) {
+            // Player 1 fills from left, Player 2 fills from right
+            for (let i = 0; i <= gameState.p1Pos && i < 38; i++) {
+                if (leds[i]) {
+                    leds[i].className = 'led active player1';
+                    leds[i].style.background = `rgb(${colors[gameState.p1ColorIndex].rgb.join(',')})`;
+                }
+            }
+            for (let i = 37; i >= gameState.p2Pos && i >= 0; i--) {
                 if (leds[i]) {
                     leds[i].className = 'led active player2';
                     leds[i].style.background = `rgb(${colors[gameState.p2ColorIndex].rgb.join(',')})`;
-                }
-            }
-            for (let i = 37; i >= gameState.p3Pos && i >= 0; i--) {
-                if (leds[i]) {
-                    leds[i].className = 'led active player3';
-                    leds[i].style.background = `rgb(${colors[gameState.p3ColorIndex].rgb.join(',')})`;
                 }
             }
         }
 
         function updateSwapSidesMode(leds) {
             // Individual LED positions
+            if (gameState.p1Pos >= 0 && gameState.p1Pos < 38) {
+                leds[gameState.p1Pos].className = 'led active player1';
+                leds[gameState.p1Pos].style.background = `rgb(${colors[gameState.p1ColorIndex].rgb.join(',')})`;
+            }
             if (gameState.p2Pos >= 0 && gameState.p2Pos < 38) {
                 leds[gameState.p2Pos].className = 'led active player2';
                 leds[gameState.p2Pos].style.background = `rgb(${colors[gameState.p2ColorIndex].rgb.join(',')})`;
             }
-            if (gameState.p3Pos >= 0 && gameState.p3Pos < 38) {
-                leds[gameState.p3Pos].className = 'led active player3';
-                leds[gameState.p3Pos].style.background = `rgb(${colors[gameState.p3ColorIndex].rgb.join(',')})`;
-            }
         }
 
         function updateSplitScoringMode(leds) {
-            // Player 2 fills from center-left outward, Player 3 fills from center-right outward
+            // Player 1 fills from center-left outward, Player 2 fills from center-right outward
             const centerLeft = 18;
             const centerRight = 19;
             
-            for (let i = centerLeft; i >= gameState.p2Pos && i >= 0; i--) {
+            for (let i = centerLeft; i >= gameState.p1Pos && i >= 0; i--) {
+                if (leds[i]) {
+                    leds[i].className = 'led active player1';
+                    leds[i].style.background = `rgb(${colors[gameState.p1ColorIndex].rgb.join(',')})`;
+                }
+            }
+            for (let i = centerRight; i <= gameState.p2Pos && i < 38; i++) {
                 if (leds[i]) {
                     leds[i].className = 'led active player2';
                     leds[i].style.background = `rgb(${colors[gameState.p2ColorIndex].rgb.join(',')})`;
-                }
-            }
-            for (let i = centerRight; i <= gameState.p3Pos && i < 38; i++) {
-                if (leds[i]) {
-                    leds[i].className = 'led active player3';
-                    leds[i].style.background = `rgb(${colors[gameState.p3ColorIndex].rgb.join(',')})`;
                 }
             }
         }
@@ -460,8 +460,8 @@
             // Fill LEDs in sequence based on scoring order
             for (let i = 0; i < gameState.nextLedPos && i < 38; i++) {
                 if (leds[i]) {
-                    const playerClass = gameState.scoringSequence && gameState.scoringSequence[i] === 3 ? 'player3' : 'player2';
-                    const colorIndex = gameState.scoringSequence && gameState.scoringSequence[i] === 3 ? gameState.p3ColorIndex : gameState.p2ColorIndex;
+                    const playerClass = gameState.scoringSequence && gameState.scoringSequence[i] === 2 ? 'player2' : 'player1';
+                    const colorIndex = gameState.scoringSequence && gameState.scoringSequence[i] === 2 ? gameState.p2ColorIndex : gameState.p1ColorIndex;
                     leds[i].className = `led active ${playerClass}`;
                     leds[i].style.background = `rgb(${colors[colorIndex].rgb.join(',')})`;
                 }
@@ -470,13 +470,13 @@
 
         function updateRaceMode(leds) {
             // Individual race positions
+            if (gameState.p1RacePos >= 0 && gameState.p1RacePos < 38) {
+                leds[gameState.p1RacePos].className = 'led active player1';
+                leds[gameState.p1RacePos].style.background = `rgb(${colors[gameState.p1ColorIndex].rgb.join(',')})`;
+            }
             if (gameState.p2RacePos >= 0 && gameState.p2RacePos < 38) {
                 leds[gameState.p2RacePos].className = 'led active player2';
                 leds[gameState.p2RacePos].style.background = `rgb(${colors[gameState.p2ColorIndex].rgb.join(',')})`;
-            }
-            if (gameState.p3RacePos >= 0 && gameState.p3RacePos < 38) {
-                leds[gameState.p3RacePos].className = 'led active player3';
-                leds[gameState.p3RacePos].style.background = `rgb(${colors[gameState.p3ColorIndex].rgb.join(',')})`;
             }
         }
 
@@ -484,14 +484,14 @@
             // Tug of war boundary
             for (let i = 0; i <= gameState.tugBoundary && i < 38; i++) {
                 if (leds[i]) {
-                    leds[i].className = 'led active player2';
-                    leds[i].style.background = `rgb(${colors[gameState.p2ColorIndex].rgb.join(',')})`;
+                    leds[i].className = 'led active player1';
+                    leds[i].style.background = `rgb(${colors[gameState.p1ColorIndex].rgb.join(',')})`;
                 }
             }
             for (let i = gameState.tugBoundary + 1; i < 38; i++) {
                 if (leds[i]) {
-                    leds[i].className = 'led active player3';
-                    leds[i].style.background = `rgb(${colors[gameState.p3ColorIndex].rgb.join(',')})`;
+                    leds[i].className = 'led active player2';
+                    leds[i].style.background = `rgb(${colors[gameState.p2ColorIndex].rgb.join(',')})`;
                 }
             }
         }
@@ -500,11 +500,11 @@
             document.getElementById('gameMode').textContent = `Mode: ${gameModes[gameState.mode - 1]}`;
             
             // Update player color swatches
-            const p2Swatch = document.querySelector('.player-color:first-child .color-swatch');
-            const p3Swatch = document.querySelector('.player-color:last-child .color-swatch');
+            const p1Swatch = document.querySelector('.player-color:first-child .color-swatch');
+            const p2Swatch = document.querySelector('.player-color:last-child .color-swatch');
             
+            p1Swatch.style.background = `rgb(${colors[gameState.p1ColorIndex].rgb.join(',')})`;
             p2Swatch.style.background = `rgb(${colors[gameState.p2ColorIndex].rgb.join(',')})`;
-            p3Swatch.style.background = `rgb(${colors[gameState.p3ColorIndex].rgb.join(',')})`;
         }
 
         // Socket.IO event handlers
@@ -521,8 +521,8 @@
         socket.on('esp32_status', (data) => {
             updateStatus('esp32Status', data.connected);
             // Player connection statuses (via ESP-NOW from Bridge)
+            updateStatus('player1Status', data.player1Connected || false);
             updateStatus('player2Status', data.player2Connected || false);
-            updateStatus('player3Status', data.player3Connected || false);
             // Physical lightboard connection status (via ESP-NOW from Bridge)
             updateStatus('lightboardStatus', data.lightboardConnected || false);
         });
@@ -544,16 +544,16 @@
                 // Could add celebration effect here
             } else if (data.action === 2) { // Game state update
                 gameState.mode = data.gameMode ?? gameState.mode;
+                gameState.p1ColorIndex = data.p1ColorIndex !== undefined ? data.p1ColorIndex : gameState.p1ColorIndex;
                 gameState.p2ColorIndex = data.p2ColorIndex !== undefined ? data.p2ColorIndex : gameState.p2ColorIndex;
-                gameState.p3ColorIndex = data.p3ColorIndex !== undefined ? data.p3ColorIndex : gameState.p3ColorIndex;
                 updateLightboard();
                 saveState();
             } else if (data.action === 3) { // Point update
                 handlePointUpdate(data.winner);
             } else if (data.action === 4) { // Mode change
                 gameState.mode = data.gameMode ?? gameState.mode;
+                gameState.p1ColorIndex = data.p1ColorIndex !== undefined ? data.p1ColorIndex : gameState.p1ColorIndex;
                 gameState.p2ColorIndex = data.p2ColorIndex !== undefined ? data.p2ColorIndex : gameState.p2ColorIndex;
-                gameState.p3ColorIndex = data.p3ColorIndex !== undefined ? data.p3ColorIndex : gameState.p3ColorIndex;
                 resetGameState();
                 updateLightboard();
                 saveState();
@@ -595,8 +595,8 @@
                 const modeChanged = (oldMode !== newMode);
                 
                 gameState.mode = newMode;
+                gameState.p1ColorIndex = command.p1Color !== undefined ? command.p1Color : gameState.p1ColorIndex;
                 gameState.p2ColorIndex = command.p2Color !== undefined ? command.p2Color : gameState.p2ColorIndex;
-                gameState.p3ColorIndex = command.p3Color !== undefined ? command.p3Color : gameState.p3ColorIndex;
                 
                 // If mode changed, reset positions; otherwise preserve them
                 if (modeChanged) {
@@ -614,24 +614,24 @@
             // Simulate the lightboard game logic
             switch (gameState.mode) {
                 case 1: // Territory
-                    if (scoringPlayer === 2 && gameState.p2Pos < 37) {
-                        gameState.p2Pos++;
-                    } else if (scoringPlayer === 3 && gameState.p3Pos > 0) {
-                        gameState.p3Pos--;
+                    if (scoringPlayer === 1 && gameState.p1Pos < 37) {
+                        gameState.p1Pos++;
+                    } else if (scoringPlayer === 2 && gameState.p2Pos > 0) {
+                        gameState.p2Pos--;
                     }
                     break;
                 case 2: // Swap Sides
-                    if (scoringPlayer === 2 && gameState.p2Pos < 37) {
-                        gameState.p2Pos++;
-                    } else if (scoringPlayer === 3 && gameState.p3Pos > 0) {
-                        gameState.p3Pos--;
+                    if (scoringPlayer === 1 && gameState.p1Pos < 37) {
+                        gameState.p1Pos++;
+                    } else if (scoringPlayer === 2 && gameState.p2Pos > 0) {
+                        gameState.p2Pos--;
                     }
                     break;
                 case 3: // Split Scoring
-                    if (scoringPlayer === 2 && gameState.p2Pos > 0) {
-                        gameState.p2Pos--;
-                    } else if (scoringPlayer === 3 && gameState.p3Pos < 37) {
-                        gameState.p3Pos++;
+                    if (scoringPlayer === 1 && gameState.p1Pos > 0) {
+                        gameState.p1Pos--;
+                    } else if (scoringPlayer === 2 && gameState.p2Pos < 37) {
+                        gameState.p2Pos++;
                     }
                     break;
                 case 4: // Score Order
@@ -642,16 +642,16 @@
                     }
                     break;
                 case 5: // Race
-                    if (scoringPlayer === 2 && gameState.p2RacePos < 37) {
+                    if (scoringPlayer === 1 && gameState.p1RacePos < 37) {
+                        gameState.p1RacePos++;
+                    } else if (scoringPlayer === 2 && gameState.p2RacePos < 37) {
                         gameState.p2RacePos++;
-                    } else if (scoringPlayer === 3 && gameState.p3RacePos < 37) {
-                        gameState.p3RacePos++;
                     }
                     break;
                 case 6: // Tug O War
-                    if (scoringPlayer === 2 && gameState.tugBoundary < 37) {
+                    if (scoringPlayer === 1 && gameState.tugBoundary < 37) {
                         gameState.tugBoundary++;
-                    } else if (scoringPlayer === 3 && gameState.tugBoundary >= 0) {
+                    } else if (scoringPlayer === 2 && gameState.tugBoundary >= 0) {
                         gameState.tugBoundary--;
                     }
                     break;
@@ -665,69 +665,69 @@
         }
 
         function checkWinConditions() {
+            let p1Wins = false;
             let p2Wins = false;
-            let p3Wins = false;
             
             switch (gameState.mode) {
                 case 1: // Territory
-                    if (gameState.p2Pos >= gameState.p3Pos) {
-                        p2Wins = (gameState.p2Pos + 1 >= 38 - gameState.p3Pos);
-                        p3Wins = !p2Wins;
+                    if (gameState.p1Pos >= gameState.p2Pos) {
+                        p1Wins = (gameState.p1Pos + 1 >= 38 - gameState.p2Pos);
+                        p2Wins = !p1Wins;
                     }
                     break;
                     
                 case 2: // Swap Sides
-                    p2Wins = (gameState.p2Pos >= 37);
-                    p3Wins = (gameState.p3Pos <= 0);
+                    p1Wins = (gameState.p1Pos >= 37);
+                    p2Wins = (gameState.p2Pos <= 0);
                     break;
                     
                 case 3: // Split Scoring
-                    p2Wins = (gameState.p2Pos <= 0);
-                    p3Wins = (gameState.p3Pos >= 37);
+                    p1Wins = (gameState.p1Pos <= 0);
+                    p2Wins = (gameState.p2Pos >= 37);
                     break;
                     
                 case 4: // Score Order
                     if (gameState.nextLedPos >= 38) {
-                        let p2Count = 0, p3Count = 0;
+                        let p1Count = 0, p2Count = 0;
                         for (let i = 0; i < 38; i++) {
-                            if (gameState.scoringSequence[i] === 2) p2Count++;
-                            else if (gameState.scoringSequence[i] === 3) p3Count++;
+                            if (gameState.scoringSequence[i] === 1) p1Count++;
+                            else if (gameState.scoringSequence[i] === 2) p2Count++;
                         }
-                        p2Wins = (p2Count > p3Count);
-                        p3Wins = !p2Wins;
+                        p1Wins = (p1Count > p2Count);
+                        p2Wins = !p1Wins;
                     }
                     break;
                     
                 case 5: // Race
+                    p1Wins = (gameState.p1RacePos >= 37);
                     p2Wins = (gameState.p2RacePos >= 37);
-                    p3Wins = (gameState.p3RacePos >= 37);
                     break;
                     
                 case 6: // Tug O War
-                    p2Wins = (gameState.tugBoundary >= 37);
-                    p3Wins = (gameState.tugBoundary < 0);
+                    p1Wins = (gameState.tugBoundary >= 37);
+                    p2Wins = (gameState.tugBoundary < 0);
                     break;
             }
             
-            if (p2Wins && !p3Wins) {
+            if (p1Wins && !p2Wins) {
+                console.log('🎉 Player 1 wins! Starting celebration...');
+                startCelebration(true); // Player 1 wins
+            } else if (p2Wins && !p1Wins) {
                 console.log('🎉 Player 2 wins! Starting celebration...');
-                startCelebration(true); // Player 2 wins
-            } else if (p3Wins && !p2Wins) {
-                console.log('🎉 Player 3 wins! Starting celebration...');
-                startCelebration(false); // Player 3 wins
+                startCelebration(false); // Player 2 wins
             }
         }
 
-        function startCelebration(player2Wins) {
+        function startCelebration(player1Wins) {
             celebrationState.active = true;
-            celebrationState.player2Wins = player2Wins;
+            celebrationState.player1Wins = player1Wins;
             celebrationState.startTime = Date.now();
             
             // Set winner color
-            if (player2Wins) {
-                celebrationState.winnerColor = colors[gameState.p2ColorIndex];
+            if (player1Wins) {
+                celebrationState.winnerColor = colors[gameState.p1ColorIndex];
             } else {
-                celebrationState.winnerColor = colors[gameState.p3ColorIndex];
+                celebrationState.winnerColor = colors[gameState.p2ColorIndex];
             }
             
             // Cycle through celebration types
@@ -741,7 +741,7 @@
                 case 3: celebrationState.duration = 3000; break; // Breathe
             }
             
-            console.log(`🎊 Starting celebration type ${celebrationState.type} for ${player2Wins ? 'Player 2' : 'Player 3'}`);
+            console.log(`🎊 Starting celebration type ${celebrationState.type} for ${player1Wins ? 'Player 1' : 'Player 2'}`);
             
             // Start celebration animation
             updateCelebration();
@@ -871,12 +871,12 @@
         }
 
         function resetGameState() {
-            gameState.p2Pos = -1;
-            gameState.p3Pos = 38;
+            gameState.p1Pos = -1;
+            gameState.p2Pos = 38;
             gameState.nextLedPos = 0;
             gameState.tugBoundary = 18;
+            gameState.p1RacePos = -1;
             gameState.p2RacePos = -1;
-            gameState.p3RacePos = -1;
             gameState.scoringSequence = [];
             gameState.celebrating = false;
             gameState.winner = 0;
@@ -888,8 +888,8 @@
         function resetAllSettings() {
             // Reset settings to defaults
             gameState.mode = 1;
-            gameState.p2ColorIndex = 0;
-            gameState.p3ColorIndex = 1;
+            gameState.p1ColorIndex = 0;
+            gameState.p2ColorIndex = 1;
             
             // Also reset game positions
             resetGameState();
