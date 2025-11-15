@@ -545,13 +545,34 @@ function createCategoryButtons(categories) {
     return `
       <div class="category-btn" data-filename="${category.filename}">
         ${musicEmoji}
-        <div style="font-size: 18px; margin-bottom: 4px;">${category.name}</div>
+        <div class="category-name-container">
+          <span class="category-name-text">${category.name}</span>
+        </div>
         <div style="font-size: 12px; color: var(--muted);">${category.questions.length} questions</div>
       </div>
     `;
   }).join('');
 
   categoryGrid.innerHTML = buttonsHTML;
+
+  // Check for text overflow and enable scrolling after layout
+  requestAnimationFrame(() => {
+    categoryGrid.querySelectorAll('.category-name-container').forEach(container => {
+      const textSpan = container.querySelector('.category-name-text');
+      if (textSpan) {
+        // Check if text overflows
+        const containerWidth = container.offsetWidth;
+        const textWidth = textSpan.scrollWidth;
+        
+        if (textWidth > containerWidth) {
+          container.classList.add('needs-scroll');
+          // Set CSS variable for scroll distance
+          const scrollDistance = textWidth - containerWidth;
+          container.style.setProperty('--scroll-distance', `${scrollDistance}px`);
+        }
+      }
+    });
+  });
 
   // Add click handlers
   categoryGrid.querySelectorAll('.category-btn').forEach(btn => {

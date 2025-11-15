@@ -538,6 +538,11 @@ button:active {
     transition: all 0.2s ease;
     font-weight: 600;
     position: relative;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
 }
 
 .category-btn:hover {
@@ -557,6 +562,45 @@ button:active {
     right: 8px;
     font-size: 16px;
     opacity: 0.8;
+}
+
+.category-name-container {
+    font-size: 18px;
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    position: relative;
+    height: 1.3em;
+    line-height: 1.3em;
+}
+
+.category-name-text {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+/* Only scroll on hover if text overflows */
+.category-btn:hover .category-name-container.needs-scroll {
+    overflow: hidden;
+}
+
+.category-btn:hover .category-name-container.needs-scroll .category-name-text {
+    animation: scroll-text-hover 4s linear infinite;
+    padding-right: 20px;
+}
+
+@keyframes scroll-text-hover {
+    0% {
+        transform: translateX(0);
+    }
+    50% {
+        transform: translateX(calc(-1 * var(--scroll-distance, 0px)));
+    }
+    100% {
+        transform: translateX(0);
+    }
 }
 
 /* Custom Mix Builder Styles */
