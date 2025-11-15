@@ -257,6 +257,10 @@ const categorySelection = document.getElementById('categorySelection');
 const categoryItems = document.getElementById('categoryItems');
 const totalQuestions = document.getElementById('totalQuestions');
 const totalNumber = document.getElementById('totalNumber');
+const totalQuestionsControl = document.getElementById('totalQuestionsControl');
+const totalQuestionsSlider = document.getElementById('totalQuestionsSlider');
+const totalQuestionsInput = document.getElementById('totalQuestionsInput');
+const maxQuestionsInfo = document.getElementById('maxQuestionsInfo');
 const startCustomQuiz = document.getElementById('startCustomQuiz');
 const selectAllCategories = document.getElementById('selectAllCategories');
 const clearAllCategories = document.getElementById('clearAllCategories');
@@ -671,6 +675,10 @@ function loadCombinedCategories(categories) {
 function createCategorySelectionItems(categories) {
   categoryItems.innerHTML = '';
   
+  // Reset total questions control to default
+  totalQuestionsSlider.value = 100;
+  totalQuestionsInput.value = 100;
+  
   categories.forEach((category, index) => {
     const item = document.createElement('div');
     item.className = 'category-item';
@@ -711,33 +719,56 @@ function createCategorySelectionItems(categories) {
 function updateTotalQuestions() {
   const selectedCategories = [];
   let totalRatio = 0;
+  let maxAvailable = 0;
   
   categoryItems.querySelectorAll('.category-checkbox:checked').forEach(checkbox => {
     const index = parseInt(checkbox.dataset.index);
     const slider = document.getElementById(`ratio-${index}`);
     const ratio = parseInt(slider.value);
+    const category = availableCategories[index];
     
     selectedCategories.push({
       index: index,
       ratio: ratio
     });
     totalRatio += ratio;
+    maxAvailable += category.questions.length;
   });
   
   if (selectedCategories.length === 0) {
     totalQuestions.classList.add('hidden');
+    totalQuestionsControl.classList.add('hidden');
     startCustomQuiz.disabled = true;
     return;
   }
   
-  // Calculate total questions based on ratios
-  const baseQuestions = 100; // Base number of questions
+  // Show the control and update max values
+  totalQuestionsControl.classList.remove('hidden');
+  const currentTotal = parseInt(totalQuestionsInput.value) || 100;
+  const maxTotal = Math.max(1, maxAvailable);
+  
+  // Update slider and input max values
+  totalQuestionsSlider.max = maxTotal;
+  totalQuestionsInput.max = maxTotal;
+  
+  // Ensure current value doesn't exceed max
+  const clampedTotal = Math.min(Math.max(1, currentTotal), maxTotal);
+  if (clampedTotal !== currentTotal) {
+    totalQuestionsSlider.value = clampedTotal;
+    totalQuestionsInput.value = clampedTotal;
+  }
+  
+  // Update max info display
+  maxQuestionsInfo.textContent = `Maximum available: ${maxAvailable} questions`;
+  
+  // Calculate estimated questions based on ratios and user-selected total
+  const userSelectedTotal = parseInt(totalQuestionsInput.value) || 100;
   let totalQuestionsCount = 0;
   
   selectedCategories.forEach(cat => {
     const category = availableCategories[cat.index];
     const ratio = cat.ratio / totalRatio;
-    const questionsForCategory = Math.round(baseQuestions * ratio);
+    const questionsForCategory = Math.round(userSelectedTotal * ratio);
     totalQuestionsCount += Math.min(questionsForCategory, category.questions.length);
   });
   
@@ -770,13 +801,13 @@ function loadCustomQuiz() {
   // Build the custom quiz
   QA = [];
   const categoryNames = [];
-  const baseQuestions = 100;
+  const userSelectedTotal = parseInt(totalQuestionsInput.value) || 100;
   let hasMusicQuiz = false;
   
   selectedCategories.forEach(cat => {
     const category = availableCategories[cat.index];
     const ratio = cat.ratio / totalRatio;
-    const questionsForCategory = Math.round(baseQuestions * ratio);
+    const questionsForCategory = Math.round(userSelectedTotal * ratio);
     
     // Shuffle the category questions and take the required number
     const shuffledQuestions = shuffle([...category.questions]);
@@ -1711,6 +1742,43 @@ clearAllCategories.addEventListener('click', () => {
   updateTotalQuestions();
 });
 backToSimpleCategories.addEventListener('click', showCategorySelector);
+
+// Total questions slider and input sync
+totalQuestionsSlider.addEventListener('input', () => {
+  const value = parseInt(totalQuestionsSlider.value);
+  totalQuestionsInput.value = value;
+  updateTotalQuestions();
+});
+
+totalQuestionsInput.addEventListener('input', () => {
+  let value = parseInt(totalQuestionsInput.value);
+  const max = parseInt(totalQuestionsInput.max) || 1;
+  const min = parseInt(totalQuestionsInput.min) || 1;
+  
+  // Clamp value to valid range
+  value = Math.min(Math.max(min, value), max);
+  
+  totalQuestionsSlider.value = value;
+  totalQuestionsInput.value = value;
+  updateTotalQuestions();
+});
+
+totalQuestionsInput.addEventListener('blur', () => {
+  let value = parseInt(totalQuestionsInput.value);
+  const max = parseInt(totalQuestionsInput.max) || 1;
+  const min = parseInt(totalQuestionsInput.min) || 1;
+  
+  // Clamp value to valid range on blur
+  if (isNaN(value) || value < min) {
+    value = min;
+  } else if (value > max) {
+    value = max;
+  }
+  
+  totalQuestionsSlider.value = value;
+  totalQuestionsInput.value = value;
+  updateTotalQuestions();
+});
 
 // Close modals when clicking overlay
 confirmModal.addEventListener('click', function(e) {

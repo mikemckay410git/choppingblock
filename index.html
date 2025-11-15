@@ -55,9 +55,20 @@
                     <!-- Category items will be generated here -->
                 </div>
 
+                <div class="total-questions-control hidden" id="totalQuestionsControl">
+                    <label for="totalQuestionsSlider" class="total-questions-label">Total Questions:</label>
+                    <div class="total-questions-slider-container">
+                        <input type="range" id="totalQuestionsSlider" class="total-questions-slider" min="1" value="100" step="1">
+                        <input type="number" id="totalQuestionsInput" class="total-questions-input" min="1" value="100" step="1">
+                    </div>
+                    <div class="total-questions-info">
+                        <span id="maxQuestionsInfo" class="max-questions-info"></span>
+                    </div>
+                </div>
+
                 <div class="total-questions hidden" id="totalQuestions">
                     <div class="number" id="totalNumber">0</div>
-                    <div class="label">Total Questions</div>
+                    <div class="label">Estimated Questions</div>
                 </div>
 
                 <div class="selection-actions">

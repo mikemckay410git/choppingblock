@@ -702,6 +702,87 @@ button:active {
     margin-top: 4px;
 }
 
+.total-questions-control {
+    background: rgba(255,255,255,.02);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 16px;
+    margin-bottom: 16px;
+}
+
+.total-questions-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 12px;
+}
+
+.total-questions-slider-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.total-questions-slider {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,.1);
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.total-questions-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent2);
+    cursor: pointer;
+}
+
+.total-questions-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent2);
+    cursor: pointer;
+    border: none;
+}
+
+.total-questions-input {
+    width: 80px;
+    padding: 8px 12px;
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    outline: none;
+}
+
+.total-questions-input:focus {
+    border-color: var(--accent2);
+    background: linear-gradient(180deg, rgba(155,225,255,.15), rgba(155,225,255,.08));
+}
+
+.total-questions-info {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+}
+
+.max-questions-info {
+    color: var(--accent2);
+    font-weight: 500;
+}
+
 /* Game Status in Quiz Mode */
 .game-status {
     position: relative;
@@ -983,6 +1064,15 @@ button:active {
     
     .selection-actions button { 
         min-width: auto; 
+    }
+    
+    .total-questions-slider-container {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .total-questions-input {
+        width: 100%;
     }
     
     #connDot { 
