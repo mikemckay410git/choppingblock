@@ -575,6 +575,10 @@ button:active {
     color: var(--accent);
 }
 
+.category-selection .bar h2 {
+    margin: 0;
+}
+
 .category-selection h3 {
     margin: 16px 0 12px 0;
     font-size: clamp(16px, 2vw, 20px);

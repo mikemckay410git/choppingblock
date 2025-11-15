@@ -48,7 +48,10 @@
 
             <!-- Category Selection Interface (Custom Mix Builder) -->
             <div class="category-selection hidden" id="categorySelection">
-                <h2>Custom Quiz Builder</h2>
+                <div class="bar">
+                    <h2>Custom Quiz Builder</h2>
+                    <button id="backToSimpleCategories" class="exit-btn" title="Back to Categories">↩</button>
+                </div>
                 <p style="color: var(--muted); margin-bottom: 20px;">Select which categories to include and adjust the ratio of questions from each category.</p>
                 
                 <div class="select-all-container">
@@ -69,7 +72,6 @@
 
                 <div class="selection-actions">
                     <button id="startCustomQuiz" class="ghost">Start Custom Quiz</button>
-                    <button id="backToSimpleCategories">← Back to Simple Selection</button>
                 </div>
             </div>
 
