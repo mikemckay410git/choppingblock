@@ -547,6 +547,7 @@ function createCategoryButtons(categories) {
         ${musicEmoji}
         <div class="category-name-container">
           <span class="category-name-text">${category.name}</span>
+          <span class="category-name-text category-name-text-duplicate">${category.name}</span>
         </div>
         <div style="font-size: 12px; color: var(--muted);">${category.questions.length} questions</div>
       </div>
@@ -558,7 +559,7 @@ function createCategoryButtons(categories) {
   // Check for text overflow and enable scrolling after layout
   requestAnimationFrame(() => {
     categoryGrid.querySelectorAll('.category-name-container').forEach(container => {
-      const textSpan = container.querySelector('.category-name-text');
+      const textSpan = container.querySelector('.category-name-text:not(.category-name-text-duplicate)');
       if (textSpan) {
         // Check if text overflows
         const containerWidth = container.offsetWidth;
@@ -566,8 +567,9 @@ function createCategoryButtons(categories) {
         
         if (textWidth > containerWidth) {
           container.classList.add('needs-scroll');
-          // Set CSS variable for scroll distance
-          const scrollDistance = textWidth - containerWidth;
+          // Set CSS variable for scroll distance (full text width + gap)
+          const gap = 40;
+          const scrollDistance = textWidth + gap;
           container.style.setProperty('--scroll-distance', `${scrollDistance}px`);
         }
       }

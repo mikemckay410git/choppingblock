@@ -581,14 +581,31 @@ button:active {
     white-space: nowrap;
 }
 
+.category-name-text-duplicate {
+    display: none;
+}
+
+.category-name-container.needs-scroll {
+    display: flex;
+    white-space: nowrap;
+}
+
+.category-name-container.needs-scroll .category-name-text {
+    flex-shrink: 0;
+}
+
+.category-name-container.needs-scroll .category-name-text-duplicate {
+    display: inline-block;
+    padding-left: 40px;
+}
+
 /* Only scroll on hover if text overflows */
 .category-btn:hover .category-name-container.needs-scroll {
     overflow: hidden;
 }
 
-.category-btn:hover .category-name-container.needs-scroll .category-name-text {
-    animation: scroll-text-hover 2.5s linear infinite;
-    padding-right: 40px;
+.category-btn:hover .category-name-container.needs-scroll {
+    animation: scroll-text-hover 3s linear infinite;
 }
 
 @keyframes scroll-text-hover {
@@ -596,7 +613,7 @@ button:active {
         transform: translateX(0);
     }
     100% {
-        transform: translateX(calc(-1 * var(--scroll-distance, 0px) - 40px));
+        transform: translateX(calc(-1 * var(--scroll-distance, 0px)));
     }
 }
 
