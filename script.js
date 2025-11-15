@@ -528,15 +528,10 @@ function createCategoryButtons(categories) {
     return;
   }
 
-  // Add "Combine All" and "Custom Mix" buttons if there are multiple categories
+  // Add "Custom Mix" button if there are multiple categories
   let buttonsHTML = '';
   if (categories.length > 1) {
-    const totalQuestions = categories.reduce((sum, cat) => sum + cat.questions.length, 0);
     buttonsHTML += `
-      <div class="category-btn combine-all" style="grid-column: 1 / -1; background: linear-gradient(180deg, rgba(155,225,255,.25), rgba(155,225,255,.15)); border-color: var(--accent2);">
-        <div style="font-size: 18px; margin-bottom: 4px;">🎯 Combine All Categories</div>
-        <div style="font-size: 12px; color: var(--muted);">${totalQuestions} total questions from ${categories.length} categories</div>
-      </div>
       <div class="category-btn custom-mix" style="grid-column: 1 / -1; background: linear-gradient(180deg, rgba(106,161,255,.25), rgba(106,161,255,.15)); border-color: var(--accent);">
         <div style="font-size: 18px; margin-bottom: 4px;">⚙️ Custom Mix Builder</div>
         <div style="font-size: 12px; color: var(--muted);">Select categories and set question ratios</div>
@@ -561,9 +556,7 @@ function createCategoryButtons(categories) {
   // Add click handlers
   categoryGrid.querySelectorAll('.category-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      if (btn.classList.contains('combine-all')) {
-        loadCombinedCategories(categories);
-      } else if (btn.classList.contains('custom-mix')) {
+      if (btn.classList.contains('custom-mix')) {
         showCustomMixBuilder(categories);
       } else {
         const filename = btn.dataset.filename;
@@ -609,56 +602,6 @@ function loadCategory(filename) {
   quizTitle.textContent = currentCategory;
   
   // Preload all images for this category
-  preloadImages(QA);
-  
-  // Music controls visibility will be handled per-question in render()
-  // Initially hide them, they'll be shown if the first question has audio
-  musicControls.classList.add('hidden');
-  stopMusic();
-  
-  // Clear any winner state from previous quiz
-  hideWinner();
-  
-  showQuizDisplay();
-  setOrder(true);
-  render(true);
-  enableControls();
-}
-
-function loadCombinedCategories(categories) {
-  // Combine all questions from all categories
-  QA = [];
-  const categoryNames = [];
-  let hasMusicQuiz = false;
-  
-  categories.forEach(category => {
-    // Add category information to each question
-    const questionsWithCategory = category.questions.map(qa => ({
-      ...qa,
-      category: category.name
-    }));
-    QA = QA.concat(questionsWithCategory);
-    categoryNames.push(category.name);
-    
-    // Check if any category is a music quiz
-    if (category.type === 'music') {
-      hasMusicQuiz = true;
-    }
-  });
-
-  // Format category title - limit to 3 category names, otherwise show count
-  let categoryTitle;
-  if (categoryNames.length <= 3) {
-    categoryTitle = categoryNames.join(', ');
-  } else {
-    categoryTitle = `${categoryNames.length} Categories`;
-  }
-  
-  currentCategory = `Mixed: ${categoryTitle}`;
-  currentQuizType = hasMusicQuiz ? 'music' : 'regular';
-  quizTitle.textContent = currentCategory;
-  
-  // Preload all images for combined categories
   preloadImages(QA);
   
   // Music controls visibility will be handled per-question in render()
