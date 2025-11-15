@@ -731,14 +731,39 @@ function updateTotalQuestions() {
   }
   
   // Calculate total questions based on ratios
-  const baseQuestions = 100; // Base number of questions
-  let totalQuestionsCount = 0;
+  // The ratio determines the proportion of questions from each category
+  // We scale the ratios to fit within available questions
   
-  selectedCategories.forEach(cat => {
+  // First, calculate proportional amounts for each category
+  const proportionalAmounts = selectedCategories.map(cat => {
     const category = availableCategories[cat.index];
     const ratio = cat.ratio / totalRatio;
-    const questionsForCategory = Math.round(baseQuestions * ratio);
-    totalQuestionsCount += Math.min(questionsForCategory, category.questions.length);
+    // Use a high base to calculate proportions, then scale down
+    const proportional = ratio * 1000; // High base for precision
+    return {
+      index: cat.index,
+      ratio: cat.ratio,
+      proportional: proportional,
+      available: category.questions.length
+    };
+  });
+  
+  // Find the scale factor needed so no category exceeds its available questions
+  let scaleFactor = 1;
+  proportionalAmounts.forEach(item => {
+    if (item.proportional > item.available) {
+      const neededScale = item.available / item.proportional;
+      if (neededScale < scaleFactor) {
+        scaleFactor = neededScale;
+      }
+    }
+  });
+  
+  // Calculate final question counts
+  let totalQuestionsCount = 0;
+  proportionalAmounts.forEach(item => {
+    const questionsForCategory = Math.round(item.proportional * scaleFactor);
+    totalQuestionsCount += questionsForCategory;
   });
   
   totalNumber.textContent = totalQuestionsCount;
@@ -770,29 +795,52 @@ function loadCustomQuiz() {
   // Build the custom quiz
   QA = [];
   const categoryNames = [];
-  const baseQuestions = 100;
   let hasMusicQuiz = false;
   
-  selectedCategories.forEach(cat => {
+  // Calculate proportional amounts for each category (same logic as updateTotalQuestions)
+  const proportionalAmounts = selectedCategories.map(cat => {
     const category = availableCategories[cat.index];
     const ratio = cat.ratio / totalRatio;
-    const questionsForCategory = Math.round(baseQuestions * ratio);
+    const proportional = ratio * 1000; // High base for precision
+    return {
+      index: cat.index,
+      ratio: cat.ratio,
+      proportional: proportional,
+      available: category.questions.length,
+      category: category
+    };
+  });
+  
+  // Find the scale factor needed so no category exceeds its available questions
+  let scaleFactor = 1;
+  proportionalAmounts.forEach(item => {
+    if (item.proportional > item.available) {
+      const neededScale = item.available / item.proportional;
+      if (neededScale < scaleFactor) {
+        scaleFactor = neededScale;
+      }
+    }
+  });
+  
+  // Calculate and load questions for each category
+  proportionalAmounts.forEach(item => {
+    const questionsForCategory = Math.round(item.proportional * scaleFactor);
     
     // Shuffle the category questions and take the required number
-    const shuffledQuestions = shuffle([...category.questions]);
-    const selectedQuestions = shuffledQuestions.slice(0, Math.min(questionsForCategory, category.questions.length));
+    const shuffledQuestions = shuffle([...item.category.questions]);
+    const selectedQuestions = shuffledQuestions.slice(0, questionsForCategory);
     
     // Add category information to each question
     const questionsWithCategory = selectedQuestions.map(qa => ({
       ...qa,
-      category: category.name
+      category: item.category.name
     }));
     
     QA = QA.concat(questionsWithCategory);
-    categoryNames.push(category.name);
+    categoryNames.push(item.category.name);
     
     // Check if any category is a music quiz
-    if (category.type === 'music') {
+    if (item.category.type === 'music') {
       hasMusicQuiz = true;
     }
   });
