@@ -646,7 +646,15 @@ function loadCombinedCategories(categories) {
     }
   });
 
-  currentCategory = `Mixed: ${categoryNames.join(', ')}`;
+  // Format category title - limit to 3 category names, otherwise show count
+  let categoryTitle;
+  if (categoryNames.length <= 3) {
+    categoryTitle = categoryNames.join(', ');
+  } else {
+    categoryTitle = `${categoryNames.length} Categories`;
+  }
+  
+  currentCategory = `Mixed: ${categoryTitle}`;
   currentQuizType = hasMusicQuiz ? 'music' : 'regular';
   quizTitle.textContent = currentCategory;
   
@@ -871,7 +879,15 @@ function loadCustomQuiz() {
   // Shuffle the final combined questions
   QA = shuffle(QA);
   
-  currentCategory = `Custom Mix: ${categoryNames.join(', ')}`;
+  // Format category title - limit to 3 category names, otherwise show count
+  let categoryTitle;
+  if (categoryNames.length <= 3) {
+    categoryTitle = categoryNames.join(', ');
+  } else {
+    categoryTitle = `${categoryNames.length} Categories`;
+  }
+  
+  currentCategory = `Custom Mix: ${categoryTitle}`;
   currentQuizType = hasMusicQuiz ? 'music' : 'regular';
   quizTitle.textContent = currentCategory;
   
