@@ -46,9 +46,9 @@ npm run dev
 
 ## Ports
 
-- **HTTP Server**: `http://localhost:3000` (serves static files)
-- **WebSocket Server**: `ws://localhost:8080` (real-time communication)
-- **Health Check**: `http://localhost:3000/health`
+- **HTTP Server**: `http://localhost:80` (serves static files)
+- **WebSocket Server**: `ws://localhost:80` (real-time communication)
+- **Health Check**: `http://localhost:80/health`
 
 ## API
 
@@ -56,7 +56,7 @@ npm run dev
 
 **To ESP32**: Send JSON commands via WebSocket
 ```javascript
-const ws = new WebSocket('ws://localhost:8080');
+const ws = new WebSocket('ws://localhost:80');
 ws.send(JSON.stringify({ command: 'led_on', pin: 13 }));
 ```
 
@@ -71,7 +71,7 @@ ws.onmessage = (event) => {
 ### Health Check Endpoint
 
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:80/health
 ```
 
 Response:
@@ -126,12 +126,12 @@ void sendData() {
 
 1. **Check if server is running**:
    ```bash
-   curl http://localhost:3000/health
+   curl http://localhost:80/health
    ```
 
 2. **Test WebSocket connection**:
    ```javascript
-   const ws = new WebSocket('ws://localhost:8080');
+   const ws = new WebSocket('ws://localhost:80');
    ws.onopen = () => console.log('Connected');
    ws.onerror = (error) => console.error('Error:', error);
    ```

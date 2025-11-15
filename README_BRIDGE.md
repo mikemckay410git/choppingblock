@@ -88,7 +88,7 @@ This project now uses a **Raspberry Pi + ESP32 Bridge** architecture instead of 
 
 ### 3. Access Web Interface
 
-- **Open browser** and go to `http://localhost:3000` (or your Pi's IP address)
+- **Open browser** and go to `http://localhost:80` (or your Pi's IP address)
 - **Web interface** provides the same functionality as before:
   - Load CSV quiz files
   - Configure lightboard settings
@@ -99,7 +99,7 @@ This project now uses a **Raspberry Pi + ESP32 Bridge** architecture instead of 
 ## Communication Protocol
 
 ### Web Interface ↔ Raspberry Pi
-- **WebSocket** connection on port 8080
+- **WebSocket** connection on port 80
 - **Commands from Web to Pi**:
   ```json
   {"cmd":"heartbeat"}
@@ -137,7 +137,7 @@ This project now uses a **Raspberry Pi + ESP32 Bridge** architecture instead of 
 ### Web Interface Not Loading
 - Check if server is running: `ps aux | grep node`
 - Check logs in terminal where you started the server
-- Try accessing: `http://localhost:3000`
+- Try accessing: `http://localhost:80`
 
 ### ESP-NOW Communication Issues
 - Check ESP32 serial output for connection status
@@ -152,7 +152,7 @@ This project now uses a **Raspberry Pi + ESP32 Bridge** architecture instead of 
 3. **ESP32 Communication**: Modify `Player1_Bridge.ino`
 
 ### Testing
-- **Web Interface**: Test in browser with `http://localhost:3000`
+- **Web Interface**: Test in browser with `http://localhost:80`
 - **Serial Communication**: Monitor terminal output where server is running
 - **ESP32**: Monitor serial output in Arduino IDE
 

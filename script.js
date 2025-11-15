@@ -124,8 +124,30 @@ function sendToESP32(command) {
 
 // === CSV PARSER ===
 function parseCSV(csv) {
-  const lines = csv.split('\n');
-  const headers = lines[0].split(',').map(h => h.replace(/"/g, ''));
+  // Handle different line endings (Windows \r\n, Mac \r, Unix \n)
+  const lines = csv.split(/\r?\n/).filter(line => line.trim() !== '');
+  
+  if (lines.length === 0) return [];
+  
+  // Parse header line properly, handling quoted values
+  const headerLine = lines[0];
+  const headers = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let j = 0; j < headerLine.length; j++) {
+    const char = headerLine[j];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      headers.push(current.trim().replace(/^"|"$/g, ''));
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  headers.push(current.trim().replace(/^"|"$/g, ''));
+  
   const data = [];
   
   for (let i = 1; i < lines.length; i++) {
@@ -147,16 +169,22 @@ function parseCSV(csv) {
         current += char;
       }
     }
+    // Push the last value after the loop
     values.push(current.trim());
     
+    // Ensure we have the same number of values as headers (pad with empty strings if needed)
+    while (values.length < headers.length) {
+      values.push('');
+    }
+
     const row = {};
     headers.forEach((header, index) => {
-      row[header] = values[index] ? values[index].replace(/^"|"$/g, '') : '';
+      const cleanHeader = header.trim();
+      const value = values[index] !== undefined ? values[index].replace(/^"|"$/g, '').trim() : '';
+      row[cleanHeader] = value;
     });
-    // Also store raw values for Level column (third column)
-    if (values.length > 2) {
-      row.Level = values[2] ? values[2].replace(/^"|"$/g, '') : '';
-    }
+    // Don't set row.Level here as it conflicts with the actual column structure
+    // The row object now has properties matching the CSV headers exactly
     data.push(row);
   }
   
@@ -346,9 +374,12 @@ function handleFileSelect(event) {
             // Get column values - handle CSVs with 2, 3, or 4 columns
             const rowValues = Object.values(row);
             // Column 3 (index 2): always for audio files (if it exists)
-            const audioColumn = row.Audio || row.audio || row.AudioFile || row.audioFile || row.File || row.file || (rowValues.length > 2 ? rowValues[2] : '') || '';
+            // Support multiple header names: Audio, Music, File, etc.
+            const audioColumn = row.Audio || row.audio || row.AudioFile || row.audioFile || row.Music || row.music || row.File || row.file || (rowValues.length > 2 ? rowValues[2] : '') || '';
             // Column 4 (index 3): always for badge category/level (if it exists)
-            const badgeColumn = row.Level || row.level || row.Category || row.category || row.Badge || row.badge || (rowValues.length > 3 ? rowValues[3] : '') || '';
+            // IMPORTANT: Don't use row.Level as it's set to the wrong column by parseCSV
+            // Support multiple header names: Badge, Icon, Category, Level, etc.
+            const badgeColumn = row.Badge || row.badge || row.Icon || row.icon || row.Category || row.category || (rowValues.length > 3 ? rowValues[3] : '') || '';
             
             // Set audio file from column 3 (only if it exists and is not empty)
             if (audioColumn && audioColumn.trim() !== '') {
@@ -1535,11 +1566,15 @@ async function loadAllQuizzes() {
           const questionObj = { q: question, a: answer };
           
           // Get column values - handle CSVs with 2, 3, or 4 columns
-          const rowValues = Object.values(row);
+          // IMPORTANT: Object.values() doesn't guarantee order, so we need to access by header name
           // Column 3 (index 2): always for audio files (if it exists)
-          const audioColumn = row.Audio || row.audio || row.AudioFile || row.audioFile || row.File || row.file || (rowValues.length > 2 ? rowValues[2] : '') || '';
+          // Support multiple header names: Audio, Music, File, etc.
+          const audioColumn = row.Audio || row.audio || row.AudioFile || row.audioFile || row.Music || row.music || row.File || row.file || '';
+          
           // Column 4 (index 3): always for badge category/level (if it exists)
-          const badgeColumn = row.Level || row.level || row.Category || row.category || row.Badge || row.badge || (rowValues.length > 3 ? rowValues[3] : '') || '';
+          // IMPORTANT: Don't use row.Level as it's set to the wrong column by parseCSV
+          // Support multiple header names: Badge, Icon, Category, Level, etc.
+          const badgeColumn = row.Badge || row.badge || row.Icon || row.icon || row.Category || row.category || row.Level || row.level || '';
           
           // Set audio file from column 3 (only if it exists and is not empty)
           if (audioColumn && audioColumn.trim() !== '') {
@@ -1567,6 +1602,7 @@ async function loadAllQuizzes() {
                 }
               }
               questionObj.iconPath = imagePath;
+              console.log(`Set iconPath for question: ${imagePath}`);
             } else {
               // Column 4 is a badge name - try standard icon path
               questionObj.iconPath = getIconPath(badgeColumn.trim());

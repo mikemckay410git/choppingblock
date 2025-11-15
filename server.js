@@ -529,13 +529,13 @@ setInterval(() => {
   console.log(`Memory usage - RSS: ${Math.round(memUsage.rss / 1024 / 1024)}MB, Heap: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`);
 }, 10 * 60 * 1000); // Every 10 minutes
 
-const PORT = 3000;
+const PORT = 80;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://0.0.0.0:${PORT}`);
   console.log('ESP32 Bridge server started!');
-  console.log('Web interface: http://localhost:3000');
-  console.log('Network access: http://[PI_IP]:3000');
-  console.log('Socket.IO server: ws://localhost:3000');
+  console.log('Web interface: http://localhost:80');
+  console.log('Network access: http://[PI_IP]:80');
+  console.log('Socket.IO server: ws://localhost:80');
   console.log('ESP32 connection is optional - server will run with or without ESP32');
   console.log('Press Ctrl+C to stop');
 });
