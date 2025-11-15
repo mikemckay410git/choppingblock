@@ -587,7 +587,7 @@ button:active {
 }
 
 .category-btn:hover .category-name-container.needs-scroll .category-name-text {
-    animation: scroll-text-hover 4s linear infinite;
+    animation: scroll-text-hover 5s linear infinite;
     padding-right: 20px;
 }
 
@@ -595,10 +595,10 @@ button:active {
     0% {
         transform: translateX(0);
     }
-    50% {
+    85% {
         transform: translateX(calc(-1 * var(--scroll-distance, 0px)));
     }
-    100% {
+    85.01%, 100% {
         transform: translateX(0);
     }
 }
