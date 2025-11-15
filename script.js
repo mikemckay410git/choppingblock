@@ -355,10 +355,25 @@ function handleFileSelect(event) {
               questionObj.audioFile = audioColumn.trim();
             }
             
-            // Set badge/level from column 4 (only if it exists and is not empty)
+            // Set badge/image from column 4 (only if it exists and is not empty)
             if (badgeColumn && badgeColumn.trim() !== '') {
               questionObj.level = badgeColumn.trim();
-              questionObj.iconPath = getIconPath(badgeColumn.trim());
+              // Check if column 4 is a direct image path (has image extension)
+              const imageExtensions = ['.png', '.svg', '.webp', '.jpg', '.jpeg', '.gif'];
+              const isImagePath = imageExtensions.some(ext => 
+                badgeColumn.trim().toLowerCase().endsWith(ext)
+              );
+              
+              if (isImagePath) {
+                // Column 4 is a direct image path - use it as-is
+                // Paths can be:
+                // - Absolute: "Images/Geography.png" or "/Images/Geography.png"
+                // - Relative to quiz folder: "Geography.png" (will be resolved by server)
+                questionObj.iconPath = badgeColumn.trim();
+              } else {
+                // Column 4 is a badge name - try standard icon path
+                questionObj.iconPath = getIconPath(badgeColumn.trim());
+              }
             }
             
             return questionObj;
@@ -1531,10 +1546,31 @@ async function loadAllQuizzes() {
             questionObj.audioFile = audioColumn.trim();
           }
           
-          // Set badge/level from column 4 (only if it exists and is not empty)
+          // Set badge/image from column 4 (only if it exists and is not empty)
           if (badgeColumn && badgeColumn.trim() !== '') {
             questionObj.level = badgeColumn.trim();
-            questionObj.iconPath = getIconPath(badgeColumn.trim());
+            // Check if column 4 is a direct image path (has image extension)
+            const imageExtensions = ['.png', '.svg', '.webp', '.jpg', '.jpeg', '.gif'];
+            const isImagePath = imageExtensions.some(ext => 
+              badgeColumn.trim().toLowerCase().endsWith(ext)
+            );
+            
+            if (isImagePath) {
+              // Column 4 is a direct image path - use it as-is
+              // If it's a relative path, prepend quiz folder if available
+              let imagePath = badgeColumn.trim();
+              if (quizItem.path && !imagePath.startsWith('http') && !imagePath.startsWith('/') && !imagePath.startsWith('Images/')) {
+                // Relative path - prepend quiz folder
+                const folderPath = quizItem.path.substring(0, quizItem.path.lastIndexOf('/'));
+                if (folderPath) {
+                  imagePath = `${folderPath}/${imagePath}`;
+                }
+              }
+              questionObj.iconPath = imagePath;
+            } else {
+              // Column 4 is a badge name - try standard icon path
+              questionObj.iconPath = getIconPath(badgeColumn.trim());
+            }
           }
           
           return questionObj;
