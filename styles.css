@@ -587,7 +587,8 @@ button:active {
 }
 
 .category-btn:hover .category-name-container.needs-scroll .category-name-text {
-    animation: scroll-text-hover 3s linear infinite;
+    animation: scroll-text-hover 2.5s linear infinite;
+    padding-right: 40px;
 }
 
 @keyframes scroll-text-hover {
@@ -595,7 +596,7 @@ button:active {
         transform: translateX(0);
     }
     100% {
-        transform: translateX(calc(-1 * var(--scroll-distance, 0px)));
+        transform: translateX(calc(-1 * var(--scroll-distance, 0px) - 40px));
     }
 }
 

@@ -566,8 +566,7 @@ function createCategoryButtons(categories) {
         
         if (textWidth > containerWidth) {
           container.classList.add('needs-scroll');
-          // Set CSS variable for scroll distance - scroll the full text width off screen
-          // We want to scroll until the end of the text is visible, then loop
+          // Set CSS variable for scroll distance
           const scrollDistance = textWidth - containerWidth;
           container.style.setProperty('--scroll-distance', `${scrollDistance}px`);
         }
