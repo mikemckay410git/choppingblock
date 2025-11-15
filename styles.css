@@ -581,6 +581,28 @@ button:active {
     color: var(--accent2);
 }
 
+.select-all-container {
+    background: rgba(255,255,255,.02);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.select-all-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.select-all-text {
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--ink);
+}
+
 .category-item {
     background: rgba(255,255,255,.02);
     border: 1px solid rgba(255,255,255,.08);

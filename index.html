@@ -51,6 +51,13 @@
                 <h2>Custom Quiz Builder</h2>
                 <p style="color: var(--muted); margin-bottom: 20px;">Select which categories to include and adjust the ratio of questions from each category.</p>
                 
+                <div class="select-all-container">
+                    <label class="select-all-label">
+                        <input type="checkbox" id="selectAllCheckbox" class="category-checkbox">
+                        <span class="select-all-text">Select All Categories</span>
+                    </label>
+                </div>
+                
                 <div id="categoryItems">
                     <!-- Category items will be generated here -->
                 </div>
@@ -62,8 +69,6 @@
 
                 <div class="selection-actions">
                     <button id="startCustomQuiz" class="ghost">Start Custom Quiz</button>
-                    <button id="selectAllCategories">Select All</button>
-                    <button id="clearAllCategories">Clear All</button>
                     <button id="backToSimpleCategories">← Back to Simple Selection</button>
                 </div>
             </div>

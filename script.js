@@ -258,8 +258,7 @@ const categoryItems = document.getElementById('categoryItems');
 const totalQuestions = document.getElementById('totalQuestions');
 const totalNumber = document.getElementById('totalNumber');
 const startCustomQuiz = document.getElementById('startCustomQuiz');
-const selectAllCategories = document.getElementById('selectAllCategories');
-const clearAllCategories = document.getElementById('clearAllCategories');
+const selectAllCheckbox = document.getElementById('selectAllCheckbox');
 const backToSimpleCategories = document.getElementById('backToSimpleCategories');
 const quizInterface = document.getElementById('quizInterface');
 const quizDisplay = document.getElementById('quizDisplay');
@@ -696,6 +695,7 @@ function createCategorySelectionItems(categories) {
     
     checkbox.addEventListener('change', () => {
       item.classList.toggle('selected', checkbox.checked);
+      updateSelectAllCheckbox();
       updateTotalQuestions();
     });
     
@@ -705,7 +705,30 @@ function createCategorySelectionItems(categories) {
     });
   });
   
+  updateSelectAllCheckbox();
   updateTotalQuestions();
+}
+
+function updateSelectAllCheckbox() {
+  const allCheckboxes = categoryItems.querySelectorAll('.category-checkbox');
+  const checkedCount = categoryItems.querySelectorAll('.category-checkbox:checked').length;
+  
+  if (allCheckboxes.length === 0) {
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = false;
+    return;
+  }
+  
+  if (checkedCount === 0) {
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = false;
+  } else if (checkedCount === allCheckboxes.length) {
+    selectAllCheckbox.checked = true;
+    selectAllCheckbox.indeterminate = false;
+  } else {
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = true;
+  }
 }
 
 function updateTotalQuestions() {
@@ -1744,17 +1767,11 @@ document.getElementById('confirmExitKeepScores').addEventListener('click', () =>
 
 // Custom mix builder event listeners
 startCustomQuiz.addEventListener('click', loadCustomQuiz);
-selectAllCategories.addEventListener('click', () => {
-  categoryItems.querySelectorAll('.category-checkbox').forEach(checkbox => {
-    checkbox.checked = true;
-    checkbox.closest('.category-item').classList.add('selected');
-  });
-  updateTotalQuestions();
-});
-clearAllCategories.addEventListener('click', () => {
-  categoryItems.querySelectorAll('.category-checkbox').forEach(checkbox => {
-    checkbox.checked = false;
-    checkbox.closest('.category-item').classList.remove('selected');
+selectAllCheckbox.addEventListener('change', () => {
+  const allCheckboxes = categoryItems.querySelectorAll('.category-checkbox');
+  allCheckboxes.forEach(checkbox => {
+    checkbox.checked = selectAllCheckbox.checked;
+    checkbox.closest('.category-item').classList.toggle('selected', selectAllCheckbox.checked);
   });
   updateTotalQuestions();
 });
