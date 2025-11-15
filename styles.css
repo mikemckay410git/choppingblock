@@ -547,6 +547,149 @@ button:active {
     opacity: 0.8;
 }
 
+/* Custom Mix Builder Styles */
+.category-selection {
+    background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 18px;
+    padding: clamp(18px, 3.5vw, 28px);
+    box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25);
+    margin-bottom: 20px;
+}
+
+.category-selection h2 {
+    margin: 0 0 16px 0;
+    font-size: clamp(18px, 2.5vw, 24px);
+    color: var(--accent);
+}
+
+.category-selection h3 {
+    margin: 16px 0 12px 0;
+    font-size: clamp(16px, 2vw, 20px);
+    color: var(--accent2);
+}
+
+.category-item {
+    background: rgba(255,255,255,.02);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.category-item.selected {
+    background: rgba(155,225,255,.08);
+    border-color: var(--accent2);
+}
+
+.category-checkbox {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--accent2);
+}
+
+.category-info {
+    flex: 1;
+    min-width: 200px;
+}
+
+.category-name {
+    font-weight: 600;
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.category-count {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.ratio-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.ratio-label {
+    font-size: 14px;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.ratio-slider {
+    width: 120px;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,.1);
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.ratio-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent2);
+    cursor: pointer;
+}
+
+.ratio-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent2);
+    cursor: pointer;
+    border: none;
+}
+
+.ratio-value {
+    font-size: 14px;
+    color: var(--accent2);
+    font-weight: 600;
+    min-width: 40px;
+    text-align: center;
+}
+
+.selection-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.selection-actions button {
+    flex: 1;
+    min-width: 120px;
+}
+
+.total-questions {
+    background: rgba(155,225,255,.1);
+    border: 1px solid rgba(155,225,255,.2);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 16px;
+    text-align: center;
+}
+
+.total-questions .number {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--accent2);
+}
+
+.total-questions .label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+}
+
 /* Game Status in Quiz Mode */
 .game-status {
     position: relative;
@@ -810,6 +953,24 @@ button:active {
     
     .category-grid { 
         grid-template-columns: 1fr; 
+    }
+    
+    .category-item { 
+        flex-direction: column; 
+        align-items: flex-start; 
+    }
+    
+    .ratio-controls { 
+        width: 100%; 
+        justify-content: space-between; 
+    }
+    
+    .selection-actions { 
+        flex-direction: column; 
+    }
+    
+    .selection-actions button { 
+        min-width: auto; 
     }
     
     #connDot { 

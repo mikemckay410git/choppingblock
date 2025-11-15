@@ -253,6 +253,14 @@ const loadedFiles = document.getElementById('loadedFiles');
 const fileList = document.getElementById('fileList');
 const categorySelector = document.getElementById('categorySelector');
 const categoryGrid = document.getElementById('categoryGrid');
+const categorySelection = document.getElementById('categorySelection');
+const categoryItems = document.getElementById('categoryItems');
+const totalQuestions = document.getElementById('totalQuestions');
+const totalNumber = document.getElementById('totalNumber');
+const startCustomQuiz = document.getElementById('startCustomQuiz');
+const selectAllCategories = document.getElementById('selectAllCategories');
+const clearAllCategories = document.getElementById('clearAllCategories');
+const backToSimpleCategories = document.getElementById('backToSimpleCategories');
 const quizInterface = document.getElementById('quizInterface');
 const quizDisplay = document.getElementById('quizDisplay');
 const quizTitle = document.getElementById('quizTitle');
@@ -479,6 +487,7 @@ function addFileToList(filename, message, status) {
 // === CATEGORY SELECTION ===
 function showCategorySelector() {
   categorySelector.classList.remove('hidden');
+  categorySelection.classList.add('hidden');
   quizDisplay.classList.add('hidden');
   fileInputSection.classList.remove('hidden');
   resetAllData.parentElement.classList.remove('hidden');
@@ -486,6 +495,18 @@ function showCategorySelector() {
   currentCategory = '';
   QA = [];
   console.log('Category selector shown, file input visible');
+}
+
+function showCustomMixBuilder(categories) {
+  categorySelector.classList.add('hidden');
+  categorySelection.classList.remove('hidden');
+  quizDisplay.classList.add('hidden');
+  fileInputSection.classList.add('hidden');
+  resetAllData.parentElement.classList.add('hidden');
+  lightboardSettingsBtn.parentElement.classList.add('hidden');
+  
+  createCategorySelectionItems(categories);
+  console.log('Custom mix builder shown');
 }
 
 function showQuizDisplay() {
@@ -507,7 +528,7 @@ function createCategoryButtons(categories) {
     return;
   }
 
-  // Add "Combine All" button if there are multiple categories
+  // Add "Combine All" and "Custom Mix" buttons if there are multiple categories
   let buttonsHTML = '';
   if (categories.length > 1) {
     const totalQuestions = categories.reduce((sum, cat) => sum + cat.questions.length, 0);
@@ -515,6 +536,10 @@ function createCategoryButtons(categories) {
       <div class="category-btn combine-all" style="grid-column: 1 / -1; background: linear-gradient(180deg, rgba(155,225,255,.25), rgba(155,225,255,.15)); border-color: var(--accent2);">
         <div style="font-size: 18px; margin-bottom: 4px;">🎯 Combine All Categories</div>
         <div style="font-size: 12px; color: var(--muted);">${totalQuestions} total questions from ${categories.length} categories</div>
+      </div>
+      <div class="category-btn custom-mix" style="grid-column: 1 / -1; background: linear-gradient(180deg, rgba(106,161,255,.25), rgba(106,161,255,.15)); border-color: var(--accent);">
+        <div style="font-size: 18px; margin-bottom: 4px;">⚙️ Custom Mix Builder</div>
+        <div style="font-size: 12px; color: var(--muted);">Select categories and set question ratios</div>
       </div>
     `;
   }
@@ -538,6 +563,8 @@ function createCategoryButtons(categories) {
     btn.addEventListener('click', () => {
       if (btn.classList.contains('combine-all')) {
         loadCombinedCategories(categories);
+      } else if (btn.classList.contains('custom-mix')) {
+        showCustomMixBuilder(categories);
       } else {
         const filename = btn.dataset.filename;
         loadCategory(filename);
@@ -624,6 +651,159 @@ function loadCombinedCategories(categories) {
   quizTitle.textContent = currentCategory;
   
   // Preload all images for combined categories
+  preloadImages(QA);
+  
+  // Music controls visibility will be handled per-question in render()
+  // Initially hide them, they'll be shown if the first question has audio
+  musicControls.classList.add('hidden');
+  stopMusic();
+  
+  // Clear any winner state from previous quiz
+  hideWinner();
+  
+  showQuizDisplay();
+  setOrder(true);
+  render(true);
+  enableControls();
+}
+
+function createCategorySelectionItems(categories) {
+  categoryItems.innerHTML = '';
+  
+  categories.forEach((category, index) => {
+    const item = document.createElement('div');
+    item.className = 'category-item';
+    item.innerHTML = `
+      <input type="checkbox" class="category-checkbox" id="cat-${index}" data-index="${index}">
+      <div class="category-info">
+        <div class="category-name">${category.name}</div>
+        <div class="category-count">${category.questions.length} questions</div>
+      </div>
+      <div class="ratio-controls">
+        <span class="ratio-label">Ratio:</span>
+        <input type="range" class="ratio-slider" id="ratio-${index}" min="1" max="10" value="5" data-index="${index}">
+        <span class="ratio-value" id="ratio-value-${index}">5</span>
+      </div>
+    `;
+    
+    categoryItems.appendChild(item);
+    
+    // Add event listeners
+    const checkbox = item.querySelector('.category-checkbox');
+    const slider = item.querySelector('.ratio-slider');
+    const ratioValue = item.querySelector('.ratio-value');
+    
+    checkbox.addEventListener('change', () => {
+      item.classList.toggle('selected', checkbox.checked);
+      updateTotalQuestions();
+    });
+    
+    slider.addEventListener('input', () => {
+      ratioValue.textContent = slider.value;
+      updateTotalQuestions();
+    });
+  });
+  
+  updateTotalQuestions();
+}
+
+function updateTotalQuestions() {
+  const selectedCategories = [];
+  let totalRatio = 0;
+  
+  categoryItems.querySelectorAll('.category-checkbox:checked').forEach(checkbox => {
+    const index = parseInt(checkbox.dataset.index);
+    const slider = document.getElementById(`ratio-${index}`);
+    const ratio = parseInt(slider.value);
+    
+    selectedCategories.push({
+      index: index,
+      ratio: ratio
+    });
+    totalRatio += ratio;
+  });
+  
+  if (selectedCategories.length === 0) {
+    totalQuestions.classList.add('hidden');
+    startCustomQuiz.disabled = true;
+    return;
+  }
+  
+  // Calculate total questions based on ratios
+  const baseQuestions = 100; // Base number of questions
+  let totalQuestionsCount = 0;
+  
+  selectedCategories.forEach(cat => {
+    const category = availableCategories[cat.index];
+    const ratio = cat.ratio / totalRatio;
+    const questionsForCategory = Math.round(baseQuestions * ratio);
+    totalQuestionsCount += Math.min(questionsForCategory, category.questions.length);
+  });
+  
+  totalNumber.textContent = totalQuestionsCount;
+  totalQuestions.classList.remove('hidden');
+  startCustomQuiz.disabled = false;
+}
+
+function loadCustomQuiz() {
+  const selectedCategories = [];
+  let totalRatio = 0;
+  
+  categoryItems.querySelectorAll('.category-checkbox:checked').forEach(checkbox => {
+    const index = parseInt(checkbox.dataset.index);
+    const slider = document.getElementById(`ratio-${index}`);
+    const ratio = parseInt(slider.value);
+    
+    selectedCategories.push({
+      index: index,
+      ratio: ratio
+    });
+    totalRatio += ratio;
+  });
+  
+  if (selectedCategories.length === 0) {
+    alert('Please select at least one category');
+    return;
+  }
+  
+  // Build the custom quiz
+  QA = [];
+  const categoryNames = [];
+  const baseQuestions = 100;
+  let hasMusicQuiz = false;
+  
+  selectedCategories.forEach(cat => {
+    const category = availableCategories[cat.index];
+    const ratio = cat.ratio / totalRatio;
+    const questionsForCategory = Math.round(baseQuestions * ratio);
+    
+    // Shuffle the category questions and take the required number
+    const shuffledQuestions = shuffle([...category.questions]);
+    const selectedQuestions = shuffledQuestions.slice(0, Math.min(questionsForCategory, category.questions.length));
+    
+    // Add category information to each question
+    const questionsWithCategory = selectedQuestions.map(qa => ({
+      ...qa,
+      category: category.name
+    }));
+    
+    QA = QA.concat(questionsWithCategory);
+    categoryNames.push(category.name);
+    
+    // Check if any category is a music quiz
+    if (category.type === 'music') {
+      hasMusicQuiz = true;
+    }
+  });
+  
+  // Shuffle the final combined questions
+  QA = shuffle(QA);
+  
+  currentCategory = `Custom Mix: ${categoryNames.join(', ')}`;
+  currentQuizType = hasMusicQuiz ? 'music' : 'regular';
+  quizTitle.textContent = currentCategory;
+  
+  // Preload all images for custom quiz
   preloadImages(QA);
   
   // Music controls visibility will be handled per-question in render()
@@ -1400,7 +1580,11 @@ window.addEventListener('keydown', (e) => {
   }
   else if (e.key === 'Escape') { 
     e.preventDefault(); 
-    showCategorySelector();
+    if (!categorySelection.classList.contains('hidden')) {
+      showCategorySelector();
+    } else if (!quizDisplay.classList.contains('hidden')) {
+      showCategorySelector();
+    }
   }
 });
 
@@ -1488,6 +1672,24 @@ function exitToCategories(keepNames = false, keepScores = false, keepLightboardS
 document.getElementById('cancelExit').addEventListener('click', hideExitConfirmation);
 document.getElementById('confirmExitKeepNames').addEventListener('click', () => exitToCategories(true, false, true));
 document.getElementById('confirmExitKeepScores').addEventListener('click', () => exitToCategories(true, true, true));
+
+// Custom mix builder event listeners
+startCustomQuiz.addEventListener('click', loadCustomQuiz);
+selectAllCategories.addEventListener('click', () => {
+  categoryItems.querySelectorAll('.category-checkbox').forEach(checkbox => {
+    checkbox.checked = true;
+    checkbox.closest('.category-item').classList.add('selected');
+  });
+  updateTotalQuestions();
+});
+clearAllCategories.addEventListener('click', () => {
+  categoryItems.querySelectorAll('.category-checkbox').forEach(checkbox => {
+    checkbox.checked = false;
+    checkbox.closest('.category-item').classList.remove('selected');
+  });
+  updateTotalQuestions();
+});
+backToSimpleCategories.addEventListener('click', showCategorySelector);
 
 // Close modals when clicking overlay
 confirmModal.addEventListener('click', function(e) {
