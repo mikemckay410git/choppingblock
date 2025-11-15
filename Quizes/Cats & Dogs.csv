@@ -1,81 +1,81 @@
-question,answer
-How many ears does a cat have?,Two
-How many ears does a dog have?,Two
-How many legs does a cat have?,Four
-How many legs does an average dog have?,Four
-How many whiskers does a normal cat have on each side?,12
-"If dogs beling to the Canine family, which family do cats belong to?",Feline
-What animal is known as “man’s best friend”?,Dog
-What covers a cat’s body?,Fur
-What covers a dog’s body?,Fur
-What do cats do when happy and relaxed?,Purr
-What do cats do with a ball of yarn?,Play with it
-What do cats drink?,Water or milk
-Which animals do cats usually chase?,Mice or birds
-What do cats land on when they fall?,Their feet
-What do cats mostly use to clean themselves?,Their tongues
-What do cats sharpen on furniture?,Claws
-What do cats use to climb?,Claws
-What do cats use to feel things around them?,Whiskers
-What do cats use to see in the dark?,Eyes
-What do dogs chase when playing fetch?,A ball or stick
-What do dogs tradfitionally like to chew?,Bones
-How do dogs cool themselves down?,They pant
-What do dogs often bury in the yard?,Bones
-What do dogs sniff when they meet each other?,Each other’s butt
-What do dogs wag when they’re happy?,Their tails
-What do cats and dogs usually wear around their necks?,A collar
-What do puppies grow up to be?,Dogs
-What do you call a dog’s babies collectively?,A litter
-What do you call a female cat?,Queen
-What do you call a female dog?,Bitch
-What do you call a group of dogs?,A pack
-What do you call a male cat?,Tom
-What do you call a male dog?,Dog
-What do you clip when you give a dog a pedicure?,Nails
-"What kind of animal is a cat — mammal, reptile, or amphibian?",Mammal
-What breed of dog usually helps police detect drugs?,Beagle
-"What kind of food do dogs eat — meat, plants, or both?",Both (omnivores)
-Which animal makes a 'Meow sound'.,A cat sound
-What organ helps a dog breathe?,Lungs
-What part of a cat helps it balance?,Tail
-What part of a dog is often cold and wet?,Nose
-What part of a dog moves most when it’s excited?,Tail
-What sense do police dogs mainly use to find people?,Smell
-What sound does a happy cat make?,Purr
-What sound does a puppy make?,Yip or bark
-What’s a baby cat called?,Kitten
-What’s a cat’s nose made for?,Smelling
-What’s a cat’s tongue covered with?,Tiny rough barbs
-What’s a dog’s favourite shape?,Bone
-What’s a group of kittens called?,A litter
-What’s the average number of eyes a cat has?,Two
-What’s the colour of most Golden Retrievers?,Golden
-What’s the largest member of the cat family?,Tiger
-What’s the main liquid dogs drink?,Water
-What’s the name for a baby dog?,Puppy
-What’s the name for a dog doctor?,Veterinarian
-What’s the name for a dog trained to help blind people?,Guide dog
-What’s the name of a cat’s doctor?,Veterinarian
-What’s the name of a cat’s foot?,Paw
-What’s the normal number of eyes on a dog?,Two
-What’s the opposite of a big dog?,Small dog
-What’s the opposite of a wild cat?,Domestic cat
-What’s the soft hair under a cat’s fur called?,Undercoat
-What’s the usual sound a dog makes?,Bark
-What’s the word for a dog’s foot?,Paw
-Which animal barks?,Dog
-Which animal purrs?,Cat
-Which dog breed is famous for droopy ears and tracking scent?,Bloodhound
-Which dog breed is famous for its spots?,Dalmatian
-Which dog breed is known for pulling sleds?,Husky
-"If a cat belongs to the feline family, which family does a dog belong to?",Canine
-What can cats claws to that a dogs cannot?,Retract
-Which one is commonly used for police work?,Dog
-Which one is more likely to fetch a stick?,Dog
-Which one is most likely to ignore you completely?,Cat
-Which one likes climbing trees?,Cat
-Which one wags its tail more often?,Dog
-Which organ helps dogs hear?,Ears
-Which part of a dog’s body does it sniff with?,Nose
-"Which sense is strongest in dogs — sight, smell, or hearing?",Smell
+question,answer,Audio,Badge
+How many ears does a cat have?,Two,,
+How many ears does a dog have?,Two,,
+How many legs does a cat have?,Four,,
+How many legs does an average dog have?,Four,,
+How many whiskers does a normal cat have on each side?,12,,
+"If dogs beling to the Canine family, which family do cats belong to?",Feline,,
+What animal is known as “man’s best friend”?,Dog,,
+What covers a cat’s body?,Fur,,
+What covers a dog’s body?,Fur,,
+What do cats do when happy and relaxed?,Purr,,
+What do cats do with a ball of yarn?,Play with it,,
+What do cats drink?,Water or milk,,
+Which animals do cats usually chase?,Mice or birds,,
+What do cats land on when they fall?,Their feet,,
+What do cats mostly use to clean themselves?,Their tongues,,
+What do cats sharpen on furniture?,Claws,,
+What do cats use to climb?,Claws,,
+What do cats use to feel things around them?,Whiskers,,
+What do cats use to see in the dark?,Eyes,,
+What do dogs chase when playing fetch?,A ball or stick,,
+What do dogs tradfitionally like to chew?,Bones,,
+How do dogs cool themselves down?,They pant,,
+What do dogs often bury in the yard?,Bones,,
+What do dogs sniff when they meet each other?,Each other’s butt,,
+What do dogs wag when they’re happy?,Their tails,,
+What do cats and dogs usually wear around their necks?,A collar,,
+What do puppies grow up to be?,Dogs,,
+What do you call a dog’s babies collectively?,A litter,,
+What do you call a female cat?,Queen,,
+What do you call a female dog?,Bitch,,
+What do you call a group of dogs?,A pack,,
+What do you call a male cat?,Tom,,
+What do you call a male dog?,Dog,,
+What do you clip when you give a dog a pedicure?,Nails,,
+"What kind of animal is a cat — mammal, reptile, or amphibian?",Mammal,,
+What breed of dog usually helps police detect drugs?,Beagle,,
+"What kind of food do dogs eat — meat, plants, or both?",Both (omnivores),,
+Which animal makes a 'Meow sound'.,A cat sound,,
+What organ helps a dog breathe?,Lungs,,
+What part of a cat helps it balance?,Tail,,
+What part of a dog is often cold and wet?,Nose,,
+What part of a dog moves most when it’s excited?,Tail,,
+What sense do police dogs mainly use to find people?,Smell,,
+What sound does a happy cat make?,Purr,,
+What sound does a puppy make?,Yip or bark,,
+What’s a baby cat called?,Kitten,,
+What’s a cat’s nose made for?,Smelling,,
+What’s a cat’s tongue covered with?,Tiny rough barbs,,
+What’s a dog’s favourite shape?,Bone,,
+What’s a group of kittens called?,A litter,,
+What’s the average number of eyes a cat has?,Two,,
+What’s the colour of most Golden Retrievers?,Golden,,
+What’s the largest member of the cat family?,Tiger,,
+What’s the main liquid dogs drink?,Water,,
+What’s the name for a baby dog?,Puppy,,
+What’s the name for a dog doctor?,Veterinarian,,
+What’s the name for a dog trained to help blind people?,Guide dog,,
+What’s the name of a cat’s doctor?,Veterinarian,,
+What’s the name of a cat’s foot?,Paw,,
+What’s the normal number of eyes on a dog?,Two,,
+What’s the opposite of a big dog?,Small dog,,
+What’s the opposite of a wild cat?,Domestic cat,,
+What’s the soft hair under a cat’s fur called?,Undercoat,,
+What’s the usual sound a dog makes?,Bark,,
+What’s the word for a dog’s foot?,Paw,,
+Which animal barks?,Dog,,
+Which animal purrs?,Cat,,
+Which dog breed is famous for droopy ears and tracking scent?,Bloodhound,,
+Which dog breed is famous for its spots?,Dalmatian,,
+Which dog breed is known for pulling sleds?,Husky,,
+"If a cat belongs to the feline family, which family does a dog belong to?",Canine,,
+What can cats claws to that a dogs cannot?,Retract,,
+Which one is commonly used for police work?,Dog,,
+Which one is more likely to fetch a stick?,Dog,,
+Which one is most likely to ignore you completely?,Cat,,
+Which one likes climbing trees?,Cat,,
+Which one wags its tail more often?,Dog,,
+Which organ helps dogs hear?,Ears,,
+Which part of a dog’s body does it sniff with?,Nose,,
+"Which sense is strongest in dogs — sight, smell, or hearing?",Smell,,

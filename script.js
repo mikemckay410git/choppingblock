@@ -23,7 +23,7 @@ socket.on('disconnect', () => {
 socket.on('esp32_status', (status) => {
   esp32Connected = status.connected;
   esp32Enabled = status.enabled;
-  console.log('ESP32 status:', status);
+  // Removed frequent heartbeat log to reduce console noise
   
   // Update connection indicator
   if (esp32Enabled && esp32Connected) {
@@ -36,7 +36,11 @@ socket.on('esp32_status', (status) => {
 });
 
 socket.on('esp32_data', (data) => {
-  console.log('Received from ESP32:', data);
+  // Removed frequent heartbeat log to reduce console noise
+  // Only log non-status messages (hits, winners, etc.)
+  if (data.type !== 'status') {
+    console.log('Received from ESP32:', data);
+  }
   
   // Handle different types of ESP32 messages
   if (data.type === 'hit') {
@@ -336,32 +340,25 @@ function handleFileSelect(event) {
           const questions = csvData.map(row => {
             const question = row.Question || row.question || row.Q || row.q || Object.values(row)[0];
             const answer = row.Answer || row.answer || row.A || row.a || Object.values(row)[1];
-            const thirdColumn = row.Level || Object.values(row)[2] || '';
             
             const questionObj = { q: question, a: answer };
             
-            // Check if third column is a Level or an audio file
-            // IMPORTANT: Check for Level FIRST, before checking for audio files
-            if (thirdColumn && thirdColumn.includes('Level')) {
-              // It's a Level column - set level and icon, but NOT audioFile
-              questionObj.level = thirdColumn;
-              questionObj.iconPath = getIconPath(thirdColumn);
-              // Explicitly ensure audioFile is NOT set
-              questionObj.audioFile = undefined;
-            } else if (thirdColumn && isAudioFile(thirdColumn)) {
-              // It's an audio file
-              questionObj.audioFile = thirdColumn;
-            } else {
-              // Check explicit Audio column (in case it's in a different column)
-              const audioFile = row.Audio || row.audio || row.AudioFile || row.audioFile;
-              if (audioFile) {
-                questionObj.audioFile = audioFile;
-              }
-              // If third column exists but isn't Level or audio, treat as level
-              if (thirdColumn && !audioFile) {
-                questionObj.level = thirdColumn;
-                questionObj.iconPath = getIconPath(thirdColumn);
-              }
+            // Get column values - handle CSVs with 2, 3, or 4 columns
+            const rowValues = Object.values(row);
+            // Column 3 (index 2): always for audio files (if it exists)
+            const audioColumn = row.Audio || row.audio || row.AudioFile || row.audioFile || row.File || row.file || (rowValues.length > 2 ? rowValues[2] : '') || '';
+            // Column 4 (index 3): always for badge category/level (if it exists)
+            const badgeColumn = row.Level || row.level || row.Category || row.category || row.Badge || row.badge || (rowValues.length > 3 ? rowValues[3] : '') || '';
+            
+            // Set audio file from column 3 (only if it exists and is not empty)
+            if (audioColumn && audioColumn.trim() !== '') {
+              questionObj.audioFile = audioColumn.trim();
+            }
+            
+            // Set badge/level from column 4 (only if it exists and is not empty)
+            if (badgeColumn && badgeColumn.trim() !== '') {
+              questionObj.level = badgeColumn.trim();
+              questionObj.iconPath = getIconPath(badgeColumn.trim());
             }
             
             return questionObj;
@@ -1519,32 +1516,25 @@ async function loadAllQuizzes() {
         const questions = csvData.map(row => {
           const question = row.Question || row.question || row.Q || row.q || Object.values(row)[0];
           const answer = row.Answer || row.answer || row.A || row.a || Object.values(row)[1];
-          const thirdColumn = row.Level || Object.values(row)[2] || '';
           
           const questionObj = { q: question, a: answer };
           
-          // Check if third column is a Level or an audio file
-          // IMPORTANT: Check for Level FIRST, before checking for audio files
-          if (thirdColumn && thirdColumn.includes('Level')) {
-            // It's a Level column - set level and icon, but NOT audioFile
-            questionObj.level = thirdColumn;
-            questionObj.iconPath = getIconPath(thirdColumn);
-            // Explicitly ensure audioFile is NOT set
-            questionObj.audioFile = undefined;
-          } else if (thirdColumn && isAudioFile(thirdColumn)) {
-            // It's an audio file
-            questionObj.audioFile = thirdColumn;
-          } else {
-            // Check explicit Audio column (in case it's in a different column)
-            const audioFile = row.Audio || row.audio || row.AudioFile || row.audioFile;
-            if (audioFile) {
-              questionObj.audioFile = audioFile;
-            }
-            // If third column exists but isn't Level or audio, treat as level
-            if (thirdColumn && !audioFile) {
-              questionObj.level = thirdColumn;
-              questionObj.iconPath = getIconPath(thirdColumn);
-            }
+          // Get column values - handle CSVs with 2, 3, or 4 columns
+          const rowValues = Object.values(row);
+          // Column 3 (index 2): always for audio files (if it exists)
+          const audioColumn = row.Audio || row.audio || row.AudioFile || row.audioFile || row.File || row.file || (rowValues.length > 2 ? rowValues[2] : '') || '';
+          // Column 4 (index 3): always for badge category/level (if it exists)
+          const badgeColumn = row.Level || row.level || row.Category || row.category || row.Badge || row.badge || (rowValues.length > 3 ? rowValues[3] : '') || '';
+          
+          // Set audio file from column 3 (only if it exists and is not empty)
+          if (audioColumn && audioColumn.trim() !== '') {
+            questionObj.audioFile = audioColumn.trim();
+          }
+          
+          // Set badge/level from column 4 (only if it exists and is not empty)
+          if (badgeColumn && badgeColumn.trim() !== '') {
+            questionObj.level = badgeColumn.trim();
+            questionObj.iconPath = getIconPath(badgeColumn.trim());
           }
           
           return questionObj;

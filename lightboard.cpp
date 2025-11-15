@@ -22,8 +22,8 @@ static void forceStaChannel(uint8_t ch){
   esp_wifi_set_promiscuous(false);
 }
 
-// Player 1 MAC address (hardcoded for reliability)
-uint8_t player1Address[] = {0x80, 0xF3, 0xDA, 0x4A, 0x2F, 0x98}; // Player 1 AP MAC
+// Bridge MAC address (hardcoded for reliability)
+uint8_t bridgeAddress[] = {0x80, 0xF3, 0xDA, 0x4A, 0x2F, 0x98}; // Bridge AP MAC
 
 typedef struct struct_lightboard_message {
   uint8_t  deviceId;     // 3=Lightboard
@@ -42,13 +42,13 @@ typedef struct struct_lightboard_message {
 } struct_lightboard_message;
 
 struct_lightboard_message myData;
-struct_lightboard_message player1Data;
+struct_lightboard_message bridgeData;
 
 // Connection tracking
-bool player1Connected = false;
+bool bridgeConnected = false;
 unsigned long lastHeartbeat = 0;
 const unsigned long heartbeatTimeout = 2000; // 2 seconds
-bool player1MacLearned = false;
+bool bridgeMacLearned = false;
 static bool wasConnected = false; // Track if we've been connected before
 
 // ---- Game state ----
@@ -249,11 +249,11 @@ void clearStrip(){ for (int i=0;i<NUM_LEDS;i++) strip.setPixelColor(i,0); strip.
 
 void requestStateRestore() {
   // Send state request message to Bridge (action 7 = state request)
-  if (!player1MacLearned) return; // Can't send if we don't know the MAC yet
+  if (!bridgeMacLearned) return; // Can't send if we don't know the MAC yet
   
   myData.deviceId = 3; // Lightboard
   myData.action = 7; // state request
-  esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
+  esp_now_send(bridgeAddress, (uint8_t*)&myData, sizeof(myData));
   Serial.println("Sent state request to Bridge");
 }
 
@@ -289,31 +289,31 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
   Serial.printf("ESP-NOW message received: len=%d, expected=%d\n", len, sizeof(struct_lightboard_message));
   if (len != sizeof(struct_lightboard_message)) return;
   
-  memcpy(&player1Data, data, sizeof(player1Data));
+  memcpy(&bridgeData, data, sizeof(bridgeData));
 
-  if (player1Data.deviceId == 1) { // Player 1
-    // Learn Player 1 MAC dynamically
-    if (info && !player1MacLearned) {
-      memcpy(player1Address, info->src_addr, 6);
+  if (bridgeData.deviceId == 1) { // Bridge
+    // Learn Bridge MAC dynamically
+    if (info && !bridgeMacLearned) {
+      memcpy(bridgeAddress, info->src_addr, 6);
       char macStr[18];
-      sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", player1Address[0],player1Address[1],player1Address[2],player1Address[3],player1Address[4],player1Address[5]);
-      Serial.printf("Discovered Player 1 MAC: %s\r\n", macStr);
-      esp_now_del_peer(player1Address);
+      sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", bridgeAddress[0],bridgeAddress[1],bridgeAddress[2],bridgeAddress[3],bridgeAddress[4],bridgeAddress[5]);
+      Serial.printf("Discovered Bridge MAC: %s\r\n", macStr);
+      esp_now_del_peer(bridgeAddress);
       esp_now_peer_info_t p = {};
-      memcpy(p.peer_addr, player1Address, 6);
+      memcpy(p.peer_addr, bridgeAddress, 6);
       p.channel = 1;
       p.encrypt = false;
       if (esp_now_add_peer(&p) == ESP_OK) {
-        player1MacLearned = true;
-        Serial.println("Player 1 peer added after discovery");
+        bridgeMacLearned = true;
+        Serial.println("Bridge peer added after discovery");
         Serial.println("Connection established! Heartbeats will now be sent.");
       } else {
-        Serial.println("Failed to add discovered Player 1 peer");
+        Serial.println("Failed to add discovered Bridge peer");
       }
     }
     // Check if this is a new connection (was disconnected, now connected)
-    bool wasDisconnected = !player1Connected;
-    player1Connected = true;
+    bool wasDisconnected = !bridgeConnected;
+    bridgeConnected = true;
     lastHeartbeat = millis();
     
     // Clear demo mode and go black only on new connection
@@ -324,50 +324,50 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
       requestStateRestore();
     }
 
-    if (player1Data.action == 1) {
+    if (bridgeData.action == 1) {
       // Heartbeat - just update connection status
-      Serial.println("Player 1 heartbeat received");
-    } else if (player1Data.action == 2) {
+      Serial.println("Bridge heartbeat received");
+    } else if (bridgeData.action == 2) {
       // Game state update - only update essential settings (mode, colors)
-      gameMode = player1Data.gameMode;
-      p1ColorIndex = player1Data.p1ColorIndex;
-      p2ColorIndex = player1Data.p2ColorIndex;
+      gameMode = bridgeData.gameMode;
+      p1ColorIndex = bridgeData.p1ColorIndex;
+      p2ColorIndex = bridgeData.p2ColorIndex;
       
       Serial.printf("Game state update: mode=%d, p1Color=%d, p2Color=%d\n", 
                    gameMode, p1ColorIndex, p2ColorIndex);
       paintProgress();
       
-    } else if (player1Data.action == 3) {
+    } else if (bridgeData.action == 3) {
       // Point update - run our own game logic
-      Serial.printf("Point update received - Player %d scored, running lightboard game logic\n", player1Data.winner);
-      handlePointUpdate(player1Data.winner);
+      Serial.printf("Point update received - Player %d scored, running lightboard game logic\n", bridgeData.winner);
+      handlePointUpdate(bridgeData.winner);
       
-    } else if (player1Data.action == 4) {
+    } else if (bridgeData.action == 4) {
       // Mode change
-      gameMode = player1Data.gameMode;
-      p1ColorIndex = player1Data.p1ColorIndex;
-      p2ColorIndex = player1Data.p2ColorIndex;
+      gameMode = bridgeData.gameMode;
+      p1ColorIndex = bridgeData.p1ColorIndex;
+      p2ColorIndex = bridgeData.p2ColorIndex;
       Serial.printf("Mode changed to: %d\n", gameMode);
       resetGame();
       
-    } else if (player1Data.action == 5) {
+    } else if (bridgeData.action == 5) {
       // Reset
       Serial.println("Reset received - resetting lightboard game state");
       resetGame();
       
-    } else if (player1Data.action == 6) {
+    } else if (bridgeData.action == 6) {
       // State restore - restore full game state from saved state
       Serial.println("State restore received - restoring lightboard game state");
-      gameMode = player1Data.gameMode;
-      p1ColorIndex = player1Data.p1ColorIndex;
-      p2ColorIndex = player1Data.p2ColorIndex;
-      p1Pos = player1Data.p1Pos;
-      p2Pos = player1Data.p2Pos;
-      nextLedPosition = player1Data.nextLedPos;
-      tugBoundary = player1Data.tugBoundary;
-      p1RacePos = player1Data.p1RacePos;
-      p2RacePos = player1Data.p2RacePos;
-      celebrating = player1Data.celebrating;
+      gameMode = bridgeData.gameMode;
+      p1ColorIndex = bridgeData.p1ColorIndex;
+      p2ColorIndex = bridgeData.p2ColorIndex;
+      p1Pos = bridgeData.p1Pos;
+      p2Pos = bridgeData.p2Pos;
+      nextLedPosition = bridgeData.nextLedPos;
+      tugBoundary = bridgeData.tugBoundary;
+      p1RacePos = bridgeData.p1RacePos;
+      p2RacePos = bridgeData.p2RacePos;
+      celebrating = bridgeData.celebrating;
       
       // Restore scoring sequence for mode 4 (Score Order)
       if (gameMode == 4) {
@@ -406,9 +406,9 @@ void setup(){
   Serial.printf("WiFi Channel: %d\r\n", WiFi.channel());
   Serial.println("===============================");
   
-  // Convert MAC address to proper format for player1_host_sync.ino
+  // Convert MAC address to proper format for Bridge.ino
   macStr.replace(":", "");
-  Serial.println("COPY THIS LINE TO player1_host_sync.ino:");
+  Serial.println("COPY THIS LINE TO Bridge.ino:");
   Serial.print("uint8_t lightboardAddress[] = {");
   for (int i = 0; i < 6; i++) {
     String byteStr = macStr.substring(i * 2, i * 2 + 2);
@@ -443,20 +443,20 @@ void setup(){
   esp_now_register_send_cb(OnDataSent);
   esp_now_register_recv_cb(OnDataRecv);
 
-  // Add Player 1 peer with known MAC address
+  // Add Bridge peer with known MAC address
   esp_now_peer_info_t peerInfo = {};
-  memcpy(peerInfo.peer_addr, player1Address, 6);
+  memcpy(peerInfo.peer_addr, bridgeAddress, 6);
   peerInfo.channel = 1; // follow current channel
   peerInfo.encrypt = false;
   
   peerInfo.ifidx = WIFI_IF_STA;
 if (esp_now_add_peer(&peerInfo) == ESP_OK) {
-    Serial.println("Player 1 peer added successfully");
+    Serial.println("Bridge peer added successfully");
   
-    player1MacLearned = true;
+    bridgeMacLearned = true;
     Serial.println("Connection established! Heartbeats will now be sent.");
 } else {
-    Serial.println("Failed to add Player 1 peer");
+    Serial.println("Failed to add Bridge peer");
   }
 
   myData.deviceId = 3; // Lightboard device ID
@@ -464,9 +464,9 @@ if (esp_now_add_peer(&peerInfo) == ESP_OK) {
   // Initialize game state
   resetGame();
   
-  Serial.println("Lightboard ready - waiting for Player 1 connection");
-  Serial.println("Make sure Player 1 is running and has the correct lightboard MAC address");
-  Serial.println("The lightboard will automatically discover Player 1 when it sends a message");
+  Serial.println("Lightboard ready - waiting for Bridge connection");
+  Serial.println("Make sure Bridge is running and has the correct lightboard MAC address");
+  Serial.println("The lightboard will automatically discover Bridge when it sends a message");
 }
 
 // ===================== Helper Functions =====================
@@ -626,7 +626,7 @@ void runDemoMode() {
   if (millis() - lastDemoUpdate >= 50) { // Update every 50ms for smooth animation
     lastDemoUpdate = millis();
     
-    if (!player1Connected) {
+    if (!bridgeConnected) {
       // Rainbow chase effect
       rainbowOffset = (rainbowOffset + 1) % 256;
       
@@ -660,9 +660,9 @@ void loop(){
   }
   
   // Track previous connection state to detect transitions
-  static bool prevPlayer1Connected = false;
-  bool justConnected = !prevPlayer1Connected && player1Connected;
-  prevPlayer1Connected = player1Connected;
+  static bool prevBridgeConnected = false;
+  bool justConnected = !prevBridgeConnected && bridgeConnected;
+  prevBridgeConnected = bridgeConnected;
   
   // If we just left demo mode (transitioned from disconnected to connected), request state
   if (justConnected) {
@@ -674,23 +674,23 @@ void loop(){
   runDemoMode();
 
   // Check for connection timeout
-  if (player1Connected && (millis() - lastHeartbeat > heartbeatTimeout)) {
-    player1Connected = false;
-    player1MacLearned = false; // Reset MAC learning to force rediscovery
+  if (bridgeConnected && (millis() - lastHeartbeat > heartbeatTimeout)) {
+    bridgeConnected = false;
+    bridgeMacLearned = false; // Reset MAC learning to force rediscovery
     wasConnected = false; // Reset connection flag to allow demo mode again
-    Serial.println("Player 1 connection lost - resetting discovery");
+    Serial.println("Bridge connection lost - resetting discovery");
     clearStrip(); // Clear LEDs when disconnected
   }
 
-  // Send heartbeat to Player 1 (start immediately after setup)
+  // Send heartbeat to Bridge (start immediately after setup)
   static unsigned long lastHeartbeatSend = 0;
   if (millis() - lastHeartbeatSend >= 1000) {
     myData.action = 1; // heartbeat
-    esp_now_send(player1Address, (uint8_t*)&myData, sizeof(myData));
-    if (player1MacLearned) {
-      Serial.println("Sent heartbeat to Player 1");
+    esp_now_send(bridgeAddress, (uint8_t*)&myData, sizeof(myData));
+    if (bridgeMacLearned) {
+      Serial.println("Sent heartbeat to Bridge");
     } else {
-      Serial.println("Sent heartbeat to Player 1 (waiting for connection)");
+      Serial.println("Sent heartbeat to Bridge (waiting for connection)");
     }
     lastHeartbeatSend = millis();
   }

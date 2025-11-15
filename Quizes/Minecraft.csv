@@ -1,101 +1,101 @@
-question,answer
-Which game mode makes you gather resources and manage hunger?,Survival
-Which game mode gives unlimited blocks and flight?,Creative
-Which game mode is for playing maps with set rules and no block breaking?,Adventure
-Which mode lets you die permanently when you run out of health?,Hardcore
-What green mob explodes when it gets close?,Creeper
-What do Creepers drop when defeated?,Gunpowder
-Which mob shoots arrows at you?,Skeleton
-Which mob drops bones and arrows?,Skeleton
-Which tall mob teleports and gets angry if you stare?,Enderman
-Which mob drops ender pearls?,Enderman
-What boss lives in the End dimension?,Ender Dragon
-What item lets you glide from high places?,Elytra
-What item is used to light a Nether portal?,Flint and steel
-What block is needed to build a Nether portal frame?,Obsidian
-How many obsidian are needed for the smallest portal (no corners)?,10
-What rare Nether block smelts into netherite scrap?,Ancient debris
-Which ore dust is used to power circuits?,Redstone
-What table is used to enchant items?,Enchanting table
-What block removes enchantments and gives some XP back?,Grindstone
-What block combines items and enchantments from books?,Anvil
-What block upgrades diamond gear to netherite?,Smithing table
-What plant used in brewing grows in the Nether?,Nether wart
-What do you need to fuel a brewing stand?,Blaze powder
-Which Nether mob drops blaze rods?,Blaze
-Which ocean mob shoots a laser?,Guardian
-Which structure in the ocean contains Elder Guardians?,Ocean monument
-Which End structure contains shulkers?,End city
-What do shulkers drop?,Shulker shells
-How many shulker shells are needed for a shulker box?,2
-What block do you sleep on to set your spawn?,Bed
-What happens if you try to sleep in the Nether or End?,It explodes
-What item do you throw to teleport a short distance?,Ender pearl
-What item is crafted from 3 sugar cane in a row?,Paper
-What generator uses water and lava to make mineable blocks?,Cobblestone generator
-Which animal can you ride with a saddle and a carrot on a stick?,Pig
-Which Nether mob can walk on lava and be ridden?,Strider
-What do you use to control a strider?,Warped fungus on a stick
-What block grows crops when hydrated by water?,Farmland
-What tool is used to till soil into farmland?,Hoe
-Which food is used to breed cows and sheep?,Wheat
-Which item is used to breed chickens?,Seeds
-Which item tames wolves?,Bones
-Which animal provides wool for beds and banners?,Sheep
-Which mob drops string and spider eyes?,Spider
-What animal can be milked with a bucket?,Cow
-What item increases potion duration when brewed?,Redstone
-What item increases potion strength when brewed?,Glowstone dust
-What item turns potions into splash potions?,Gunpowder
-What stand is used to brew potions?,Brewing stand
-Which ore is smelted to get iron ingots?,Iron ore
-How many iron ingots are needed to craft a bucket?,3
-Which gem is used as currency with villagers?,Emerald
-What do you throw to locate a stronghold?,Eye of Ender
-Which structure is found in deserts with a TNT trap below the floor?,Desert temple
-Which wooden structure often generates in oceans?,Shipwreck
-Which biome has tall spruce trees and sometimes snow?,Taiga
-Which cold biome has tall blue spikes of packed ice?,Ice Spikes
-Which hot dimension is full of lava and fortresses?,The Nether
-What is the main world called?,Overworld
-Which dimension has islands of end stone and chorus plants?,The End
-What is the default maximum stack size for most items?,64
-What block is crafted from 4 wooden planks and lets you craft items?,Crafting table
-How many wooden planks are needed to craft a chest?,8
-What block smelts ores and cooks food?,Furnace
-Which furnace variant smelts ores faster?,Blast furnace
-Which furnace variant cooks food faster?,Smoker
-Which tool mines stone and ores the fastest?,Pickaxe
-Which tool chops wood the fastest?,Axe
-"Which tool digs dirt, sand, and gravel the fastest?",Shovel
-Which tool is best for gathering leaves?,Shears
-Which ore is green and found in mountain biomes?,Emerald ore
-Which white ore in the Nether gives experience?,Nether quartz ore
-Which flying hostile mob spawns if you don’t sleep?,Phantom
-Which friendly mob trades items in villages?,Villager
-What item stores lots of items and keeps contents when broken?,Shulker box
-What item lets you carry liquids like water and lava?,Bucket
-What sandy block is used to grow nether wart?,Soul sand
-What forms when water meets flowing lava?,Cobblestone
-What forms when water meets source lava?,Obsidian
-Which block creates upward bubble columns in water?,Soul sand
-Which block creates downward bubble columns in water?,Magma block
-What drink removes most status effects?,Milk
-What item do you use to collect honeycomb from a hive?,Shears
-What do bees make that you can bottle?,Honey bottles
-Which wood type do cocoa beans grow on?,Jungle logs
-Which crop grows on sand near water and grows tall?,Sugar cane
-Which crop breeds pigs and rabbits?,Carrots
-Which crop is used to make bread?,Wheat
-What do you combine with leather to craft a book?,Paper
-How many bookshelves are needed for level 30 enchants?,15
-Which helmet enchantment helps you breathe underwater longer?,Respiration
-Which boot enchantment reduces fall damage?,Feather Falling
-Which tool enchantment repairs items using XP?,Mending
-Which sword enchantment increases damage?,Sharpness
-Which bow enchantment increases arrow damage?,Power
-Which boot enchantment freezes water into ice as you walk?,Frost Walker
-Which animal can be ridden and jump high after taming?,Horse
-What item can tie passive mobs to fences?,Lead
-Which passive mob spits when angered?,Llama
-Which fiery cube in the Nether splits into smaller ones?,Magma cube
+question,answer,Audio,Badge
+Which game mode makes you gather resources and manage hunger?,Survival,,
+Which game mode gives unlimited blocks and flight?,Creative,,
+Which game mode is for playing maps with set rules and no block breaking?,Adventure,,
+Which mode lets you die permanently when you run out of health?,Hardcore,,
+What green mob explodes when it gets close?,Creeper,,
+What do Creepers drop when defeated?,Gunpowder,,
+Which mob shoots arrows at you?,Skeleton,,
+Which mob drops bones and arrows?,Skeleton,,
+Which tall mob teleports and gets angry if you stare?,Enderman,,
+Which mob drops ender pearls?,Enderman,,
+What boss lives in the End dimension?,Ender Dragon,,
+What item lets you glide from high places?,Elytra,,
+What item is used to light a Nether portal?,Flint and steel,,
+What block is needed to build a Nether portal frame?,Obsidian,,
+How many obsidian are needed for the smallest portal (no corners)?,10,,
+What rare Nether block smelts into netherite scrap?,Ancient debris,,
+Which ore dust is used to power circuits?,Redstone,,
+What table is used to enchant items?,Enchanting table,,
+What block removes enchantments and gives some XP back?,Grindstone,,
+What block combines items and enchantments from books?,Anvil,,
+What block upgrades diamond gear to netherite?,Smithing table,,
+What plant used in brewing grows in the Nether?,Nether wart,,
+What do you need to fuel a brewing stand?,Blaze powder,,
+Which Nether mob drops blaze rods?,Blaze,,
+Which ocean mob shoots a laser?,Guardian,,
+Which structure in the ocean contains Elder Guardians?,Ocean monument,,
+Which End structure contains shulkers?,End city,,
+What do shulkers drop?,Shulker shells,,
+How many shulker shells are needed for a shulker box?,2,,
+What block do you sleep on to set your spawn?,Bed,,
+What happens if you try to sleep in the Nether or End?,It explodes,,
+What item do you throw to teleport a short distance?,Ender pearl,,
+What item is crafted from 3 sugar cane in a row?,Paper,,
+What generator uses water and lava to make mineable blocks?,Cobblestone generator,,
+Which animal can you ride with a saddle and a carrot on a stick?,Pig,,
+Which Nether mob can walk on lava and be ridden?,Strider,,
+What do you use to control a strider?,Warped fungus on a stick,,
+What block grows crops when hydrated by water?,Farmland,,
+What tool is used to till soil into farmland?,Hoe,,
+Which food is used to breed cows and sheep?,Wheat,,
+Which item is used to breed chickens?,Seeds,,
+Which item tames wolves?,Bones,,
+Which animal provides wool for beds and banners?,Sheep,,
+Which mob drops string and spider eyes?,Spider,,
+What animal can be milked with a bucket?,Cow,,
+What item increases potion duration when brewed?,Redstone,,
+What item increases potion strength when brewed?,Glowstone dust,,
+What item turns potions into splash potions?,Gunpowder,,
+What stand is used to brew potions?,Brewing stand,,
+Which ore is smelted to get iron ingots?,Iron ore,,
+How many iron ingots are needed to craft a bucket?,3,,
+Which gem is used as currency with villagers?,Emerald,,
+What do you throw to locate a stronghold?,Eye of Ender,,
+Which structure is found in deserts with a TNT trap below the floor?,Desert temple,,
+Which wooden structure often generates in oceans?,Shipwreck,,
+Which biome has tall spruce trees and sometimes snow?,Taiga,,
+Which cold biome has tall blue spikes of packed ice?,Ice Spikes,,
+Which hot dimension is full of lava and fortresses?,The Nether,,
+What is the main world called?,Overworld,,
+Which dimension has islands of end stone and chorus plants?,The End,,
+What is the default maximum stack size for most items?,64,,
+What block is crafted from 4 wooden planks and lets you craft items?,Crafting table,,
+How many wooden planks are needed to craft a chest?,8,,
+What block smelts ores and cooks food?,Furnace,,
+Which furnace variant smelts ores faster?,Blast furnace,,
+Which furnace variant cooks food faster?,Smoker,,
+Which tool mines stone and ores the fastest?,Pickaxe,,
+Which tool chops wood the fastest?,Axe,,
+"Which tool digs dirt, sand, and gravel the fastest?",Shovel,,
+Which tool is best for gathering leaves?,Shears,,
+Which ore is green and found in mountain biomes?,Emerald ore,,
+Which white ore in the Nether gives experience?,Nether quartz ore,,
+Which flying hostile mob spawns if you don’t sleep?,Phantom,,
+Which friendly mob trades items in villages?,Villager,,
+What item stores lots of items and keeps contents when broken?,Shulker box,,
+What item lets you carry liquids like water and lava?,Bucket,,
+What sandy block is used to grow nether wart?,Soul sand,,
+What forms when water meets flowing lava?,Cobblestone,,
+What forms when water meets source lava?,Obsidian,,
+Which block creates upward bubble columns in water?,Soul sand,,
+Which block creates downward bubble columns in water?,Magma block,,
+What drink removes most status effects?,Milk,,
+What item do you use to collect honeycomb from a hive?,Shears,,
+What do bees make that you can bottle?,Honey bottles,,
+Which wood type do cocoa beans grow on?,Jungle logs,,
+Which crop grows on sand near water and grows tall?,Sugar cane,,
+Which crop breeds pigs and rabbits?,Carrots,,
+Which crop is used to make bread?,Wheat,,
+What do you combine with leather to craft a book?,Paper,,
+How many bookshelves are needed for level 30 enchants?,15,,
+Which helmet enchantment helps you breathe underwater longer?,Respiration,,
+Which boot enchantment reduces fall damage?,Feather Falling,,
+Which tool enchantment repairs items using XP?,Mending,,
+Which sword enchantment increases damage?,Sharpness,,
+Which bow enchantment increases arrow damage?,Power,,
+Which boot enchantment freezes water into ice as you walk?,Frost Walker,,
+Which animal can be ridden and jump high after taming?,Horse,,
+What item can tie passive mobs to fences?,Lead,,
+Which passive mob spits when angered?,Llama,,
+Which fiery cube in the Nether splits into smaller ones?,Magma cube,,
