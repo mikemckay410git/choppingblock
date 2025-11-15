@@ -547,7 +547,6 @@ function createCategoryButtons(categories) {
         ${musicEmoji}
         <div class="category-name-container">
           <span class="category-name-text">${category.name}</span>
-          <span class="category-name-text category-name-text-duplicate">${category.name}</span>
         </div>
         <div style="font-size: 12px; color: var(--muted);">${category.questions.length} questions</div>
       </div>
@@ -558,8 +557,18 @@ function createCategoryButtons(categories) {
 
   // Check for text overflow and enable scrolling after layout
   requestAnimationFrame(() => {
-    categoryGrid.querySelectorAll('.category-name-container').forEach(container => {
-      const textSpan = container.querySelector('.category-name-text:not(.category-name-text-duplicate)');
+    // Create a single style element for all animations
+    let styleElement = document.getElementById('scroll-animations-style');
+    if (!styleElement) {
+      styleElement = document.createElement('style');
+      styleElement.id = 'scroll-animations-style';
+      document.head.appendChild(styleElement);
+    }
+    
+    let keyframesText = '';
+    
+    categoryGrid.querySelectorAll('.category-name-container').forEach((container, index) => {
+      const textSpan = container.querySelector('.category-name-text');
       if (textSpan) {
         // Check if text overflows
         const containerWidth = container.offsetWidth;
@@ -567,13 +576,94 @@ function createCategoryButtons(categories) {
         
         if (textWidth > containerWidth) {
           container.classList.add('needs-scroll');
-          // Set CSS variable for scroll distance (full text width + gap)
-          const gap = 40;
-          const scrollDistance = textWidth + gap;
-          container.style.setProperty('--scroll-distance', `${scrollDistance}px`);
+          const scrollGap = 48;
+          
+          // Calculate distances for constant speed
+          // First scroll: moves from 0 to -textWidth (distance = textWidth)
+          const firstScrollDistance = textWidth;
+          // Loop scroll: moves from containerWidth to -textWidth - gap (distance = containerWidth + textWidth + gap)
+          const loopScrollDistance = containerWidth + textWidth + scrollGap;
+          // Total distance for one complete cycle
+          const totalDistance = firstScrollDistance + loopScrollDistance;
+          
+          // Calculate percentage for first scroll based on distance (for constant speed)
+          const firstCyclePercentage = (firstScrollDistance / totalDistance) * 100;
+          
+          // Calculate animation duration based on total distance
+          const pxPerSecond = 120; // Slower speed for smoother animation
+          const durationSeconds = Math.max(2, totalDistance / pxPerSecond);
+          
+          container.style.setProperty('--text-width', `${textWidth}px`);
+          container.style.setProperty('--container-width', `${containerWidth}px`);
+          container.style.setProperty('--scroll-gap', `${scrollGap}px`);
+          container.style.setProperty('--scroll-duration', `${durationSeconds.toFixed(2)}s`);
+          container.style.setProperty('--first-cycle-end', `${firstCyclePercentage.toFixed(2)}%`);
+          
+          // Create unique animation name for this container
+          const animationName = `scroll-text-hover-${index}`;
+          container.style.setProperty('--animation-name', animationName);
+          
+          // Add keyframes to the style element
+          // Structure: The animation loops from right to left continuously
+          // We'll use a negative delay on first play to start from center
+          // Calculate what percentage "center" would be in the loop
+          // The loop goes: right -> left, so center is at the start of that journey
+          // But we want first cycle to be: center -> left -> (then loop from right)
+          
+          // The loop portion: from right (containerWidth) to left (-textWidth - gap)
+          // This takes: (100 - firstCyclePercentage - 0.01)% of the animation
+          // We want the animation to loop seamlessly, so 0% and 100% should be the same state
+          // But we also need the first cycle to start from center
+          
+          // Solution: Make the animation end at the loop start position
+          // Then use animation-direction or a wrapper animation
+          
+          // Better: Create two animations - one for first cycle, one for loop
+          // Or: Make the animation so 0% is loop start, and use a negative delay to start from center
+          
+          const loopDuration = durationSeconds * (1 - firstCyclePercentage / 100);
+          const firstCycleDuration = durationSeconds * (firstCyclePercentage / 100);
+          
+          keyframesText += `
+            @keyframes ${animationName}-first {
+              /* First cycle: center to left */
+              0% {
+                transform: translateX(0);
+              }
+              100% {
+                transform: translateX(calc(-1 * ${textWidth}px));
+              }
+            }
+            @keyframes ${animationName}-loop {
+              /* Loop: right to left continuously */
+              0% {
+                transform: translateX(${containerWidth}px);
+              }
+              100% {
+                transform: translateX(calc(-1 * ${textWidth}px - ${scrollGap}px));
+              }
+            }
+          `;
+          
+          // Set CSS variables for the animations
+          container.style.setProperty('--first-anim', `${animationName}-first`);
+          container.style.setProperty('--loop-anim', `${animationName}-loop`);
+          container.style.setProperty('--first-duration', `${firstCycleDuration.toFixed(2)}s`);
+          container.style.setProperty('--loop-duration', `${loopDuration.toFixed(2)}s`);
+          
+          // Store as attributes for potential JS use
+          container.setAttribute('data-first-anim', `${animationName}-first`);
+          container.setAttribute('data-loop-anim', `${animationName}-loop`);
+          container.setAttribute('data-first-duration', `${firstCycleDuration.toFixed(2)}s`);
+          container.setAttribute('data-loop-duration', `${loopDuration.toFixed(2)}s`);
         }
       }
     });
+    
+    // Set all keyframes at once
+    if (keyframesText) {
+      styleElement.textContent = keyframesText;
+    }
   });
 
   // Add click handlers

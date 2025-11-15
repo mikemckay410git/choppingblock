@@ -574,6 +574,8 @@ button:active {
     position: relative;
     height: 1.3em;
     line-height: 1.3em;
+    --scroll-gap: 48px;
+    --scroll-duration: 4s;
 }
 
 .category-name-text {
@@ -581,39 +583,36 @@ button:active {
     white-space: nowrap;
 }
 
-.category-name-text-duplicate {
-    display: none;
-}
-
 .category-name-container.needs-scroll {
-    display: flex;
-    white-space: nowrap;
-}
-
-.category-name-container.needs-scroll .category-name-text {
-    flex-shrink: 0;
-}
-
-.category-name-container.needs-scroll .category-name-text-duplicate {
-    display: inline-block;
-    padding-left: 40px;
-}
-
-/* Only scroll on hover if text overflows */
-.category-btn:hover .category-name-container.needs-scroll {
     overflow: hidden;
 }
 
-.category-btn:hover .category-name-container.needs-scroll {
-    animation: scroll-text-hover 3s linear infinite;
+.category-name-container.needs-scroll .category-name-text {
+    transform: translateX(0);
+    will-change: transform;
 }
 
+.category-btn:hover .category-name-container.needs-scroll .category-name-text {
+    /* First animation: center to left (plays once) */
+    /* Second animation: right to left (loops infinitely, starts after first completes) */
+    animation: var(--first-anim, scroll-text-hover) var(--first-duration, 1s) linear forwards,
+               var(--loop-anim, scroll-text-hover) var(--loop-duration, 3s) linear infinite;
+    animation-delay: 0s, var(--first-duration, 1s);
+}
+
+/* Fallback keyframes if JavaScript hasn't loaded yet */
 @keyframes scroll-text-hover {
     0% {
         transform: translateX(0);
     }
+    20% {
+        transform: translateX(calc(-1 * var(--text-width, 100%)));
+    }
+    20.01% {
+        transform: translateX(calc(var(--container-width, 200px)));
+    }
     100% {
-        transform: translateX(calc(-1 * var(--scroll-distance, 0px)));
+        transform: translateX(calc(-1 * var(--text-width, 100%) - var(--scroll-gap, 48px)));
     }
 }
 
