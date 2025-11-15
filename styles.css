@@ -184,6 +184,18 @@ h1 {
     z-index: 1;
 }
 
+/* When music controls are visible, position category badge below them */
+.quiz-card.has-both-controls .category-badge {
+    top: 60px;
+}
+
+/* Fallback using :has() selector for modern browsers */
+@supports selector(:has(*)) {
+    .quiz-card:has(.music-controls:not(.hidden)) .category-badge:not(.hidden) {
+        top: 60px;
+    }
+}
+
 /* Music Quiz Controls */
 .music-controls {
     position: absolute;

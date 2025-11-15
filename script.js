@@ -865,6 +865,16 @@ function render(hideAnswer = true) {
     stopMusic(); // Stop any playing music when switching to non-music question
   }
   
+  // Add class to quiz card when both category badge and music controls are visible
+  // This helps position them correctly to avoid overlap
+  const hasCategoryBadge = !categoryBadge.classList.contains('hidden');
+  const hasMusicControls = !musicControls.classList.contains('hidden');
+  if (hasCategoryBadge && hasMusicControls) {
+    card.classList.add('has-both-controls');
+  } else {
+    card.classList.remove('has-both-controls');
+  }
+  
   // Show/hide question icon based on whether question has icon path
   // Use preloaded image from cache for instant display
   if (qa.iconPath) {
