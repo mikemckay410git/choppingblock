@@ -511,6 +511,7 @@ function showCustomMixBuilder(categories) {
 
 function showQuizDisplay() {
   categorySelector.classList.add('hidden');
+  categorySelection.classList.add('hidden');
   quizDisplay.classList.remove('hidden');
   fileInputSection.classList.add('hidden');
   resetAllData.parentElement.classList.add('hidden');
