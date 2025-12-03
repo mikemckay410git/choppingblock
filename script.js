@@ -2065,7 +2065,8 @@ async function loadQuizList() {
     quizItems.forEach(item => {
       const option = document.createElement('option');
       option.value = item.path;
-      option.textContent = item.name;
+      // Remove .csv extension from display name
+      option.textContent = item.name.replace(/\.csv$/i, '');
       existingQuizSelect.appendChild(option);
     });
   } catch (error) {
@@ -2236,7 +2237,7 @@ function escapeHtml(text) {
 }
 
 async function saveQuiz() {
-  const name = quizEditorMode === 'new' ? quizName.value.trim() : existingQuizSelect.options[existingQuizSelect.selectedIndex]?.textContent.replace('.csv', '');
+  const name = quizEditorMode === 'new' ? quizName.value.trim() : existingQuizSelect.options[existingQuizSelect.selectedIndex]?.textContent;
   
   if (!name) {
     alert('Please enter a quiz name');
