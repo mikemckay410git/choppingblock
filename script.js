@@ -2678,18 +2678,21 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   if (saveAndExitQuizEditor) {
     saveAndExitQuizEditor.addEventListener('click', async () => {
-      // Store the pending action before hiding modal
+      // Store the pending action before hiding modal - this is the action we want to execute
       const actionToExecute = pendingQuizEditorAction;
       hideQuizEditorExitConfirmation();
-      // Restore the pending action since hideQuizEditorExitConfirmation might clear it
-      pendingQuizEditorAction = actionToExecute;
+      // Temporarily clear pending action so saveQuiz doesn't think there's a pending action
+      pendingQuizEditorAction = null;
       await saveQuiz();
-      // After saving, execute the pending action if it exists
-      // If no pending action, close the editor (this handles the "exit" case)
-      if (pendingQuizEditorAction) {
-        executePendingQuizEditorAction();
+      // After saving, execute the stored action if it exists
+      // If no stored action, close the editor (this handles the "exit" case)
+      if (actionToExecute) {
+        // Clear any pending action that might have been set during save
+        pendingQuizEditorAction = null;
+        // Execute the original action
+        actionToExecute();
       } else {
-        // No pending action means user was exiting, so close the editor
+        // No stored action means user was exiting, so close the editor
         closeQuizEditor();
       }
     });
