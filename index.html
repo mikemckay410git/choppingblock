@@ -26,6 +26,14 @@
                 <div class="hint">Configure game mode and player colors</div>
             </div>
 
+            <!-- Quiz Editor Button -->
+            <div class="file-input" id="quizEditorSection">
+                <button id="quizEditorBtn" class="quiz-editor-btn">
+                    ✏️ Make / Edit Quiz
+                </button>
+                <div class="hint">Create new quizzes or edit existing ones</div>
+            </div>
+
             <!-- File Upload Section -->
             <div class="file-input" id="fileInputSection">
                 <label for="csvFile">📁 Load CSV Files</label>
@@ -228,6 +236,55 @@
                 <div class="modal-actions">
                     <button class="modal-btn cancel" id="cancelLightboard">Cancel</button>
                     <button class="modal-btn confirm" id="confirmLightboard">Apply Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quiz Editor Modal -->
+        <div class="modal-overlay hidden" id="quizEditorModal">
+            <div class="modal-dialog quiz-editor-dialog">
+                <div class="modal-header">
+                    <h3>✏️ Quiz Editor</h3>
+                </div>
+                <div class="modal-content quiz-editor-content">
+                    <!-- Mode Selection -->
+                    <div class="quiz-editor-mode">
+                        <button class="mode-btn active" id="newQuizMode">New Quiz</button>
+                        <button class="mode-btn" id="editQuizMode">Edit Quiz</button>
+                    </div>
+
+                    <!-- New Quiz Section -->
+                    <div class="quiz-editor-section" id="newQuizSection">
+                        <div class="settings-section">
+                            <label for="quizName">Quiz Name:</label>
+                            <input type="text" id="quizName" class="quiz-input" placeholder="Enter quiz name (e.g., Geography)">
+                        </div>
+                    </div>
+
+                    <!-- Edit Quiz Section -->
+                    <div class="quiz-editor-section hidden" id="editQuizSection">
+                        <div class="settings-section">
+                            <label for="existingQuizSelect">Select Quiz to Edit:</label>
+                            <select id="existingQuizSelect" class="settings-select">
+                                <option value="">-- Select a quiz --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Questions List -->
+                    <div class="quiz-questions-section">
+                        <div class="questions-header">
+                            <h4>Questions</h4>
+                            <button class="add-question-btn" id="addQuestionBtn">+ Add Question</button>
+                        </div>
+                        <div class="questions-list" id="questionsList">
+                            <!-- Questions will be added here dynamically -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn cancel" id="cancelQuizEditor">Cancel</button>
+                    <button class="modal-btn confirm" id="saveQuizBtn">Save Quiz</button>
                 </div>
             </div>
         </div>

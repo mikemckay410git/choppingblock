@@ -6,6 +6,7 @@ import { SerialPort } from "serialport";
 import { ReadlineParser } from "@serialport/parser-readline";
 import fs from "fs";
 import path from "path";
+import multer from "multer";
 import { lightboardState } from "./lightboard.js";
 
 const app = express();
@@ -19,7 +20,221 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json()); // Parse JSON request bodies
-app.use(express.static(".")); // serve files from home directory
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    // Determine destination based on file type
+    if (file.fieldname.startsWith('audio_')) {
+      const quizName = req.body.quizName || 'default';
+      const quizDir = path.join(process.cwd(), 'Quizes', quizName);
+      if (!fs.existsSync(quizDir)) {
+        fs.mkdirSync(quizDir, { recursive: true });
+      }
+      cb(null, quizDir);
+    } else if (file.fieldname.startsWith('image_')) {
+      // Images can go to Images folder or quiz folder
+      const imagesDir = path.join(process.cwd(), 'Images');
+      if (!fs.existsSync(imagesDir)) {
+        fs.mkdirSync(imagesDir, { recursive: true });
+      }
+      cb(null, imagesDir);
+    } else {
+      // CSV files go to Quizes folder
+      const quizesDir = path.join(process.cwd(), 'Quizes');
+      if (!fs.existsSync(quizesDir)) {
+        fs.mkdirSync(quizesDir, { recursive: true });
+      }
+      cb(null, quizesDir);
+    }
+  },
+  filename: function (req, file, cb) {
+    // Use original filename or the name provided in the request
+    if (file.fieldname === 'csvContent') {
+      cb(null, file.originalname);
+    } else {
+      // For audio and image files, use the name from the request
+      const index = file.fieldname.split('_')[1];
+      const nameField = file.fieldname.startsWith('audio_') 
+        ? `audio_name_${index}` 
+        : `image_name_${index}`;
+      const fileName = req.body[nameField] || file.originalname;
+      cb(null, fileName);
+    }
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+});
+
+// IMPORTANT: API routes must be defined BEFORE express.static
+// to prevent static file serving from interfering with API endpoints
+
+// Debug endpoint to test if save-quiz route exists
+app.get("/api/save-quiz-test", (req, res) => {
+  console.log('GET /api/save-quiz-test called');
+  res.json({ 
+    message: 'Save quiz route is registered',
+    timestamp: new Date().toISOString(),
+    multerInstalled: typeof upload !== 'undefined',
+    uploadType: typeof upload
+  });
+});
+
+// Save quiz endpoint
+app.post("/api/save-quiz", upload.any(), (req, res) => {
+  console.log('=== SAVE QUIZ REQUEST RECEIVED ===');
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
+  console.log('Body keys:', Object.keys(req.body));
+  console.log('Files:', req.files ? req.files.map(f => ({ fieldname: f.fieldname, filename: f.filename })) : 'No files');
+  
+  try {
+    const quizName = req.body.quizName;
+    const mode = req.body.mode;
+    const existingPath = req.body.existingPath;
+    
+    console.log('Quiz name:', quizName);
+    console.log('Mode:', mode);
+    console.log('Existing path:', existingPath);
+    
+    if (!quizName) {
+      console.log('ERROR: Quiz name is required');
+      return res.status(400).json({ error: 'Quiz name is required' });
+    }
+    
+    // Find the CSV file in the uploaded files
+    const csvFile = req.files ? req.files.find(f => f.fieldname === 'csvContent') : null;
+    if (!csvFile) {
+      console.log('ERROR: CSV file is required. Files received:', req.files);
+      return res.status(400).json({ error: 'CSV file is required' });
+    }
+    
+    // Determine the final path
+    let finalPath;
+    if (mode === 'edit' && existingPath) {
+      // For editing, use the existing path structure
+      finalPath = path.join(process.cwd(), existingPath);
+      // Ensure directory exists
+      const dir = path.dirname(finalPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    } else {
+      // For new quizzes, save to Quizes folder
+      const quizesDir = path.join(process.cwd(), 'Quizes');
+      if (!fs.existsSync(quizesDir)) {
+        fs.mkdirSync(quizesDir, { recursive: true });
+      }
+      finalPath = path.join(quizesDir, `${quizName}.csv`);
+    }
+    
+    // Move the CSV file to the final location
+    fs.renameSync(csvFile.path, finalPath);
+    
+    // Handle audio files - they should be in the quiz folder
+    const audioFiles = req.files.filter(f => f.fieldname.startsWith('audio_'));
+    audioFiles.forEach(audioFile => {
+      // Audio files are already saved in the quiz folder by multer
+      // Just ensure they're in the right place
+      const quizDir = path.dirname(finalPath);
+      const audioPath = path.join(quizDir, audioFile.filename);
+      if (audioFile.path !== audioPath) {
+        // Move to correct location if needed
+        if (fs.existsSync(audioFile.path)) {
+          if (!fs.existsSync(quizDir)) {
+            fs.mkdirSync(quizDir, { recursive: true });
+          }
+          fs.renameSync(audioFile.path, audioPath);
+        }
+      }
+    });
+    
+    // Handle image files - they should be in the Images folder
+    const imageFiles = req.files.filter(f => f.fieldname.startsWith('image_'));
+    imageFiles.forEach(imageFile => {
+      // Image files are already saved in the Images folder by multer
+      // No additional action needed
+    });
+    
+    console.log('SUCCESS: Quiz saved to', finalPath);
+    res.json({ 
+      success: true, 
+      message: 'Quiz saved successfully',
+      path: finalPath
+    });
+  } catch (error) {
+    console.error('ERROR saving quiz:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ error: 'Failed to save quiz: ' + error.message });
+  }
+});
+
+// Quiz files listing endpoint
+app.get("/api/quiz-files", (req, res) => {
+  try {
+    const quizesDir = path.join(process.cwd(), 'Quizes');
+    
+    // Check if Quizes directory exists
+    if (!fs.existsSync(quizesDir)) {
+      return res.json([]);
+    }
+    
+    const quizItems = [];
+    
+    // Read directory contents
+    const items = fs.readdirSync(quizesDir, { withFileTypes: true });
+    
+    for (const item of items) {
+      if (item.isFile() && item.name.toLowerCase().endsWith('.csv')) {
+        // Regular CSV quiz file
+        quizItems.push({
+          type: 'regular',
+          name: item.name,
+          path: `Quizes/${item.name}`
+        });
+      } else if (item.isDirectory()) {
+        // Check if it's a music quiz folder
+        const folderPath = path.join(quizesDir, item.name);
+        const csvFile = path.join(folderPath, `${item.name}.csv`);
+        
+        if (fs.existsSync(csvFile)) {
+          // Check if folder contains audio files
+          const audioFiles = fs.readdirSync(folderPath)
+            .filter(file => file.toLowerCase().endsWith('.mp3') || file.toLowerCase().endsWith('.wav'));
+          
+          if (audioFiles.length > 0) {
+            quizItems.push({
+              type: 'music',
+              name: item.name,
+              path: `Quizes/${item.name}/${item.name}.csv`,
+              audioFiles: audioFiles.map(file => `Quizes/${item.name}/${file}`)
+            });
+          } else {
+            // Folder with CSV but no audio files - treat as regular quiz
+            quizItems.push({
+              type: 'regular',
+              name: `${item.name}.csv`,
+              path: `Quizes/${item.name}/${item.name}.csv`
+            });
+          }
+        }
+      }
+    }
+    
+    // Sort alphabetically by name
+    quizItems.sort((a, b) => a.name.localeCompare(b.name));
+    
+    res.json(quizItems);
+  } catch (error) {
+    console.error('Error reading quiz files:', error);
+    res.status(500).json({ error: 'Failed to read quiz files' });
+  }
+});
+
+app.use(express.static(".")); // serve files from home directory (AFTER API routes)
 
 // ESP32 Serial Communication
 class ESP32Bridge {
@@ -343,9 +558,36 @@ class ESP32Bridge {
 // Create ESP32 bridge instance
 const esp32Bridge = new ESP32Bridge('/dev/ttyUSB0', 115200);
 
+// Version check endpoint - helps verify which code is running
+app.get("/api/version", (req, res) => {
+  res.json({ 
+    version: "2.0.0-with-quiz-editor",
+    hasSaveQuizRoute: true,
+    hasDebugging: true,
+    multerInstalled: typeof upload !== 'undefined',
+    timestamp: new Date().toISOString(),
+    routes: {
+      saveQuiz: "/api/save-quiz",
+      saveQuizTest: "/api/save-quiz-test",
+      quizFiles: "/api/quiz-files",
+      version: "/api/version"
+    }
+  });
+});
+
 // Example endpoint
 app.get("/api", (req, res) => {
-  res.json({ message: "Quizboard backend running" });
+  res.json({ 
+    message: "Quizboard backend running",
+    version: "2.0.0-with-quiz-editor",
+    routes: {
+      saveQuiz: "/api/save-quiz",
+      saveQuizTest: "/api/save-quiz-test",
+      quizFiles: "/api/quiz-files",
+      version: "/api/version"
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Lightboard emulator endpoint
@@ -373,6 +615,9 @@ app.post("/api/lightboard-state", (req, res) => {
     res.status(500).json({ error: 'Failed to save lightboard state' });
   }
 });
+
+// NOTE: The /api/save-quiz route is defined earlier in the file (around line 76)
+// before express.static to ensure it's registered properly
 
 // Quiz files listing endpoint
 app.get("/api/quiz-files", (req, res) => {
@@ -538,6 +783,15 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('Socket.IO server: ws://localhost:80');
   console.log('ESP32 connection is optional - server will run with or without ESP32');
   console.log('Press Ctrl+C to stop');
+  console.log('\n=== REGISTERED API ROUTES ===');
+  console.log('GET  /api - API info');
+  console.log('GET  /api/version - Version check (NEW)');
+  console.log('GET  /api/quiz-files - List quiz files');
+  console.log('GET  /api/save-quiz-test - Test save-quiz route');
+  console.log('POST /api/save-quiz - Save quiz (with file upload)');
+  console.log('================================');
+  console.log('Server version: 2.0.0-with-quiz-editor');
+  console.log('If you do not see this version message, the server is running old code!\n');
 });
 
 // Handle graceful shutdown

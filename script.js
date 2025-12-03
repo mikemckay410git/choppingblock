@@ -298,6 +298,20 @@ const lightboardP1Color = document.getElementById('lightboardP1Color');
 const lightboardP2Color = document.getElementById('lightboardP2Color');
 const damageMultiplier = document.getElementById('damageMultiplier');
 
+// Quiz Editor elements (will be initialized in DOMContentLoaded)
+let quizEditorBtn;
+let quizEditorModal;
+let cancelQuizEditor;
+let saveQuizBtn;
+let newQuizMode;
+let editQuizMode;
+let newQuizSection;
+let editQuizSection;
+let quizName;
+let existingQuizSelect;
+let questionsList;
+let addQuestionBtn;
+
 // Game status elements
 const gameStatus = document.getElementById('gameStatus');
 const player1Tile = document.getElementById('player1Tile');
@@ -1862,6 +1876,333 @@ lightboardModal.addEventListener('click', function(e) {
   }
 });
 
+// Quiz Editor state
+let quizEditorQuestions = [];
+let currentEditingQuiz = null;
+let quizEditorMode = 'new'; // 'new' or 'edit'
+
+// Quiz Editor Functions
+function openQuizEditor() {
+  quizEditorModal.classList.remove('hidden');
+  resetQuizEditor();
+  loadQuizList();
+}
+
+function closeQuizEditor() {
+  quizEditorModal.classList.add('hidden');
+  resetQuizEditor();
+}
+
+function resetQuizEditor() {
+  quizEditorQuestions = [];
+  currentEditingQuiz = null;
+  quizEditorMode = 'new';
+  quizName.value = '';
+  existingQuizSelect.value = '';
+  questionsList.innerHTML = '';
+  newQuizMode.classList.add('active');
+  editQuizMode.classList.remove('active');
+  newQuizSection.classList.remove('hidden');
+  editQuizSection.classList.add('hidden');
+}
+
+function switchQuizEditorMode(mode) {
+  quizEditorMode = mode;
+  if (mode === 'new') {
+    newQuizMode.classList.add('active');
+    editQuizMode.classList.remove('active');
+    newQuizSection.classList.remove('hidden');
+    editQuizSection.classList.add('hidden');
+    currentEditingQuiz = null;
+    quizEditorQuestions = [];
+    questionsList.innerHTML = '';
+  } else {
+    newQuizMode.classList.remove('active');
+    editQuizMode.classList.add('active');
+    newQuizSection.classList.add('hidden');
+    editQuizSection.classList.remove('hidden');
+    loadQuizList();
+  }
+}
+
+async function loadQuizList() {
+  try {
+    const quizItems = await getQuizFiles();
+    existingQuizSelect.innerHTML = '<option value="">-- Select a quiz --</option>';
+    quizItems.forEach(item => {
+      const option = document.createElement('option');
+      option.value = item.path;
+      option.textContent = item.name;
+      existingQuizSelect.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Error loading quiz list:', error);
+  }
+}
+
+async function loadQuizForEditing(quizPath) {
+  try {
+    const response = await fetch(quizPath);
+    if (!response.ok) {
+      alert('Failed to load quiz file');
+      return;
+    }
+    
+    const csvText = await response.text();
+    const csvData = parseCSV(csvText);
+    
+    quizEditorQuestions = [];
+    csvData.forEach((row, index) => {
+      const question = row.Question || row.question || row.Q || row.q || Object.values(row)[0];
+      const answer = row.Answer || row.answer || row.A || row.a || Object.values(row)[1];
+      const audioColumn = row.Audio || row.audio || row.AudioFile || row.audioFile || row.Music || row.music || row.File || row.file || '';
+      const badgeColumn = row.Badge || row.badge || row.Icon || row.icon || row.Category || row.category || '';
+      
+      quizEditorQuestions.push({
+        question: question || '',
+        answer: answer || '',
+        audio: audioColumn || '',
+        badge: badgeColumn || '',
+        audioFile: null,
+        imageFile: null
+      });
+    });
+    
+    renderQuestions();
+    currentEditingQuiz = quizPath;
+  } catch (error) {
+    console.error('Error loading quiz:', error);
+    alert('Failed to load quiz file');
+  }
+}
+
+function addQuestion() {
+  quizEditorQuestions.push({
+    question: '',
+    answer: '',
+    audio: '',
+    badge: '',
+    audioFile: null,
+    imageFile: null
+  });
+  renderQuestions();
+}
+
+function removeQuestion(index) {
+  quizEditorQuestions.splice(index, 1);
+  renderQuestions();
+}
+
+function updateQuestion(index, field, value) {
+  if (quizEditorQuestions[index]) {
+    quizEditorQuestions[index][field] = value;
+  }
+}
+
+function handleFileUpload(index, type, file) {
+  if (!quizEditorQuestions[index]) return;
+  
+  if (type === 'audio') {
+    quizEditorQuestions[index].audioFile = file;
+    quizEditorQuestions[index].audio = file.name;
+  } else if (type === 'image') {
+    quizEditorQuestions[index].imageFile = file;
+    quizEditorQuestions[index].badge = file.name;
+  }
+  
+  renderQuestions();
+}
+
+function renderQuestions() {
+  questionsList.innerHTML = '';
+  
+  quizEditorQuestions.forEach((q, index) => {
+    const questionItem = document.createElement('div');
+    questionItem.className = 'question-item';
+    
+    const audioPreview = q.audioFile ? 
+      `<div class="file-upload-preview">
+        <div>Audio: ${q.audio}</div>
+        <audio controls src="${URL.createObjectURL(q.audioFile)}"></audio>
+      </div>` : '';
+    
+    const imagePreview = q.imageFile ?
+      `<div class="file-upload-preview">
+        <div>Image: ${q.badge}</div>
+        <img src="${URL.createObjectURL(q.imageFile)}" alt="Preview">
+      </div>` : '';
+    
+    questionItem.innerHTML = `
+      <div class="question-item-header">
+        <span class="question-item-number">Question ${index + 1}</span>
+        <button class="delete-question-btn" data-index="${index}">Delete</button>
+      </div>
+      <div class="question-fields">
+        <div class="question-field full-width">
+          <label>Question</label>
+          <input type="text" class="question-input" data-index="${index}" data-field="question" value="${escapeHtml(q.question)}" placeholder="Enter question">
+        </div>
+        <div class="question-field full-width">
+          <label>Answer</label>
+          <input type="text" class="answer-input" data-index="${index}" data-field="answer" value="${escapeHtml(q.answer)}" placeholder="Enter answer">
+        </div>
+        <div class="question-field">
+          <label>Audio File</label>
+          <input type="file" class="audio-input" data-index="${index}" accept="audio/*">
+          ${q.audio && !q.audioFile ? `<div class="file-upload-preview">Current: ${q.audio}</div>` : ''}
+          ${audioPreview}
+        </div>
+        <div class="question-field">
+          <label>Image/Badge</label>
+          <input type="file" class="image-input" data-index="${index}" accept="image/*">
+          ${q.badge && !q.imageFile ? `<div class="file-upload-preview">Current: ${q.badge}</div>` : ''}
+          ${imagePreview}
+        </div>
+      </div>
+    `;
+    
+    questionsList.appendChild(questionItem);
+    
+    // Add event listeners
+    const deleteBtn = questionItem.querySelector('.delete-question-btn');
+    deleteBtn.addEventListener('click', () => removeQuestion(index));
+    
+    const questionInput = questionItem.querySelector('.question-input');
+    questionInput.addEventListener('input', (e) => updateQuestion(index, 'question', e.target.value));
+    
+    const answerInput = questionItem.querySelector('.answer-input');
+    answerInput.addEventListener('input', (e) => updateQuestion(index, 'answer', e.target.value));
+    
+    const audioInput = questionItem.querySelector('.audio-input');
+    audioInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleFileUpload(index, 'audio', e.target.files[0]);
+      }
+    });
+    
+    const imageInput = questionItem.querySelector('.image-input');
+    imageInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleFileUpload(index, 'image', e.target.files[0]);
+      }
+    });
+  });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+async function saveQuiz() {
+  const name = quizEditorMode === 'new' ? quizName.value.trim() : existingQuizSelect.options[existingQuizSelect.selectedIndex]?.textContent.replace('.csv', '');
+  
+  if (!name) {
+    alert('Please enter a quiz name');
+    return;
+  }
+  
+  if (quizEditorQuestions.length === 0) {
+    alert('Please add at least one question');
+    return;
+  }
+  
+  // Validate all questions have question and answer
+  for (let i = 0; i < quizEditorQuestions.length; i++) {
+    if (!quizEditorQuestions[i].question.trim() || !quizEditorQuestions[i].answer.trim()) {
+      alert(`Question ${i + 1} is missing question or answer`);
+      return;
+    }
+  }
+  
+  try {
+    // Create FormData for file uploads
+    const formData = new FormData();
+    formData.append('quizName', name);
+    formData.append('mode', quizEditorMode);
+    if (currentEditingQuiz) {
+      formData.append('existingPath', currentEditingQuiz);
+    }
+    
+    // Prepare CSV data
+    const csvRows = [];
+    csvRows.push(['Question', 'Answer', 'Audio', 'Badge']);
+    
+    quizEditorQuestions.forEach((q, index) => {
+      // Use the uploaded file name if available, otherwise use the existing value
+      let audioValue = q.audio || '';
+      let badgeValue = q.badge || '';
+      
+      // If a new file was uploaded, use its name
+      if (q.audioFile) {
+        audioValue = q.audioFile.name;
+      }
+      if (q.imageFile) {
+        badgeValue = q.imageFile.name;
+      }
+      
+      csvRows.push([
+        q.question,
+        q.answer,
+        audioValue,
+        badgeValue
+      ]);
+    });
+    
+    // Convert to CSV string
+    const csvContent = csvRows.map(row => 
+      row.map(cell => {
+        // Escape quotes and wrap in quotes if contains comma, quote, or newline
+        const cellStr = String(cell || '');
+        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+          return '"' + cellStr.replace(/"/g, '""') + '"';
+        }
+        return cellStr;
+      }).join(',')
+    ).join('\n');
+    
+    // Create a File object for the CSV
+    const csvBlob = new Blob([csvContent], { type: 'text/csv' });
+    const csvFile = new File([csvBlob], `${name}.csv`, { type: 'text/csv' });
+    formData.append('csvContent', csvFile);
+    
+    // Add audio and image files
+    quizEditorQuestions.forEach((q, index) => {
+      if (q.audioFile) {
+        formData.append(`audio_${index}`, q.audioFile);
+        formData.append(`audio_name_${index}`, q.audioFile.name);
+      }
+      if (q.imageFile) {
+        formData.append(`image_${index}`, q.imageFile);
+        formData.append(`image_name_${index}`, q.imageFile.name);
+      }
+    });
+    
+    // Send to server
+    const response = await fetch('/api/save-quiz', {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || 'Failed to save quiz');
+    }
+    
+    alert('Quiz saved successfully!');
+    closeQuizEditor();
+    
+    // Reload quizzes
+    loadAllQuizzes();
+  } catch (error) {
+    console.error('Error saving quiz:', error);
+    alert('Failed to save quiz: ' + error.message);
+  }
+}
+
+// Quiz Editor Event Listeners - will be set up in DOMContentLoaded
+
 // Close modals with Escape key
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
@@ -1869,6 +2210,8 @@ document.addEventListener('keydown', function(e) {
       hideExitConfirmation();
     } else if (!lightboardModal.classList.contains('hidden')) {
       lightboardModal.classList.add('hidden');
+    } else if (!quizEditorModal.classList.contains('hidden')) {
+      closeQuizEditor();
     }
   }
 });
@@ -2058,11 +2401,63 @@ function cleanupClientResources() {
 
 // Initialize quiz on load
 document.addEventListener('DOMContentLoaded', function() {
+  // Initialize quiz editor elements
+  quizEditorBtn = document.getElementById('quizEditorBtn');
+  quizEditorModal = document.getElementById('quizEditorModal');
+  cancelQuizEditor = document.getElementById('cancelQuizEditor');
+  saveQuizBtn = document.getElementById('saveQuizBtn');
+  newQuizMode = document.getElementById('newQuizMode');
+  editQuizMode = document.getElementById('editQuizMode');
+  newQuizSection = document.getElementById('newQuizSection');
+  editQuizSection = document.getElementById('editQuizSection');
+  quizName = document.getElementById('quizName');
+  existingQuizSelect = document.getElementById('existingQuizSelect');
+  questionsList = document.getElementById('questionsList');
+  addQuestionBtn = document.getElementById('addQuestionBtn');
+  
   // Load persisted data
   loadPersistedData();
   
   // Setup player name editing
   setupPlayerNameEditing();
+  
+  // Setup quiz editor event listeners
+  if (quizEditorBtn) {
+    quizEditorBtn.addEventListener('click', openQuizEditor);
+  }
+  if (cancelQuizEditor) {
+    cancelQuizEditor.addEventListener('click', closeQuizEditor);
+  }
+  if (saveQuizBtn) {
+    saveQuizBtn.addEventListener('click', saveQuiz);
+  }
+  if (newQuizMode) {
+    newQuizMode.addEventListener('click', () => switchQuizEditorMode('new'));
+  }
+  if (editQuizMode) {
+    editQuizMode.addEventListener('click', () => switchQuizEditorMode('edit'));
+  }
+  if (existingQuizSelect) {
+    existingQuizSelect.addEventListener('change', (e) => {
+      if (e.target.value) {
+        loadQuizForEditing(e.target.value);
+      } else {
+        quizEditorQuestions = [];
+        if (questionsList) questionsList.innerHTML = '';
+        currentEditingQuiz = null;
+      }
+    });
+  }
+  if (addQuestionBtn) {
+    addQuestionBtn.addEventListener('click', addQuestion);
+  }
+  if (quizEditorModal) {
+    quizEditorModal.addEventListener('click', function(e) {
+      if (e.target === quizEditorModal) {
+        closeQuizEditor();
+      }
+    });
+  }
   
   // Load all quiz files immediately
   loadAllQuizzes();
