@@ -2348,7 +2348,7 @@ async function saveQuiz() {
       throw new Error(error || 'Failed to save quiz');
     }
     
-    alert('Quiz saved successfully!');
+
     // Reset initial state since we just saved
     saveInitialState();
     
@@ -2356,8 +2356,13 @@ async function saveQuiz() {
     // If there's a pending action (like switching mode or changing quiz), it will be executed
     // If not, the save button handler will close the editor
     
-    // Reload quizzes
-    loadAllQuizzes();
+    // Update quiz list in editor if we're in edit mode
+    if (quizEditorDisplay && !quizEditorDisplay.classList.contains('hidden')) {
+      loadQuizList();
+    } else {
+      // Only reload all quizzes if we're not in the editor
+      loadAllQuizzes();
+    }
   } catch (error) {
     console.error('Error saving quiz:', error);
     alert('Failed to save quiz: ' + error.message);
@@ -2513,14 +2518,24 @@ async function loadAllQuizzes() {
     }
     
     // Show category selector when all files are processed
+    // BUT only if we're not in the quiz editor
     if (availableCategories.length > 0) {
-      showCategorySelector();
-      createCategoryButtons(availableCategories);
+      // Only show category selector if quiz editor is not visible
+      if (!quizEditorDisplay || quizEditorDisplay.classList.contains('hidden')) {
+        showCategorySelector();
+        createCategoryButtons(availableCategories);
+      } else {
+        // We're in the quiz editor, just update the quiz list for editing
+        loadQuizList();
+      }
     } else {
       console.warn('No valid quiz files loaded');
     }
     
-    loadedFiles.classList.remove('hidden');
+    // Only show loaded files section if we're not in the quiz editor
+    if (!quizEditorDisplay || quizEditorDisplay.classList.contains('hidden')) {
+      loadedFiles.classList.remove('hidden');
+    }
     
   } catch (error) {
     console.error('Error loading quiz files:', error);
