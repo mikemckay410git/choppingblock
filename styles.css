@@ -962,6 +962,11 @@ button:active {
     transition: transform 0.3s ease;
 }
 
+#quizEditorExitModal .modal-dialog {
+    max-width: 600px;
+    width: 90vw;
+}
+
 .modal-overlay:not(.hidden) .modal-dialog {
     transform: scale(1);
 }
@@ -1007,6 +1012,40 @@ button:active {
     flex: 1;
     min-width: 120px;
     text-align: center;
+}
+
+#quizEditorExitModal .modal-actions {
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 12px;
+}
+
+#quizEditorExitModal .modal-actions .modal-btn {
+    flex: 1;
+    min-width: 140px;
+    text-align: center;
+}
+
+#saveAndExitQuizEditor {
+    background: linear-gradient(180deg, rgba(34,197,94,.3), rgba(34,197,94,.2));
+    color: #86efac;
+    border-color: rgba(34,197,94,.4);
+}
+
+#saveAndExitQuizEditor:hover {
+    background: linear-gradient(180deg, rgba(34,197,94,.4), rgba(34,197,94,.3));
+    border-color: rgba(34,197,94,.5);
+}
+
+#exitWithoutSavingQuizEditor {
+    background: linear-gradient(180deg, rgba(239,68,68,.3), rgba(239,68,68,.2));
+    color: #fca5a5;
+    border-color: rgba(239,68,68,.4);
+}
+
+#exitWithoutSavingQuizEditor:hover {
+    background: linear-gradient(180deg, rgba(239,68,68,.4), rgba(239,68,68,.3));
+    border-color: rgba(239,68,68,.5);
 }
 
 .modal-btn {
@@ -1102,6 +1141,16 @@ button:active {
         flex: none;
         width: 100%;
         min-width: auto;
+    }
+    
+    #quizEditorExitModal .modal-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    #quizEditorExitModal .modal-actions .modal-btn {
+        flex: 1;
+        min-width: 100px;
     }
     
     .modal-btn {

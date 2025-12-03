@@ -315,6 +315,8 @@ let quizEditorExitModal;
 let cancelQuizEditorExit;
 let saveAndExitQuizEditor;
 let exitWithoutSavingQuizEditor;
+let quizQuestionsSection;
+let quizEditorSaveSection;
 
 // Game status elements
 const gameStatus = document.getElementById('gameStatus');
@@ -1916,6 +1918,7 @@ let quizEditorQuestions = [];
 let currentEditingQuiz = null;
 let quizEditorMode = 'new'; // 'new' or 'edit'
 let quizEditorInitialState = null; // Store initial state to detect changes
+let pendingQuizEditorAction = null; // Store pending action after confirmation
 
 // Quiz Editor Functions
 function openQuizEditor() {
@@ -1932,6 +1935,7 @@ function openQuizEditor() {
   loadQuizList();
   // Store initial state to detect changes
   saveInitialState();
+  updateQuizEditorVisibility();
 }
 
 function saveInitialState() {
@@ -1956,16 +1960,31 @@ function hasUnsavedChanges() {
   return currentState !== quizEditorInitialState;
 }
 
-function showQuizEditorExitConfirmation() {
+function showQuizEditorExitConfirmation(actionCallback) {
   if (hasUnsavedChanges()) {
+    pendingQuizEditorAction = actionCallback;
     quizEditorExitModal.classList.remove('hidden');
   } else {
-    closeQuizEditor();
+    // No unsaved changes, execute action immediately
+    if (actionCallback) {
+      actionCallback();
+    } else {
+      closeQuizEditor();
+    }
   }
 }
 
 function hideQuizEditorExitConfirmation() {
   quizEditorExitModal.classList.add('hidden');
+  // Don't clear pendingQuizEditorAction here - it will be cleared after action executes
+}
+
+function executePendingQuizEditorAction() {
+  if (pendingQuizEditorAction) {
+    const action = pendingQuizEditorAction;
+    pendingQuizEditorAction = null; // Clear before executing to prevent re-execution
+    action();
+  }
 }
 
 function closeQuizEditor() {
@@ -1986,16 +2005,45 @@ function resetQuizEditor() {
   if (newQuizSection) newQuizSection.classList.remove('hidden');
   if (editQuizSection) editQuizSection.classList.add('hidden');
   quizEditorInitialState = null;
+  updateQuizEditorVisibility();
 }
 
-function switchQuizEditorMode(mode) {
-  // Check for unsaved changes before switching
-  if (hasUnsavedChanges()) {
-    if (!confirm('You have unsaved changes. Switch mode anyway?')) {
-      return;
+function updateQuizEditorVisibility() {
+  let shouldShow = false;
+  
+  if (quizEditorMode === 'new') {
+    // Show if quiz name has been entered
+    shouldShow = quizName && quizName.value.trim().length > 0;
+  } else if (quizEditorMode === 'edit') {
+    // Show if a quiz has been selected
+    shouldShow = existingQuizSelect && existingQuizSelect.value && existingQuizSelect.value.trim().length > 0;
+  }
+  
+  if (quizQuestionsSection) {
+    if (shouldShow) {
+      quizQuestionsSection.classList.remove('hidden');
+    } else {
+      quizQuestionsSection.classList.add('hidden');
     }
   }
   
+  if (quizEditorSaveSection) {
+    if (shouldShow) {
+      quizEditorSaveSection.classList.remove('hidden');
+    } else {
+      quizEditorSaveSection.classList.add('hidden');
+    }
+  }
+}
+
+function switchQuizEditorMode(mode) {
+  // Use confirmation modal if there are unsaved changes
+  showQuizEditorExitConfirmation(() => {
+    performModeSwitch(mode);
+  });
+}
+
+function performModeSwitch(mode) {
   quizEditorMode = mode;
   if (mode === 'new') {
     newQuizMode.classList.add('active');
@@ -2005,15 +2053,18 @@ function switchQuizEditorMode(mode) {
     currentEditingQuiz = null;
     quizEditorQuestions = [];
     if (questionsList) questionsList.innerHTML = '';
+    if (existingQuizSelect) existingQuizSelect.value = '';
   } else {
     newQuizMode.classList.remove('active');
     editQuizMode.classList.add('active');
     newQuizSection.classList.add('hidden');
     editQuizSection.classList.remove('hidden');
+    if (quizName) quizName.value = '';
     loadQuizList();
   }
   // Save state after mode switch
   saveInitialState();
+  updateQuizEditorVisibility();
 }
 
 async function loadQuizList() {
@@ -2063,6 +2114,7 @@ async function loadQuizForEditing(quizPath) {
     currentEditingQuiz = quizPath;
     // Save state after loading
     saveInitialState();
+    updateQuizEditorVisibility();
   } catch (error) {
     console.error('Error loading quiz:', error);
     alert('Failed to load quiz file');
@@ -2299,7 +2351,10 @@ async function saveQuiz() {
     alert('Quiz saved successfully!');
     // Reset initial state since we just saved
     saveInitialState();
-    closeQuizEditor();
+    
+    // Don't close the editor here - let the save button handler decide
+    // If there's a pending action (like switching mode or changing quiz), it will be executed
+    // If not, the save button handler will close the editor
     
     // Reload quizzes
     loadAllQuizzes();
@@ -2526,6 +2581,8 @@ document.addEventListener('DOMContentLoaded', function() {
   existingQuizSelect = document.getElementById('existingQuizSelect');
   questionsList = document.getElementById('questionsList');
   addQuestionBtn = document.getElementById('addQuestionBtn');
+  quizQuestionsSection = document.getElementById('quizQuestionsSection');
+  quizEditorSaveSection = document.getElementById('quizEditorSaveSection');
   
   // Load persisted data
   loadPersistedData();
@@ -2548,20 +2605,63 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   if (existingQuizSelect) {
     existingQuizSelect.addEventListener('change', (e) => {
-      if (e.target.value) {
-        loadQuizForEditing(e.target.value);
+      const selectedValue = e.target.value;
+      
+      if (selectedValue) {
+        // Check for unsaved changes before loading a different quiz
+        if (hasUnsavedChanges() && currentEditingQuiz && currentEditingQuiz !== selectedValue) {
+          // Store the selected value temporarily
+          const tempValue = selectedValue;
+          // Revert the select to current quiz
+          existingQuizSelect.value = currentEditingQuiz;
+          // Show confirmation modal
+          showQuizEditorExitConfirmation(() => {
+            // After confirmation, load the new quiz
+            existingQuizSelect.value = tempValue;
+            loadQuizForEditing(tempValue);
+          });
+        } else {
+          // No unsaved changes or same quiz, load immediately
+          loadQuizForEditing(selectedValue);
+        }
       } else {
-        quizEditorQuestions = [];
-        if (questionsList) questionsList.innerHTML = '';
-        currentEditingQuiz = null;
+        // Deselecting quiz - check for unsaved changes
+        if (hasUnsavedChanges() && currentEditingQuiz) {
+          // Revert the select to current quiz
+          existingQuizSelect.value = currentEditingQuiz;
+          // Show confirmation modal
+          showQuizEditorExitConfirmation(() => {
+            // After confirmation, clear the quiz
+            existingQuizSelect.value = '';
+            quizEditorQuestions = [];
+            if (questionsList) questionsList.innerHTML = '';
+            currentEditingQuiz = null;
+            updateQuizEditorVisibility();
+            saveInitialState();
+          });
+        } else {
+          // No unsaved changes, clear immediately
+          quizEditorQuestions = [];
+          if (questionsList) questionsList.innerHTML = '';
+          currentEditingQuiz = null;
+          updateQuizEditorVisibility();
+          saveInitialState();
+        }
       }
+    });
+  }
+  if (quizName) {
+    quizName.addEventListener('input', () => {
+      updateQuizEditorVisibility();
     });
   }
   if (addQuestionBtn) {
     addQuestionBtn.addEventListener('click', addQuestion);
   }
   if (exitQuizEditorBtn) {
-    exitQuizEditorBtn.addEventListener('click', showQuizEditorExitConfirmation);
+    exitQuizEditorBtn.addEventListener('click', () => {
+      showQuizEditorExitConfirmation(closeQuizEditor);
+    });
   }
   
   // Quiz Editor Exit Modal elements
@@ -2571,19 +2671,34 @@ document.addEventListener('DOMContentLoaded', function() {
   exitWithoutSavingQuizEditor = document.getElementById('exitWithoutSavingQuizEditor');
   
   if (cancelQuizEditorExit) {
-    cancelQuizEditorExit.addEventListener('click', hideQuizEditorExitConfirmation);
+    cancelQuizEditorExit.addEventListener('click', () => {
+      hideQuizEditorExitConfirmation();
+      pendingQuizEditorAction = null; // Clear pending action on cancel
+    });
   }
   if (saveAndExitQuizEditor) {
     saveAndExitQuizEditor.addEventListener('click', async () => {
+      // Store the pending action before hiding modal
+      const actionToExecute = pendingQuizEditorAction;
       hideQuizEditorExitConfirmation();
+      // Restore the pending action since hideQuizEditorExitConfirmation might clear it
+      pendingQuizEditorAction = actionToExecute;
       await saveQuiz();
-      // closeQuizEditor is called in saveQuiz after successful save
+      // After saving, execute the pending action if it exists
+      // If no pending action, close the editor (this handles the "exit" case)
+      if (pendingQuizEditorAction) {
+        executePendingQuizEditorAction();
+      } else {
+        // No pending action means user was exiting, so close the editor
+        closeQuizEditor();
+      }
     });
   }
   if (exitWithoutSavingQuizEditor) {
     exitWithoutSavingQuizEditor.addEventListener('click', () => {
       hideQuizEditorExitConfirmation();
-      closeQuizEditor();
+      // Execute the pending action (which will discard changes)
+      executePendingQuizEditorAction();
     });
   }
   if (quizEditorExitModal) {
