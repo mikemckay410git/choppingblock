@@ -302,7 +302,6 @@ const damageMultiplier = document.getElementById('damageMultiplier');
 let quizEditorBtn;
 let quizEditorDisplay;
 let exitQuizEditorBtn;
-let saveQuizBtn;
 let newQuizMode;
 let editQuizMode;
 let newQuizSection;
@@ -316,7 +315,6 @@ let cancelQuizEditorExit;
 let saveAndExitQuizEditor;
 let exitWithoutSavingQuizEditor;
 let quizQuestionsSection;
-let quizEditorSaveSection;
 
 // Game status elements
 const gameStatus = document.getElementById('gameStatus');
@@ -2027,13 +2025,6 @@ function updateQuizEditorVisibility() {
     }
   }
   
-  if (quizEditorSaveSection) {
-    if (shouldShow) {
-      quizEditorSaveSection.classList.remove('hidden');
-    } else {
-      quizEditorSaveSection.classList.add('hidden');
-    }
-  }
 }
 
 function switchQuizEditorMode(mode) {
@@ -2587,7 +2578,6 @@ document.addEventListener('DOMContentLoaded', function() {
   quizEditorBtn = document.getElementById('quizEditorBtn');
   quizEditorDisplay = document.getElementById('quizEditorDisplay');
   exitQuizEditorBtn = document.getElementById('exitQuizEditorBtn');
-  saveQuizBtn = document.getElementById('saveQuizBtn');
   newQuizMode = document.getElementById('newQuizMode');
   editQuizMode = document.getElementById('editQuizMode');
   newQuizSection = document.getElementById('newQuizSection');
@@ -2597,8 +2587,6 @@ document.addEventListener('DOMContentLoaded', function() {
   questionsList = document.getElementById('questionsList');
   addQuestionBtn = document.getElementById('addQuestionBtn');
   quizQuestionsSection = document.getElementById('quizQuestionsSection');
-  quizEditorSaveSection = document.getElementById('quizEditorSaveSection');
-  
   // Load persisted data
   loadPersistedData();
   
@@ -2608,9 +2596,6 @@ document.addEventListener('DOMContentLoaded', function() {
   // Setup quiz editor event listeners
   if (quizEditorBtn) {
     quizEditorBtn.addEventListener('click', openQuizEditor);
-  }
-  if (saveQuizBtn) {
-    saveQuizBtn.addEventListener('click', saveQuiz);
   }
   if (newQuizMode) {
     newQuizMode.addEventListener('click', () => switchQuizEditorMode('new'));
