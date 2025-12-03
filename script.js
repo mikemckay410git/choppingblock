@@ -300,8 +300,8 @@ const damageMultiplier = document.getElementById('damageMultiplier');
 
 // Quiz Editor elements (will be initialized in DOMContentLoaded)
 let quizEditorBtn;
-let quizEditorModal;
-let cancelQuizEditor;
+let quizEditorDisplay;
+let exitQuizEditorBtn;
 let saveQuizBtn;
 let newQuizMode;
 let editQuizMode;
@@ -311,6 +311,10 @@ let quizName;
 let existingQuizSelect;
 let questionsList;
 let addQuestionBtn;
+let quizEditorExitModal;
+let cancelQuizEditorExit;
+let saveAndExitQuizEditor;
+let exitWithoutSavingQuizEditor;
 
 // Game status elements
 const gameStatus = document.getElementById('gameStatus');
@@ -417,11 +421,15 @@ function handleFileSelect(event) {
               );
               
               if (isImagePath) {
-                // Column 4 is a direct image path - use it as-is
-                // Paths can be:
-                // - Absolute: "Images/Geography.png" or "/Images/Geography.png"
-                // - Relative to quiz folder: "Geography.png" (will be resolved by server)
-                questionObj.iconPath = badgeColumn.trim();
+                // Column 4 is a direct image path
+                let imagePath = badgeColumn.trim();
+                
+                // If it doesn't have a path prefix, assume it's in Images folder
+                if (!imagePath.startsWith('http') && !imagePath.startsWith('/') && !imagePath.startsWith('Images/') && !imagePath.includes('/')) {
+                  // Just a filename - prepend Images/
+                  imagePath = `Images/${imagePath}`;
+                }
+                questionObj.iconPath = imagePath;
               } else {
                 // Column 4 is a badge name - try standard icon path
                 questionObj.iconPath = getIconPath(badgeColumn.trim());
@@ -502,9 +510,12 @@ function showCategorySelector() {
   categorySelector.classList.remove('hidden');
   categorySelection.classList.add('hidden');
   quizDisplay.classList.add('hidden');
+  if (quizEditorDisplay) quizEditorDisplay.classList.add('hidden');
   fileInputSection.classList.remove('hidden');
   resetAllData.parentElement.classList.remove('hidden');
   lightboardSettingsBtn.parentElement.classList.remove('hidden');
+  const quizEditorSection = document.getElementById('quizEditorSection');
+  if (quizEditorSection) quizEditorSection.classList.remove('hidden');
   currentCategory = '';
   QA = [];
   console.log('Category selector shown, file input visible');
@@ -514,9 +525,12 @@ function showCustomMixBuilder(categories) {
   categorySelector.classList.add('hidden');
   categorySelection.classList.remove('hidden');
   quizDisplay.classList.add('hidden');
+  if (quizEditorDisplay) quizEditorDisplay.classList.add('hidden');
   fileInputSection.classList.add('hidden');
   resetAllData.parentElement.classList.add('hidden');
   lightboardSettingsBtn.parentElement.classList.add('hidden');
+  const quizEditorSection = document.getElementById('quizEditorSection');
+  if (quizEditorSection) quizEditorSection.classList.add('hidden');
   
   createCategorySelectionItems(categories);
   console.log('Custom mix builder shown');
@@ -526,9 +540,12 @@ function showQuizDisplay() {
   categorySelector.classList.add('hidden');
   categorySelection.classList.add('hidden');
   quizDisplay.classList.remove('hidden');
+  if (quizEditorDisplay) quizEditorDisplay.classList.add('hidden');
   fileInputSection.classList.add('hidden');
   resetAllData.parentElement.classList.add('hidden');
   lightboardSettingsBtn.parentElement.classList.add('hidden');
+  const quizEditorSection = document.getElementById('quizEditorSection');
+  if (quizEditorSection) quizEditorSection.classList.add('hidden');
   console.log('Quiz interface shown, file input hidden');
 }
 
@@ -1041,7 +1058,13 @@ function render(hideAnswer = true) {
     questionIcon.classList.remove('hidden');
     // Handle image load errors gracefully
     questionIcon.onerror = function() {
+      console.error(`Failed to load image: ${qa.iconPath}`);
+      console.error(`Question: ${qa.q}`);
+      console.error(`Badge value in CSV: ${qa.level}`);
       this.classList.add('hidden');
+    };
+    questionIcon.onload = function() {
+      console.log(`Successfully loaded image: ${qa.iconPath}`);
     };
   } else {
     questionIcon.classList.add('hidden');
@@ -1744,6 +1767,18 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   
+  // Don't process shortcuts if user is typing in an input field
+  const activeElement = document.activeElement;
+  const isInputField = activeElement && (
+    activeElement.tagName === 'INPUT' ||
+    activeElement.tagName === 'TEXTAREA' ||
+    activeElement.isContentEditable
+  );
+  
+  if (isInputField) {
+    return; // Let the input field handle the key
+  }
+  
   if (e.key === 'ArrowRight') { 
     e.preventDefault(); 
     next(); 
@@ -1880,33 +1915,87 @@ lightboardModal.addEventListener('click', function(e) {
 let quizEditorQuestions = [];
 let currentEditingQuiz = null;
 let quizEditorMode = 'new'; // 'new' or 'edit'
+let quizEditorInitialState = null; // Store initial state to detect changes
 
 // Quiz Editor Functions
 function openQuizEditor() {
-  quizEditorModal.classList.remove('hidden');
+  categorySelector.classList.add('hidden');
+  categorySelection.classList.add('hidden');
+  quizDisplay.classList.add('hidden');
+  quizEditorDisplay.classList.remove('hidden');
+  fileInputSection.classList.add('hidden');
+  resetAllData.parentElement.classList.add('hidden');
+  lightboardSettingsBtn.parentElement.classList.add('hidden');
+  const quizEditorSection = document.getElementById('quizEditorSection');
+  if (quizEditorSection) quizEditorSection.classList.add('hidden');
   resetQuizEditor();
   loadQuizList();
+  // Store initial state to detect changes
+  saveInitialState();
+}
+
+function saveInitialState() {
+  quizEditorInitialState = JSON.stringify({
+    questions: quizEditorQuestions,
+    quizName: quizName ? quizName.value : '',
+    mode: quizEditorMode,
+    selectedQuiz: existingQuizSelect ? existingQuizSelect.value : ''
+  });
+}
+
+function hasUnsavedChanges() {
+  if (!quizEditorInitialState) return false;
+  
+  const currentState = JSON.stringify({
+    questions: quizEditorQuestions,
+    quizName: quizName ? quizName.value : '',
+    mode: quizEditorMode,
+    selectedQuiz: existingQuizSelect ? existingQuizSelect.value : ''
+  });
+  
+  return currentState !== quizEditorInitialState;
+}
+
+function showQuizEditorExitConfirmation() {
+  if (hasUnsavedChanges()) {
+    quizEditorExitModal.classList.remove('hidden');
+  } else {
+    closeQuizEditor();
+  }
+}
+
+function hideQuizEditorExitConfirmation() {
+  quizEditorExitModal.classList.add('hidden');
 }
 
 function closeQuizEditor() {
-  quizEditorModal.classList.add('hidden');
+  quizEditorDisplay.classList.add('hidden');
   resetQuizEditor();
+  showCategorySelector();
 }
 
 function resetQuizEditor() {
   quizEditorQuestions = [];
   currentEditingQuiz = null;
   quizEditorMode = 'new';
-  quizName.value = '';
-  existingQuizSelect.value = '';
-  questionsList.innerHTML = '';
-  newQuizMode.classList.add('active');
-  editQuizMode.classList.remove('active');
-  newQuizSection.classList.remove('hidden');
-  editQuizSection.classList.add('hidden');
+  if (quizName) quizName.value = '';
+  if (existingQuizSelect) existingQuizSelect.value = '';
+  if (questionsList) questionsList.innerHTML = '';
+  if (newQuizMode) newQuizMode.classList.add('active');
+  if (editQuizMode) editQuizMode.classList.remove('active');
+  if (newQuizSection) newQuizSection.classList.remove('hidden');
+  if (editQuizSection) editQuizSection.classList.add('hidden');
+  quizEditorInitialState = null;
 }
 
 function switchQuizEditorMode(mode) {
+  // Check for unsaved changes before switching
+  if (hasUnsavedChanges()) {
+    if (!confirm('You have unsaved changes. Switch mode anyway?')) {
+      return;
+    }
+  }
+  
   quizEditorMode = mode;
   if (mode === 'new') {
     newQuizMode.classList.add('active');
@@ -1915,7 +2004,7 @@ function switchQuizEditorMode(mode) {
     editQuizSection.classList.add('hidden');
     currentEditingQuiz = null;
     quizEditorQuestions = [];
-    questionsList.innerHTML = '';
+    if (questionsList) questionsList.innerHTML = '';
   } else {
     newQuizMode.classList.remove('active');
     editQuizMode.classList.add('active');
@@ -1923,6 +2012,8 @@ function switchQuizEditorMode(mode) {
     editQuizSection.classList.remove('hidden');
     loadQuizList();
   }
+  // Save state after mode switch
+  saveInitialState();
 }
 
 async function loadQuizList() {
@@ -1970,6 +2061,8 @@ async function loadQuizForEditing(quizPath) {
     
     renderQuestions();
     currentEditingQuiz = quizPath;
+    // Save state after loading
+    saveInitialState();
   } catch (error) {
     console.error('Error loading quiz:', error);
     alert('Failed to load quiz file');
@@ -1986,16 +2079,19 @@ function addQuestion() {
     imageFile: null
   });
   renderQuestions();
+  // Changes made - will be detected on exit
 }
 
 function removeQuestion(index) {
   quizEditorQuestions.splice(index, 1);
   renderQuestions();
+  // Changes made - will be detected on exit
 }
 
 function updateQuestion(index, field, value) {
   if (quizEditorQuestions[index]) {
     quizEditorQuestions[index][field] = value;
+    // Mark that changes have been made (state will be checked on exit)
   }
 }
 
@@ -2011,6 +2107,7 @@ function handleFileUpload(index, type, file) {
   }
   
   renderQuestions();
+  // Changes made - will be detected on exit
 }
 
 function renderQuestions() {
@@ -2139,7 +2236,16 @@ async function saveQuiz() {
         audioValue = q.audioFile.name;
       }
       if (q.imageFile) {
-        badgeValue = q.imageFile.name;
+        // Images are saved to Images folder, so prepend the path
+        badgeValue = `Images/${q.imageFile.name}`;
+      } else if (badgeValue && !badgeValue.startsWith('Images/') && !badgeValue.startsWith('/') && !badgeValue.includes('/')) {
+        // If badge value exists but doesn't have a path, check if it's an image file
+        const imageExtensions = ['.png', '.svg', '.webp', '.jpg', '.jpeg', '.gif'];
+        const isImageFile = imageExtensions.some(ext => badgeValue.toLowerCase().endsWith(ext));
+        if (isImageFile) {
+          // It's an image filename without path, prepend Images/
+          badgeValue = `Images/${badgeValue}`;
+        }
       }
       
       csvRows.push([
@@ -2191,6 +2297,8 @@ async function saveQuiz() {
     }
     
     alert('Quiz saved successfully!');
+    // Reset initial state since we just saved
+    saveInitialState();
     closeQuizEditor();
     
     // Reload quizzes
@@ -2210,8 +2318,8 @@ document.addEventListener('keydown', function(e) {
       hideExitConfirmation();
     } else if (!lightboardModal.classList.contains('hidden')) {
       lightboardModal.classList.add('hidden');
-    } else if (!quizEditorModal.classList.contains('hidden')) {
-      closeQuizEditor();
+    } else if (quizEditorDisplay && !quizEditorDisplay.classList.contains('hidden')) {
+      showQuizEditorExitConfirmation();
     }
   }
 });
@@ -2295,17 +2403,21 @@ async function loadAllQuizzes() {
             
             if (isImagePath) {
               // Column 4 is a direct image path - use it as-is
-              // If it's a relative path, prepend quiz folder if available
               let imagePath = badgeColumn.trim();
-              if (quizItem.path && !imagePath.startsWith('http') && !imagePath.startsWith('/') && !imagePath.startsWith('Images/')) {
-                // Relative path - prepend quiz folder
-                const folderPath = quizItem.path.substring(0, quizItem.path.lastIndexOf('/'));
-                if (folderPath) {
-                  imagePath = `${folderPath}/${imagePath}`;
-                }
+              
+              // If it doesn't have a path prefix, assume it's in Images folder
+              if (!imagePath.startsWith('http') && !imagePath.startsWith('/') && !imagePath.startsWith('Images/') && !imagePath.includes('/')) {
+                // Just a filename - prepend Images/
+                imagePath = `Images/${imagePath}`;
+              } else if (quizItem.path && !imagePath.startsWith('http') && !imagePath.startsWith('/') && !imagePath.startsWith('Images/')) {
+                // Has a path but not Images/ - might be relative to quiz folder
+                // But images should be in Images folder, so check if it exists there first
+                const imagesPath = `Images/${imagePath.split('/').pop()}`;
+                // For now, use Images/ path as that's where they're saved
+                imagePath = imagesPath;
               }
               questionObj.iconPath = imagePath;
-              console.log(`Set iconPath for question: ${imagePath}`);
+              console.log(`Set iconPath for question: ${imagePath} (from badge: ${badgeColumn.trim()})`);
             } else {
               // Column 4 is a badge name - try standard icon path
               questionObj.iconPath = getIconPath(badgeColumn.trim());
@@ -2403,8 +2515,8 @@ function cleanupClientResources() {
 document.addEventListener('DOMContentLoaded', function() {
   // Initialize quiz editor elements
   quizEditorBtn = document.getElementById('quizEditorBtn');
-  quizEditorModal = document.getElementById('quizEditorModal');
-  cancelQuizEditor = document.getElementById('cancelQuizEditor');
+  quizEditorDisplay = document.getElementById('quizEditorDisplay');
+  exitQuizEditorBtn = document.getElementById('exitQuizEditorBtn');
   saveQuizBtn = document.getElementById('saveQuizBtn');
   newQuizMode = document.getElementById('newQuizMode');
   editQuizMode = document.getElementById('editQuizMode');
@@ -2424,9 +2536,6 @@ document.addEventListener('DOMContentLoaded', function() {
   // Setup quiz editor event listeners
   if (quizEditorBtn) {
     quizEditorBtn.addEventListener('click', openQuizEditor);
-  }
-  if (cancelQuizEditor) {
-    cancelQuizEditor.addEventListener('click', closeQuizEditor);
   }
   if (saveQuizBtn) {
     saveQuizBtn.addEventListener('click', saveQuiz);
@@ -2451,10 +2560,36 @@ document.addEventListener('DOMContentLoaded', function() {
   if (addQuestionBtn) {
     addQuestionBtn.addEventListener('click', addQuestion);
   }
-  if (quizEditorModal) {
-    quizEditorModal.addEventListener('click', function(e) {
-      if (e.target === quizEditorModal) {
-        closeQuizEditor();
+  if (exitQuizEditorBtn) {
+    exitQuizEditorBtn.addEventListener('click', showQuizEditorExitConfirmation);
+  }
+  
+  // Quiz Editor Exit Modal elements
+  quizEditorExitModal = document.getElementById('quizEditorExitModal');
+  cancelQuizEditorExit = document.getElementById('cancelQuizEditorExit');
+  saveAndExitQuizEditor = document.getElementById('saveAndExitQuizEditor');
+  exitWithoutSavingQuizEditor = document.getElementById('exitWithoutSavingQuizEditor');
+  
+  if (cancelQuizEditorExit) {
+    cancelQuizEditorExit.addEventListener('click', hideQuizEditorExitConfirmation);
+  }
+  if (saveAndExitQuizEditor) {
+    saveAndExitQuizEditor.addEventListener('click', async () => {
+      hideQuizEditorExitConfirmation();
+      await saveQuiz();
+      // closeQuizEditor is called in saveQuiz after successful save
+    });
+  }
+  if (exitWithoutSavingQuizEditor) {
+    exitWithoutSavingQuizEditor.addEventListener('click', () => {
+      hideQuizEditorExitConfirmation();
+      closeQuizEditor();
+    });
+  }
+  if (quizEditorExitModal) {
+    quizEditorExitModal.addEventListener('click', function(e) {
+      if (e.target === quizEditorExitModal) {
+        hideQuizEditorExitConfirmation();
       }
     });
   }

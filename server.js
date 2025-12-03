@@ -156,7 +156,13 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
     const imageFiles = req.files.filter(f => f.fieldname.startsWith('image_'));
     imageFiles.forEach(imageFile => {
       // Image files are already saved in the Images folder by multer
-      // No additional action needed
+      console.log(`Image file saved: ${imageFile.filename} at ${imageFile.path}`);
+      // Verify the file exists
+      if (fs.existsSync(imageFile.path)) {
+        console.log(`✓ Image file confirmed at: ${imageFile.path}`);
+      } else {
+        console.error(`✗ Image file NOT FOUND at: ${imageFile.path}`);
+      }
     });
     
     console.log('SUCCESS: Quiz saved to', finalPath);

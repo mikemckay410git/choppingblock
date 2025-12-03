@@ -1138,14 +1138,14 @@ button:active {
     transform: translateY(-1px);
 }
 
-.quiz-editor-dialog {
-    max-width: 800px;
-    max-height: 90vh;
-    overflow-y: auto;
+/* Quiz Editor Full Screen Display */
+.quiz-editor-display {
+    width: min(900px, 96vw);
 }
 
 .quiz-editor-content {
-    max-height: calc(90vh - 200px);
+    padding: 20px 0;
+    max-height: calc(100vh - 200px);
     overflow-y: auto;
 }
 
@@ -1354,11 +1354,19 @@ button:active {
     margin-top: 6px;
 }
 
-@media (max-width: 520px) {
-    .quiz-editor-dialog {
-        max-width: 95vw;
-    }
+.quiz-editor-save-section {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,.08);
+    display: flex;
+    justify-content: center;
+}
 
+.quiz-editor-save-section .modal-btn {
+    min-width: 200px;
+}
+
+@media (max-width: 520px) {
     .question-fields {
         grid-template-columns: 1fr;
     }
@@ -1370,6 +1378,10 @@ button:active {
     }
 
     .add-question-btn {
+        width: 100%;
+    }
+
+    .quiz-editor-save-section .modal-btn {
         width: 100%;
     }
 }

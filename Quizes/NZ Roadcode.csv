@@ -1,4 +1,4 @@
-question,answer,Audio,Badge
+Question,Answer,Audio,Badge
 What is the maximum open road speed limit for cars in New Zealand?,100 km/h,,
 What is the maximum speed limit on some motorways in New Zealand?,110 km/h,,
 What is the maximum speed limit when towing a trailer or another vehicle?,90 km/h,,
@@ -19,7 +19,7 @@ What must you do when an emergency vehicle is approaching with flashing lights a
 What does a white diamond painted on the road mean?,"A special vehicle lane ahead (e.g., bus, cycle, or transit lane)",,
 What is the maximum distance a load may extend in front of a car without a special permit?,3 metres,,
 What is the maximum legal speed limit in urban areas unless otherwise posted?,50 km/h,,
-Sample Road Code Question 21?,Sample Answer 21,,
+Sample Road Code Question 21?,Sample Answer 21,,car_smoke.png
 Sample Road Code Question 22?,Sample Answer 22,,
 Sample Road Code Question 23?,Sample Answer 23,,
 Sample Road Code Question 24?,Sample Answer 24,,
