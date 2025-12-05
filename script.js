@@ -1191,6 +1191,9 @@ function playMusic() {
   // Create new audio element
   currentAudio = new Audio(audioPath);
   
+  // Track if play() has been called to prevent canplay from interfering
+  let playCalled = false;
+  
   currentAudio.addEventListener('loadstart', () => {
     musicStatus.textContent = '';
     playMusicBtn.textContent = '⏳ Loading...';
@@ -1200,29 +1203,31 @@ function playMusic() {
   currentAudio.addEventListener('canplay', () => {
     musicStatus.textContent = '';
     playMusicBtn.disabled = false;
-    // Only update button text if not already playing
-    if (!isMusicPlaying) {
-      playMusicBtn.textContent = '🎵 Play Song';
+    // Only update button text if play() hasn't been called yet
+    // This prevents the flash on first click where canplay fires before play event
+    if (!playCalled && !isMusicPlaying) {
+      playMusicBtn.textContent = '🎵 Play Audio';
     }
   });
   
   currentAudio.addEventListener('play', () => {
     isMusicPlaying = true;
-    playMusicBtn.textContent = '⏸️ Stop Song';
+    playMusicBtn.textContent = '⏸️ Stop Audio';
     playMusicBtn.classList.add('playing');
+    playMusicBtn.disabled = false;
     musicStatus.textContent = '';
   });
   
   currentAudio.addEventListener('pause', () => {
     isMusicPlaying = false;
-    playMusicBtn.textContent = '🎵 Play Song';
+    playMusicBtn.textContent = '🎵 Play Audio';
     playMusicBtn.classList.remove('playing');
     musicStatus.textContent = '';
   });
   
   currentAudio.addEventListener('ended', () => {
     isMusicPlaying = false;
-    playMusicBtn.textContent = '🎵 Play Song';
+    playMusicBtn.textContent = '🎵 Play Audio';
     playMusicBtn.classList.remove('playing');
     musicStatus.textContent = '';
   });
@@ -1230,23 +1235,23 @@ function playMusic() {
   currentAudio.addEventListener('error', (e) => {
     console.error('Audio error:', e);
     musicStatus.textContent = '';
-    playMusicBtn.textContent = '🎵 Play Song';
+    playMusicBtn.textContent = '🎵 Play Audio';
     playMusicBtn.disabled = false;
     playMusicBtn.classList.remove('playing');
   });
   
-  // Start playing
+  // Mark that play() is being called, then start playing
+  playCalled = true;
   currentAudio.play().then(() => {
     // Audio started playing successfully
-    isMusicPlaying = true;
-    playMusicBtn.textContent = '⏸️ Stop Song';
-    playMusicBtn.classList.add('playing');
-    musicStatus.textContent = '';
+    // The 'play' event handler will update the button
   }).catch(error => {
     console.error('Error playing audio:', error);
+    playCalled = false; // Reset on error so button can be clicked again
     musicStatus.textContent = '';
-    playMusicBtn.textContent = '🎵 Play Song';
+    playMusicBtn.textContent = '🎵 Play Audio';
     playMusicBtn.disabled = false;
+    playMusicBtn.classList.remove('playing');
   });
 }
 
@@ -1258,7 +1263,7 @@ function stopMusic() {
   }
   isMusicPlaying = false;
   if (playMusicBtn) {
-    playMusicBtn.textContent = '🎵 Play Song';
+    playMusicBtn.textContent = '🎵 Play Audio';
     playMusicBtn.classList.remove('playing');
     playMusicBtn.disabled = false;
   }

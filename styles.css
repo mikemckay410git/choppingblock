@@ -160,10 +160,10 @@ h1 {
     height: 50px;
     object-fit: contain;
     border-radius: 8px;
-    background: rgba(255,255,255,.05);
-    padding: 4px;
+    background: transparent;
+    padding: 0;
     z-index: 2;
-    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    box-shadow: none;
 }
 
 .question-icon.hidden {
@@ -250,7 +250,8 @@ h1 {
     display: flex;
     align-items: center;
     gap: 4px;
-    min-width: auto !important;
+    width: 110px !important;
+    justify-content: center;
 }
 
 .music-btn:hover {
