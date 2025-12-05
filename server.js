@@ -284,13 +284,21 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
       setFilePermissions(quizesDir, true);
     }
     
-    // Determine the final path
+    // Determine the final path based on the NEW quiz name (not the old path)
     let finalPath;
     let quizDir;
+    let oldPath = null;
+    let oldDir = null;
+    
+    // Get old path info if editing
+    if (mode === 'edit' && existingPath) {
+      oldPath = path.join(process.cwd(), existingPath);
+      oldDir = path.dirname(oldPath);
+    }
     
     if (hasAudioFiles) {
-      // Quiz has audio files - must be in folder structure: Quizes/${quizName}/${quizName}.csv
-      quizDir = path.join(quizesDir, quizName);
+      // Quiz has audio files - must be in folder structure: Quizes/${sanitizedQuizName}/${sanitizedQuizName}.csv
+      quizDir = path.join(quizesDir, sanitizedQuizName);
       if (!fs.existsSync(quizDir)) {
         fs.mkdirSync(quizDir, { recursive: true, mode: 0o777 });
         setFilePermissions(quizDir, true);
@@ -298,44 +306,10 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
         setFilePermissions(quizDir, true);
       }
       finalPath = path.join(quizDir, `${sanitizedQuizName}.csv`);
-      
-      // If editing and the old file was in a different location, we may need to clean up
-      if (mode === 'edit' && existingPath) {
-        const oldPath = path.join(process.cwd(), existingPath);
-        const oldDir = path.dirname(oldPath);
-        
-        // If old file was a flat file (Quizes/${quizName}.csv), move it to folder structure
-        if (oldPath !== finalPath && fs.existsSync(oldPath)) {
-          // Old file exists and is in a different location
-          // We'll move it below, but first check if we need to delete the old flat file
-          if (oldDir === quizesDir && path.basename(oldPath) === `${quizName}.csv`) {
-            // Old file is a flat file in Quizes folder - will be replaced by folder structure
-            console.log(`Moving quiz from flat file structure to folder structure: ${oldPath} -> ${finalPath}`);
-          }
-        }
-      }
     } else {
-      // No audio files - can be a flat file: Quizes/${quizName}.csv
-      if (mode === 'edit' && existingPath) {
-        // For editing without audio, try to preserve existing structure
-        const oldPath = path.join(process.cwd(), existingPath);
-        const oldDir = path.dirname(oldPath);
-        
-        // If old quiz was in a folder but has no audio now, we could flatten it
-        // But to be safe, keep it in its current location
-        if (fs.existsSync(oldPath)) {
-          finalPath = oldPath;
-          quizDir = oldDir;
-        } else {
-          // Old path doesn't exist, create as flat file
-          finalPath = path.join(quizesDir, `${sanitizedQuizName}.csv`);
-          quizDir = quizesDir;
-        }
-      } else {
-        // New quiz without audio - flat file
-        finalPath = path.join(quizesDir, `${sanitizedQuizName}.csv`);
-        quizDir = quizesDir;
-      }
+      // No audio files - flat file: Quizes/${sanitizedQuizName}.csv
+      finalPath = path.join(quizesDir, `${sanitizedQuizName}.csv`);
+      quizDir = quizesDir;
     }
     
     // Ensure directory exists
@@ -397,6 +371,68 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
         console.error(`✗ Image file NOT FOUND at: ${imageFile.path}`);
       }
     });
+    
+    // If editing and the name/location changed, clean up the old file/folder
+    if (mode === 'edit' && oldPath && oldPath !== finalPath && fs.existsSync(oldPath)) {
+      console.log(`Quiz name/location changed. Cleaning up old location: ${oldPath}`);
+      
+      try {
+        // Check if old path is a file or directory
+        const oldStats = fs.statSync(oldPath);
+        
+        if (oldStats.isDirectory()) {
+          // Old location is a directory (music quiz folder)
+          // Check if we need to move audio files from old folder to new folder
+          if (hasAudioFiles && oldDir && fs.existsSync(oldDir)) {
+            const oldAudioFiles = fs.readdirSync(oldDir).filter(file => 
+              file.toLowerCase().endsWith('.mp3') || 
+              file.toLowerCase().endsWith('.wav') || 
+              file.toLowerCase().endsWith('.ogg') ||
+              file.toLowerCase().endsWith('.m4a') ||
+              file.toLowerCase().endsWith('.aac') ||
+              file.toLowerCase().endsWith('.flac')
+            );
+            
+            // Move audio files to new location if they're not already there
+            oldAudioFiles.forEach(audioFileName => {
+              const oldAudioPath = path.join(oldDir, audioFileName);
+              const newAudioPath = path.join(quizDir, audioFileName);
+              if (fs.existsSync(oldAudioPath) && !fs.existsSync(newAudioPath)) {
+                fs.renameSync(oldAudioPath, newAudioPath);
+                setFilePermissions(newAudioPath, false);
+                console.log(`Moved audio file: ${oldAudioPath} -> ${newAudioPath}`);
+              }
+            });
+          }
+          
+          // Remove old directory if it's empty or only contains the CSV
+          const oldDirContents = fs.readdirSync(oldDir);
+          // Only delete if directory is empty or only contains the CSV file
+          if (oldDirContents.length === 0 || (oldDirContents.length === 1 && oldDirContents[0].endsWith('.csv'))) {
+            if (oldDirContents.length === 1) {
+              // Remove the CSV file first
+              const oldCsvPath = path.join(oldDir, oldDirContents[0]);
+              fs.unlinkSync(oldCsvPath);
+            }
+            fs.rmdirSync(oldDir);
+            console.log(`Removed old quiz directory: ${oldDir}`);
+          } else {
+            // Directory has other files, just remove the CSV
+            const oldCsvInDir = path.join(oldDir, path.basename(oldPath));
+            if (fs.existsSync(oldCsvInDir)) {
+              fs.unlinkSync(oldCsvInDir);
+              console.log(`Removed old CSV file: ${oldCsvInDir}`);
+            }
+          }
+        } else {
+          // Old location is a file (flat CSV)
+          fs.unlinkSync(oldPath);
+          console.log(`Removed old CSV file: ${oldPath}`);
+        }
+      } catch (error) {
+        console.warn(`Could not remove old file/folder ${oldPath}:`, error.message);
+      }
+    }
     
     // For music quizzes, ensure the entire folder structure has correct permissions
     // This is critical for allowing deletion of the folder and its contents

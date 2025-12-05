@@ -307,6 +307,14 @@ let editQuizMode;
 let newQuizSection;
 let editQuizSection;
 let quizName;
+let editQuizNameBtn;
+let editQuizNameModal;
+let editQuizNameInput;
+let cancelEditQuizName;
+let saveEditQuizName;
+let quizNameDisplay;
+let quizNameDisplaySection;
+let editedQuizName = null; // Store the edited name separately
 let existingQuizSelect;
 let questionsList;
 let addQuestionBtn;
@@ -1950,7 +1958,9 @@ function openQuizEditor() {
 function saveInitialState() {
   quizEditorInitialState = JSON.stringify({
     questions: quizEditorQuestions,
-    quizName: quizName ? quizName.value : '',
+    quizName: quizEditorMode === 'new' 
+      ? (quizName ? quizName.value : '')
+      : (editedQuizName || (existingQuizSelect && existingQuizSelect.options[existingQuizSelect.selectedIndex] ? existingQuizSelect.options[existingQuizSelect.selectedIndex].textContent.replace(/\.csv$/i, '') : '')),
     mode: quizEditorMode,
     selectedQuiz: existingQuizSelect ? existingQuizSelect.value : ''
   });
@@ -1961,7 +1971,9 @@ function hasUnsavedChanges() {
   
   const currentState = JSON.stringify({
     questions: quizEditorQuestions,
-    quizName: quizName ? quizName.value : '',
+    quizName: quizEditorMode === 'new' 
+      ? (quizName ? quizName.value : '')
+      : (editedQuizName || (existingQuizSelect && existingQuizSelect.options[existingQuizSelect.selectedIndex] ? existingQuizSelect.options[existingQuizSelect.selectedIndex].textContent.replace(/\.csv$/i, '') : '')),
     mode: quizEditorMode,
     selectedQuiz: existingQuizSelect ? existingQuizSelect.value : ''
   });
@@ -2009,6 +2021,9 @@ function resetQuizEditor() {
   currentEditingQuiz = null;
   quizEditorMode = 'new';
   if (quizName) quizName.value = '';
+  editedQuizName = null;
+  if (quizNameDisplaySection) quizNameDisplaySection.style.display = 'none';
+  if (quizNameDisplay) quizNameDisplay.textContent = '';
   if (existingQuizSelect) existingQuizSelect.value = '';
   if (questionsList) questionsList.innerHTML = '';
   if (newQuizMode) newQuizMode.classList.add('active');
@@ -2064,6 +2079,8 @@ function performModeSwitch(mode) {
     newQuizSection.classList.add('hidden');
     editQuizSection.classList.remove('hidden');
     if (quizName) quizName.value = '';
+    editedQuizName = null;
+    if (editQuizNameBtn) editQuizNameBtn.style.display = 'none';
     loadQuizList();
   }
   // Save state after mode switch
@@ -2117,6 +2134,20 @@ async function loadQuizForEditing(quizPath) {
     
     renderQuestions();
     currentEditingQuiz = quizPath;
+    
+    // Reset edited name and show quiz name display
+    editedQuizName = null;
+    if (existingQuizSelect && existingQuizSelect.selectedIndex > 0) {
+      const selectedOption = existingQuizSelect.options[existingQuizSelect.selectedIndex];
+      const quizNameText = selectedOption.textContent.replace(/\.csv$/i, '');
+      if (quizNameDisplay) {
+        quizNameDisplay.textContent = quizNameText;
+      }
+      if (quizNameDisplaySection) {
+        quizNameDisplaySection.style.display = 'block';
+      }
+    }
+    
     // Save state after loading
     saveInitialState();
     updateQuizEditorVisibility();
@@ -2343,7 +2374,9 @@ function escapeHtml(text) {
 }
 
 async function saveQuiz() {
-  const name = quizEditorMode === 'new' ? quizName.value.trim() : existingQuizSelect.options[existingQuizSelect.selectedIndex]?.textContent;
+  const name = quizEditorMode === 'new' 
+    ? quizName.value.trim() 
+    : (editedQuizName || (existingQuizSelect && existingQuizSelect.options[existingQuizSelect.selectedIndex] ? existingQuizSelect.options[existingQuizSelect.selectedIndex].textContent.replace(/\.csv$/i, '') : ''));
   
   if (!name) {
     alert('Please enter a quiz name');
@@ -2694,6 +2727,13 @@ document.addEventListener('DOMContentLoaded', function() {
   editQuizSection = document.getElementById('editQuizSection');
   quizName = document.getElementById('quizName');
   existingQuizSelect = document.getElementById('existingQuizSelect');
+  quizNameDisplay = document.getElementById('quizNameDisplay');
+  quizNameDisplaySection = document.getElementById('quizNameDisplaySection');
+  editQuizNameBtn = document.getElementById('editQuizNameBtn');
+  editQuizNameModal = document.getElementById('editQuizNameModal');
+  editQuizNameInput = document.getElementById('editQuizNameInput');
+  cancelEditQuizName = document.getElementById('cancelEditQuizName');
+  saveEditQuizName = document.getElementById('saveEditQuizName');
   questionsList = document.getElementById('questionsList');
   addQuestionBtn = document.getElementById('addQuestionBtn');
   quizQuestionsSection = document.getElementById('quizQuestionsSection');
@@ -2728,10 +2768,15 @@ document.addEventListener('DOMContentLoaded', function() {
           showQuizEditorExitConfirmation(() => {
             // After confirmation, load the new quiz
             existingQuizSelect.value = tempValue;
+            editedQuizName = null; // Reset edited name when loading new quiz
             loadQuizForEditing(tempValue);
           });
         } else {
           // No unsaved changes or same quiz, load immediately
+          editedQuizName = null; // Reset edited name when loading new quiz
+          if (editQuizNameBtn) {
+            editQuizNameBtn.style.display = 'flex';
+          }
           loadQuizForEditing(selectedValue);
         }
       } else {
@@ -2746,6 +2791,9 @@ document.addEventListener('DOMContentLoaded', function() {
             quizEditorQuestions = [];
             if (questionsList) questionsList.innerHTML = '';
             currentEditingQuiz = null;
+            editedQuizName = null;
+            if (quizNameDisplaySection) quizNameDisplaySection.style.display = 'none';
+            if (quizNameDisplay) quizNameDisplay.textContent = '';
             updateQuizEditorVisibility();
             saveInitialState();
           });
@@ -2754,6 +2802,8 @@ document.addEventListener('DOMContentLoaded', function() {
           quizEditorQuestions = [];
           if (questionsList) questionsList.innerHTML = '';
           currentEditingQuiz = null;
+          editedQuizName = null;
+          if (editQuizNameBtn) editQuizNameBtn.style.display = 'none';
           updateQuizEditorVisibility();
           saveInitialState();
         }
@@ -2763,6 +2813,82 @@ document.addEventListener('DOMContentLoaded', function() {
   if (quizName) {
     quizName.addEventListener('input', () => {
       updateQuizEditorVisibility();
+    });
+  }
+  
+  // Edit quiz name button and modal handlers
+  if (editQuizNameBtn) {
+    editQuizNameBtn.addEventListener('click', () => {
+      if (quizNameDisplay) {
+        const currentName = editedQuizName || quizNameDisplay.textContent;
+        if (editQuizNameInput) {
+          editQuizNameInput.value = currentName;
+          editQuizNameInput.focus();
+          editQuizNameInput.select();
+        }
+        if (editQuizNameModal) {
+          editQuizNameModal.classList.remove('hidden');
+        }
+      }
+    });
+  }
+  
+  if (cancelEditQuizName) {
+    cancelEditQuizName.addEventListener('click', () => {
+      if (editQuizNameModal) {
+        editQuizNameModal.classList.add('hidden');
+      }
+      if (editQuizNameInput) {
+        editQuizNameInput.value = '';
+      }
+    });
+  }
+  
+  if (saveEditQuizName) {
+    saveEditQuizName.addEventListener('click', () => {
+      if (editQuizNameInput && editQuizNameInput.value.trim()) {
+        editedQuizName = editQuizNameInput.value.trim();
+        // Update the displayed name
+        if (quizNameDisplay) {
+          quizNameDisplay.textContent = editedQuizName;
+        }
+        if (editQuizNameModal) {
+          editQuizNameModal.classList.add('hidden');
+        }
+        saveInitialState(); // Update state to reflect name change
+        updateQuizEditorVisibility();
+      } else {
+        alert('Please enter a quiz name');
+      }
+    });
+  }
+  
+  // Close modal when clicking overlay
+  if (editQuizNameModal) {
+    editQuizNameModal.addEventListener('click', (e) => {
+      if (e.target === editQuizNameModal) {
+        editQuizNameModal.classList.add('hidden');
+        if (editQuizNameInput) {
+          editQuizNameInput.value = '';
+        }
+      }
+    });
+  }
+  
+  // Allow Enter key to save in modal
+  if (editQuizNameInput) {
+    editQuizNameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (saveEditQuizName) {
+          saveEditQuizName.click();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        if (cancelEditQuizName) {
+          cancelEditQuizName.click();
+        }
+      }
     });
   }
   if (addQuestionBtn) {

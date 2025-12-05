@@ -270,6 +270,13 @@
                             <option value="">-- Select a quiz --</option>
                         </select>
                     </div>
+                    <div class="settings-section" id="quizNameDisplaySection" style="display: none;">
+                        <label>Quiz Name:</label>
+                        <div class="quiz-name-display-container">
+                            <span id="quizNameDisplay" class="quiz-name-display"></span>
+                            <button id="editQuizNameBtn" class="edit-name-btn" title="Edit quiz name">✏️</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Questions List -->
@@ -298,6 +305,25 @@
                     <button class="modal-btn cancel" id="cancelQuizEditorExit">Cancel</button>
                     <button class="modal-btn confirm" id="saveAndExitQuizEditor">Save & Exit</button>
                     <button class="modal-btn confirm" id="exitWithoutSavingQuizEditor">Exit Without Saving</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Quiz Name Modal -->
+        <div class="modal-overlay hidden" id="editQuizNameModal">
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3>Edit Quiz Name</h3>
+                </div>
+                <div class="modal-content">
+                    <div class="settings-section">
+                        <label for="editQuizNameInput">Quiz Name:</label>
+                        <input type="text" id="editQuizNameInput" class="quiz-input" placeholder="Enter quiz name">
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn cancel" id="cancelEditQuizName">Cancel</button>
+                    <button class="modal-btn confirm" id="saveEditQuizName">Save</button>
                 </div>
             </div>
         </div>
