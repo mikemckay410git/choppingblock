@@ -437,10 +437,22 @@ function handleFileSelect(event) {
                 // Column 4 is a direct image path
                 let imagePath = badgeColumn.trim();
                 
-                // If it doesn't have a path prefix, assume it's in Images folder
-                if (!imagePath.startsWith('http') && !imagePath.startsWith('/') && !imagePath.startsWith('Images/') && !imagePath.includes('/')) {
-                  // Just a filename - prepend Images/
-                  imagePath = `Images/${imagePath}`;
+                // Remove Images/ prefix if present (images now go in quiz folder)
+                if (imagePath.startsWith('Images/')) {
+                  imagePath = imagePath.replace('Images/', '');
+                }
+                
+                // Extract just the filename (remove any path)
+                const imageFilename = imagePath.split('/').pop();
+                
+                // For backward compatibility with old quizzes, check if it's in Images folder
+                // New quizzes with images will be in folder structure
+                if (!imagePath.startsWith('http') && !imagePath.startsWith('/') && !imagePath.includes('/')) {
+                  // Just a filename - try Images/ for old quizzes, but new ones use quiz folder
+                  imagePath = `Images/${imageFilename}`;
+                } else if (!imagePath.startsWith('http') && !imagePath.startsWith('/')) {
+                  // Has a path - use as-is (could be Quizes/QuizName/image.jpg)
+                  imagePath = imagePath;
                 }
                 questionObj.iconPath = imagePath;
               } else {
@@ -2426,6 +2438,12 @@ async function saveQuiz() {
     const csvRows = [];
     csvRows.push(['Question', 'Answer', 'Audio', 'Badge']);
     
+    // Check if quiz has audio or image files (needs folder structure)
+    const hasAudioFiles = quizEditorQuestions.some(q => q.audioFile || (q.audio && q.audio.trim() !== ''));
+    const hasImageFiles = quizEditorQuestions.some(q => q.imageFile || (q.badge && q.badge.trim() !== '' && 
+      ['.png', '.svg', '.webp', '.jpg', '.jpeg', '.gif'].some(ext => q.badge.toLowerCase().endsWith(ext))));
+    const needsFolderStructure = hasAudioFiles || hasImageFiles;
+    
     quizEditorQuestions.forEach((q, index) => {
       // Use the uploaded file name if available, otherwise use the existing value
       let audioValue = q.audio || '';
@@ -2436,16 +2454,23 @@ async function saveQuiz() {
         audioValue = q.audio || sanitizeFilename(q.audioFile.name);
       }
       if (q.imageFile) {
-        // Images are saved to Images folder, so prepend the path
+        // Images are saved to quiz folder (same as audio), so just use the filename
         const imageName = q.badge || sanitizeFilename(q.imageFile.name);
-        badgeValue = `Images/${imageName}`;
-      } else if (badgeValue && !badgeValue.startsWith('Images/') && !badgeValue.startsWith('/') && !badgeValue.includes('/')) {
-        // If badge value exists but doesn't have a path, check if it's an image file
+        badgeValue = imageName; // Just filename, no path prefix
+      } else if (badgeValue) {
+        // Check if badge value is an image file
         const imageExtensions = ['.png', '.svg', '.webp', '.jpg', '.jpeg', '.gif'];
         const isImageFile = imageExtensions.some(ext => badgeValue.toLowerCase().endsWith(ext));
+        
         if (isImageFile) {
-          // It's an image filename without path, prepend Images/
-          badgeValue = `Images/${badgeValue}`;
+          // Remove Images/ prefix if present (images now go in quiz folder)
+          if (badgeValue.startsWith('Images/')) {
+            badgeValue = badgeValue.replace('Images/', '');
+          }
+          // Remove any other path prefixes - just keep filename
+          if (badgeValue.includes('/')) {
+            badgeValue = badgeValue.split('/').pop();
+          }
         }
       }
       
@@ -2625,17 +2650,31 @@ async function loadAllQuizzes() {
               // Column 4 is a direct image path - use it as-is
               let imagePath = badgeColumn.trim();
               
-              // If it doesn't have a path prefix, assume it's in Images folder
-              if (!imagePath.startsWith('http') && !imagePath.startsWith('/') && !imagePath.startsWith('Images/') && !imagePath.includes('/')) {
-                // Just a filename - prepend Images/
-                imagePath = `Images/${imagePath}`;
-              } else if (quizItem.path && !imagePath.startsWith('http') && !imagePath.startsWith('/') && !imagePath.startsWith('Images/')) {
-                // Has a path but not Images/ - might be relative to quiz folder
-                // But images should be in Images folder, so check if it exists there first
-                const imagesPath = `Images/${imagePath.split('/').pop()}`;
-                // For now, use Images/ path as that's where they're saved
-                imagePath = imagesPath;
+              // Remove Images/ prefix if present (images now go in quiz folder)
+              if (imagePath.startsWith('Images/')) {
+                imagePath = imagePath.replace('Images/', '');
               }
+              
+              // Extract just the filename (remove any path)
+              const imageFilename = imagePath.split('/').pop();
+              
+              // Determine if quiz is in folder structure (music quiz or has folder)
+              const isInFolder = quizItem.type === 'music' || 
+                (quizItem.path && quizItem.path.split('/').length > 2); // Path like Quizes/QuizName/QuizName.csv
+              
+              if (isInFolder) {
+                // Quiz is in folder structure - images are in the quiz folder
+                // Extract quiz folder name from path
+                const pathParts = quizItem.path.split('/');
+                const quizFolderName = pathParts[1]; // Quizes/QuizName/QuizName.csv -> QuizName
+                imagePath = `Quizes/${quizFolderName}/${imageFilename}`;
+              } else if (!imagePath.startsWith('http') && !imagePath.startsWith('/')) {
+                // Regular quiz (flat file) - check if it's an old image in Images/ folder
+                // For backward compatibility, try Images/ first, but new images go in quiz folder
+                // Since regular quizzes with images now create folders, this is mainly for old quizzes
+                imagePath = `Images/${imageFilename}`;
+              }
+              
               questionObj.iconPath = imagePath;
               console.log(`Set iconPath for question: ${imagePath} (from badge: ${badgeColumn.trim()})`);
             } else {

@@ -136,15 +136,17 @@ const storage = multer.diskStorage({
       }
       cb(null, quizDir);
     } else if (file.fieldname.startsWith('image_')) {
-      // Images can go to Images folder or quiz folder
-      const imagesDir = path.join(process.cwd(), 'Images');
-      if (!fs.existsSync(imagesDir)) {
-        fs.mkdirSync(imagesDir, { recursive: true, mode: 0o777 });
-        setFilePermissions(imagesDir, true);
+      // Images go to the quiz folder (same as audio files)
+      const quizName = req.body.quizName || 'default';
+      const sanitizedQuizName = sanitizeFilename(quizName).replace(/\.[^.]+$/, '');
+      const quizDir = path.join(process.cwd(), 'Quizes', sanitizedQuizName);
+      if (!fs.existsSync(quizDir)) {
+        fs.mkdirSync(quizDir, { recursive: true, mode: 0o777 });
+        setFilePermissions(quizDir, true);
       } else {
-        setFilePermissions(imagesDir, true);
+        setFilePermissions(quizDir, true);
       }
-      cb(null, imagesDir);
+      cb(null, quizDir);
     } else {
       // CSV files go to Quizes folder
       const quizesDir = path.join(process.cwd(), 'Quizes');
@@ -358,19 +360,44 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
       });
     }
     
-    // Handle image files - they should be in the Images folder
+    // Handle image files - they should be in the quiz folder (same as audio)
     const imageFiles = req.files.filter(f => f.fieldname.startsWith('image_'));
-    imageFiles.forEach(imageFile => {
-      // Image files are already saved in the Images folder by multer
-      console.log(`Image file saved: ${imageFile.filename} at ${imageFile.path}`);
-      // Verify the file exists and set permissions
-      if (fs.existsSync(imageFile.path)) {
-        setFilePermissions(imageFile.path, false);
-        console.log(`✓ Image file confirmed at: ${imageFile.path}`);
-      } else {
-        console.error(`✗ Image file NOT FOUND at: ${imageFile.path}`);
+    if (imageFiles.length > 0) {
+      // If there are images, ensure quiz is in folder structure (same as audio)
+      if (!hasAudioFiles && quizDir === quizesDir) {
+        // Quiz doesn't have audio but has images - create folder structure
+        quizDir = path.join(quizesDir, sanitizedQuizName);
+        if (!fs.existsSync(quizDir)) {
+          fs.mkdirSync(quizDir, { recursive: true, mode: 0o777 });
+          setFilePermissions(quizDir, true);
+        }
+        // Move CSV to folder structure
+        const newFinalPath = path.join(quizDir, `${sanitizedQuizName}.csv`);
+        if (fs.existsSync(finalPath) && finalPath !== newFinalPath) {
+          fs.renameSync(finalPath, newFinalPath);
+          finalPath = newFinalPath;
+          setFilePermissions(finalPath, false);
+          console.log(`CSV moved to folder structure: ${finalPath}`);
+        }
       }
-    });
+      imageFiles.forEach(imageFile => {
+        // Image files are already saved in the quiz folder by multer
+        // Just ensure they're in the right place
+        const imagePath = path.join(quizDir, imageFile.filename);
+        if (imageFile.path !== imagePath) {
+          // Move to correct location if needed
+          if (fs.existsSync(imageFile.path)) {
+            fs.renameSync(imageFile.path, imagePath);
+            setFilePermissions(imagePath, false);
+            console.log(`Image file moved to: ${imagePath}`);
+          }
+        } else {
+          // File already in correct location, just set permissions
+          setFilePermissions(imagePath, false);
+          console.log(`Image file already in correct location: ${imagePath}`);
+        }
+      });
+    }
     
     // If editing and the name/location changed, clean up the old file/folder
     if (mode === 'edit' && oldPath && oldPath !== finalPath && fs.existsSync(oldPath)) {
@@ -523,7 +550,7 @@ app.get("/api/quiz-files", (req, res) => {
           path: `Quizes/${item.name}`
         });
       } else if (item.isDirectory()) {
-        // Check if it's a music quiz folder
+        // Check if it's a quiz folder (music quiz or quiz with images)
         const folderPath = path.join(quizesDir, item.name);
         const csvFile = path.join(folderPath, `${item.name}.csv`);
         
@@ -532,15 +559,28 @@ app.get("/api/quiz-files", (req, res) => {
           const audioFiles = fs.readdirSync(folderPath)
             .filter(file => file.toLowerCase().endsWith('.mp3') || file.toLowerCase().endsWith('.wav'));
           
-          if (audioFiles.length > 0) {
-            quizItems.push({
-              type: 'music',
-              name: item.name,
-              path: `Quizes/${item.name}/${item.name}.csv`,
-              audioFiles: audioFiles.map(file => `Quizes/${item.name}/${file}`)
+          // Check if folder contains image files
+          const imageFiles = fs.readdirSync(folderPath)
+            .filter(file => {
+              const ext = file.toLowerCase();
+              return ext.endsWith('.png') || ext.endsWith('.jpg') || ext.endsWith('.jpeg') || 
+                     ext.endsWith('.gif') || ext.endsWith('.webp') || ext.endsWith('.svg') || 
+                     ext.endsWith('.bmp');
             });
+          
+          // If folder has audio or images, it's in folder structure
+          if (audioFiles.length > 0 || imageFiles.length > 0) {
+            const quizItem = {
+              type: audioFiles.length > 0 ? 'music' : 'regular',
+              name: item.name,
+              path: `Quizes/${item.name}/${item.name}.csv`
+            };
+            if (audioFiles.length > 0) {
+              quizItem.audioFiles = audioFiles.map(file => `Quizes/${item.name}/${file}`);
+            }
+            quizItems.push(quizItem);
           } else {
-            // Folder with CSV but no audio files - treat as regular quiz
+            // Folder with CSV but no audio or image files - treat as regular quiz
             quizItems.push({
               type: 'regular',
               name: `${item.name}.csv`,
@@ -970,7 +1010,7 @@ app.get("/api/quiz-files", (req, res) => {
           path: `Quizes/${item.name}`
         });
       } else if (item.isDirectory()) {
-        // Check if it's a music quiz folder
+        // Check if it's a quiz folder (music quiz or quiz with images)
         const folderPath = path.join(quizesDir, item.name);
         const csvFile = path.join(folderPath, `${item.name}.csv`);
         
@@ -979,15 +1019,28 @@ app.get("/api/quiz-files", (req, res) => {
           const audioFiles = fs.readdirSync(folderPath)
             .filter(file => file.toLowerCase().endsWith('.mp3') || file.toLowerCase().endsWith('.wav'));
           
-          if (audioFiles.length > 0) {
-            quizItems.push({
-              type: 'music',
-              name: item.name,
-              path: `Quizes/${item.name}/${item.name}.csv`,
-              audioFiles: audioFiles.map(file => `Quizes/${item.name}/${file}`)
+          // Check if folder contains image files
+          const imageFiles = fs.readdirSync(folderPath)
+            .filter(file => {
+              const ext = file.toLowerCase();
+              return ext.endsWith('.png') || ext.endsWith('.jpg') || ext.endsWith('.jpeg') || 
+                     ext.endsWith('.gif') || ext.endsWith('.webp') || ext.endsWith('.svg') || 
+                     ext.endsWith('.bmp');
             });
+          
+          // If folder has audio or images, it's in folder structure
+          if (audioFiles.length > 0 || imageFiles.length > 0) {
+            const quizItem = {
+              type: audioFiles.length > 0 ? 'music' : 'regular',
+              name: item.name,
+              path: `Quizes/${item.name}/${item.name}.csv`
+            };
+            if (audioFiles.length > 0) {
+              quizItem.audioFiles = audioFiles.map(file => `Quizes/${item.name}/${file}`);
+            }
+            quizItems.push(quizItem);
           } else {
-            // Folder with CSV but no audio files - treat as regular quiz
+            // Folder with CSV but no audio or image files - treat as regular quiz
             quizItems.push({
               type: 'regular',
               name: `${item.name}.csv`,
