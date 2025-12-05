@@ -278,6 +278,10 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
     const audioFiles = req.files ? req.files.filter(f => f.fieldname.startsWith('audio_')) : [];
     const hasAudioFiles = audioFiles.length > 0;
     
+    // Check if there are image files
+    const imageFiles = req.files ? req.files.filter(f => f.fieldname.startsWith('image_')) : [];
+    const hasImageFiles = imageFiles.length > 0;
+    
     const quizesDir = path.join(process.cwd(), 'Quizes');
     if (!fs.existsSync(quizesDir)) {
       fs.mkdirSync(quizesDir, { recursive: true, mode: 0o777 });
@@ -291,15 +295,39 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
     let quizDir;
     let oldPath = null;
     let oldDir = null;
+    let wasInFolderStructure = false;
     
     // Get old path info if editing
     if (mode === 'edit' && existingPath) {
       oldPath = path.join(process.cwd(), existingPath);
       oldDir = path.dirname(oldPath);
+      // Check if the old quiz was in a folder structure (not directly in Quizes folder)
+      wasInFolderStructure = oldDir !== quizesDir && oldDir.startsWith(quizesDir);
+      
+      // Also check if old folder has audio or image files
+      if (wasInFolderStructure && fs.existsSync(oldDir)) {
+        const oldDirFiles = fs.readdirSync(oldDir);
+        const hasOldAudioFiles = oldDirFiles.some(f => f.toLowerCase().endsWith('.mp3') || f.toLowerCase().endsWith('.wav'));
+        const hasOldImageFiles = oldDirFiles.some(f => {
+          const ext = f.toLowerCase();
+          return ext.endsWith('.png') || ext.endsWith('.jpg') || ext.endsWith('.jpeg') || 
+                 ext.endsWith('.gif') || ext.endsWith('.webp') || ext.endsWith('.svg') || 
+                 ext.endsWith('.bmp');
+        });
+        if (hasOldAudioFiles || hasOldImageFiles) {
+          wasInFolderStructure = true;
+        }
+      }
     }
     
-    if (hasAudioFiles) {
-      // Quiz has audio files - must be in folder structure: Quizes/${sanitizedQuizName}/${sanitizedQuizName}.csv
+    // Determine if quiz should be in folder structure:
+    // 1. Has new audio files
+    // 2. Has new image files
+    // 3. Was already in folder structure (preserve structure when editing)
+    const needsFolderStructure = hasAudioFiles || hasImageFiles || wasInFolderStructure;
+    
+    if (needsFolderStructure) {
+      // Quiz must be in folder structure: Quizes/${sanitizedQuizName}/${sanitizedQuizName}.csv
       quizDir = path.join(quizesDir, sanitizedQuizName);
       if (!fs.existsSync(quizDir)) {
         fs.mkdirSync(quizDir, { recursive: true, mode: 0o777 });
@@ -309,7 +337,7 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
       }
       finalPath = path.join(quizDir, `${sanitizedQuizName}.csv`);
     } else {
-      // No audio files - flat file: Quizes/${sanitizedQuizName}.csv
+      // No audio/image files and wasn't in folder structure - flat file: Quizes/${sanitizedQuizName}.csv
       finalPath = path.join(quizesDir, `${sanitizedQuizName}.csv`);
       quizDir = quizesDir;
     }
@@ -361,25 +389,9 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
     }
     
     // Handle image files - they should be in the quiz folder (same as audio)
-    const imageFiles = req.files.filter(f => f.fieldname.startsWith('image_'));
+    // Note: Image files handling is now done above in the folder structure determination
+    // This section just ensures they're in the right place
     if (imageFiles.length > 0) {
-      // If there are images, ensure quiz is in folder structure (same as audio)
-      if (!hasAudioFiles && quizDir === quizesDir) {
-        // Quiz doesn't have audio but has images - create folder structure
-        quizDir = path.join(quizesDir, sanitizedQuizName);
-        if (!fs.existsSync(quizDir)) {
-          fs.mkdirSync(quizDir, { recursive: true, mode: 0o777 });
-          setFilePermissions(quizDir, true);
-        }
-        // Move CSV to folder structure
-        const newFinalPath = path.join(quizDir, `${sanitizedQuizName}.csv`);
-        if (fs.existsSync(finalPath) && finalPath !== newFinalPath) {
-          fs.renameSync(finalPath, newFinalPath);
-          finalPath = newFinalPath;
-          setFilePermissions(finalPath, false);
-          console.log(`CSV moved to folder structure: ${finalPath}`);
-        }
-      }
       imageFiles.forEach(imageFile => {
         // Image files are already saved in the quiz folder by multer
         // Just ensure they're in the right place

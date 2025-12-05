@@ -1984,6 +1984,98 @@ function openQuizEditor() {
   // Store initial state to detect changes
   saveInitialState();
   updateQuizEditorVisibility();
+  setupClipboardPaste();
+}
+
+// Setup clipboard paste for images in quiz editor
+function setupClipboardPaste() {
+  // Remove existing listener if any
+  if (quizEditorDisplay.pasteHandler) {
+    quizEditorDisplay.removeEventListener('paste', quizEditorDisplay.pasteHandler);
+  }
+  
+  // Add paste event listener
+  quizEditorDisplay.pasteHandler = async (e) => {
+    // Only handle if quiz editor is visible
+    if (quizEditorDisplay.classList.contains('hidden')) return;
+    
+    // Check if clipboard contains image
+    const items = e.clipboardData.items;
+    let imageItem = null;
+    
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        imageItem = items[i];
+        break;
+      }
+    }
+    
+    if (!imageItem) return; // No image in clipboard
+    
+    e.preventDefault(); // Prevent default paste behavior
+    
+    // Get the image file from clipboard
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    
+    // Determine which question to attach the image to
+    // Check if focus is in a question input field or near an image input
+    const activeElement = document.activeElement;
+    let questionIndex = null;
+    
+    if (activeElement) {
+      // Check if it's a question or answer input
+      if (activeElement.classList.contains('question-input') || 
+          activeElement.classList.contains('answer-input')) {
+        questionIndex = parseInt(activeElement.getAttribute('data-index'));
+      } else if (activeElement.classList.contains('image-input')) {
+        // User clicked on image input - use that question
+        questionIndex = parseInt(activeElement.getAttribute('data-index'));
+      } else {
+        // Check if focus is within a question item
+        const questionItem = activeElement.closest('.question-item');
+        if (questionItem) {
+          // Try to find the question index from any input in this item
+          const anyInput = questionItem.querySelector('[data-index]');
+          if (anyInput) {
+            questionIndex = parseInt(anyInput.getAttribute('data-index'));
+          } else {
+            // Fallback: parse from question number
+            const questionNumber = questionItem.querySelector('.question-item-number');
+            if (questionNumber) {
+              const match = questionNumber.textContent.match(/Question\s+(\d+)/);
+              if (match) {
+                questionIndex = parseInt(match[1]) - 1; // Convert to 0-based index
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // If no specific question is focused, use the last question or create a new one
+    if (questionIndex === null || questionIndex < 0 || questionIndex >= quizEditorQuestions.length) {
+      if (quizEditorQuestions.length === 0) {
+        // No questions yet, add one
+        addQuestion();
+        questionIndex = quizEditorQuestions.length - 1;
+      } else {
+        // Use the last question
+        questionIndex = quizEditorQuestions.length - 1;
+      }
+    }
+    
+    // Create a File object with a proper name
+    const timestamp = Date.now();
+    const extension = file.type.split('/')[1] || 'png';
+    const fileName = `pasted-image-${timestamp}.${extension}`;
+    const imageFile = new File([file], fileName, { type: file.type });
+    
+    // Use the existing handleFileUpload function
+    handleFileUpload(questionIndex, 'image', imageFile);
+  };
+  
+  quizEditorDisplay.addEventListener('paste', quizEditorDisplay.pasteHandler);
 }
 
 function saveInitialState() {
@@ -3169,3 +3261,28 @@ document.addEventListener('DOMContentLoaded', function() {
 // Cleanup on page unload
 window.addEventListener('beforeunload', cleanupClientResources);
 window.addEventListener('unload', cleanupClientResources);
+
+// Prevent browser back/forward button navigation - users must use app controls
+// Enhanced beforeunload handler (runs in addition to cleanupClientResources)
+window.addEventListener('beforeunload', (e) => {
+  // Check if user is in an active quiz or has unsaved changes
+  const isInQuiz = quizDisplay && !quizDisplay.classList.contains('hidden');
+  const hasUnsavedQuizEditor = quizEditorDisplay && !quizEditorDisplay.classList.contains('hidden') && hasUnsavedChanges();
+  
+  if (isInQuiz || hasUnsavedQuizEditor) {
+    // Show browser's default confirmation dialog
+    e.preventDefault();
+    e.returnValue = 'You have unsaved changes or an active quiz. Leaving may cause you to lose progress.'; // Required for Chrome
+    return e.returnValue; // Required for some browsers
+  }
+});
+
+// Completely disable back/forward button navigation
+window.addEventListener('popstate', (e) => {
+  // Always prevent back/forward navigation - push state back immediately
+  // Users must use the app's internal controls (exit buttons, etc.)
+  history.pushState(null, '', window.location.href);
+});
+
+// Push initial state to history to enable back button detection
+history.pushState(null, '', window.location.href);
