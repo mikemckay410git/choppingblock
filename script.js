@@ -2917,14 +2917,21 @@ document.addEventListener('DOMContentLoaded', function() {
   if (deleteQuizBtn) {
     deleteQuizBtn.addEventListener('click', () => {
       if (currentEditingQuiz && deleteQuizModal) {
-        if (deleteConfirmInput) {
-          deleteConfirmInput.value = '';
-          deleteConfirmInput.focus();
-        }
+        deleteQuizModal.classList.remove('hidden');
+        // Use setTimeout to ensure the modal is visible before focusing
+        // Also use requestAnimationFrame for better timing
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (deleteConfirmInput) {
+              deleteConfirmInput.value = '';
+              deleteConfirmInput.focus();
+              deleteConfirmInput.select();
+            }
+          }, 50);
+        });
         if (confirmDeleteQuiz) {
           confirmDeleteQuiz.disabled = true;
         }
-        deleteQuizModal.classList.remove('hidden');
       }
     });
   }

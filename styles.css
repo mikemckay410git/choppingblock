@@ -1189,6 +1189,36 @@ button:active {
     transform: translateY(-1px);
 }
 
+.modal-btn.save {
+    background: linear-gradient(180deg, rgba(16,185,129,.25), rgba(16,185,129,.15));
+    color: #6ee7b7;
+    border-color: rgba(16,185,129,.3);
+}
+
+.modal-btn.save:hover {
+    background: linear-gradient(180deg, rgba(16,185,129,.35), rgba(16,185,129,.25));
+    transform: translateY(-1px);
+}
+
+.modal-btn.delete {
+    background: rgba(255,255,255,.06);
+    color: var(--muted);
+    border-color: rgba(255,255,255,.14);
+    cursor: not-allowed;
+}
+
+.modal-btn.delete:not(:disabled) {
+    background: linear-gradient(180deg, rgba(239,68,68,.25), rgba(239,68,68,.15));
+    color: #fca5a5;
+    border-color: rgba(239,68,68,.3);
+    cursor: pointer;
+}
+
+.modal-btn.delete:not(:disabled):hover {
+    background: linear-gradient(180deg, rgba(239,68,68,.35), rgba(239,68,68,.25));
+    transform: translateY(-1px);
+}
+
 @media (max-width: 520px) {
     .controls { 
         grid-template-columns: 1fr; 
