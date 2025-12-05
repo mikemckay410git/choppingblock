@@ -1193,11 +1193,15 @@ function playMusic() {
   
   // Track if play() has been called to prevent canplay from interfering
   let playCalled = false;
+  let isPlaying = false;
   
   currentAudio.addEventListener('loadstart', () => {
-    musicStatus.textContent = '';
-    playMusicBtn.textContent = '⏳ Loading...';
-    playMusicBtn.disabled = true;
+    // Only show loading if we haven't called play() yet and audio isn't playing
+    if (!playCalled && !isPlaying) {
+      musicStatus.textContent = '';
+      playMusicBtn.textContent = '⏳ Loading...';
+      playMusicBtn.disabled = true;
+    }
   });
   
   currentAudio.addEventListener('canplay', () => {
@@ -1205,12 +1209,13 @@ function playMusic() {
     playMusicBtn.disabled = false;
     // Only update button text if play() hasn't been called yet
     // This prevents the flash on first click where canplay fires before play event
-    if (!playCalled && !isMusicPlaying) {
+    if (!playCalled && !isPlaying) {
       playMusicBtn.textContent = '🎵 Play Audio';
     }
   });
   
   currentAudio.addEventListener('play', () => {
+    isPlaying = true;
     isMusicPlaying = true;
     playMusicBtn.textContent = '⏸️ Stop Audio';
     playMusicBtn.classList.add('playing');
@@ -1219,6 +1224,7 @@ function playMusic() {
   });
   
   currentAudio.addEventListener('pause', () => {
+    isPlaying = false;
     isMusicPlaying = false;
     playMusicBtn.textContent = '🎵 Play Audio';
     playMusicBtn.classList.remove('playing');
@@ -1226,6 +1232,7 @@ function playMusic() {
   });
   
   currentAudio.addEventListener('ended', () => {
+    isPlaying = false;
     isMusicPlaying = false;
     playMusicBtn.textContent = '🎵 Play Audio';
     playMusicBtn.classList.remove('playing');
@@ -1234,6 +1241,7 @@ function playMusic() {
   
   currentAudio.addEventListener('error', (e) => {
     console.error('Audio error:', e);
+    isPlaying = false;
     musicStatus.textContent = '';
     playMusicBtn.textContent = '🎵 Play Audio';
     playMusicBtn.disabled = false;
@@ -1248,6 +1256,7 @@ function playMusic() {
   }).catch(error => {
     console.error('Error playing audio:', error);
     playCalled = false; // Reset on error so button can be clicked again
+    isPlaying = false;
     musicStatus.textContent = '';
     playMusicBtn.textContent = '🎵 Play Audio';
     playMusicBtn.disabled = false;
