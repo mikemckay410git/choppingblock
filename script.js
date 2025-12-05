@@ -1147,10 +1147,21 @@ function playMusic() {
   
   // Construct the full path to the audio file
   // The audio file should be in the same folder as the CSV
-  const categoryFolder = currentCategoryData.filename.replace('.csv', '');
+  // For music quizzes in folders, filename is the folder name
+  // For regular quizzes, filename includes .csv extension
+  let categoryFolder;
+  if (currentCategoryData.type === 'music') {
+    // Music quiz - filename is the folder name (no .csv extension)
+    categoryFolder = currentCategoryData.filename;
+  } else {
+    // Regular quiz - remove .csv extension
+    categoryFolder = currentCategoryData.filename.replace('.csv', '');
+  }
   const audioPath = `Quizes/${categoryFolder}/${currentQuestion.audioFile}`;
   
   console.log('Loading audio file:', audioPath);
+  console.log('Category folder:', categoryFolder);
+  console.log('Category data:', currentCategoryData);
   
   // Create new audio element
   currentAudio = new Audio(audioPath);

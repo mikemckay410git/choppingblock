@@ -18,6 +18,56 @@ const io = new Server(server, {
   }
 });
 
+// Helper function to set file permissions (readable/writable by owner, readable/writable by group and others)
+// Using more permissive permissions to allow SFTP deletion
+function setFilePermissions(filePath, isDirectory = false) {
+  try {
+    if (fs.existsSync(filePath)) {
+      // 0666 for files (rw-rw-rw-), 0777 for directories (rwxrwxrwx)
+      // This allows any user to read, write, and delete files
+      const mode = isDirectory ? 0o777 : 0o666;
+      fs.chmodSync(filePath, mode);
+      console.log(`Set permissions ${mode.toString(8)} on ${filePath}`);
+    }
+  } catch (error) {
+    console.warn(`Warning: Could not set permissions for ${filePath}:`, error.message);
+  }
+}
+
+// Helper function to recursively set permissions on a directory and all its contents
+function setDirectoryPermissionsRecursive(dirPath) {
+  try {
+    if (!fs.existsSync(dirPath)) {
+      return;
+    }
+    
+    // Set permissions on the directory itself first
+    setFilePermissions(dirPath, true);
+    
+    // Read all items in the directory
+    const items = fs.readdirSync(dirPath, { withFileTypes: true });
+    
+    for (const item of items) {
+      const itemPath = path.join(dirPath, item.name);
+      
+      if (item.isDirectory()) {
+        // Recursively set permissions on subdirectories
+        setDirectoryPermissionsRecursive(itemPath);
+      } else {
+        // Set permissions on files
+        setFilePermissions(itemPath, false);
+      }
+    }
+    
+    // Set permissions on directory again after processing contents
+    // This ensures the directory itself has correct permissions
+    setFilePermissions(dirPath, true);
+    console.log(`Completed recursive permission setting for ${dirPath}`);
+  } catch (error) {
+    console.warn(`Warning: Could not set recursive permissions for ${dirPath}:`, error.message);
+  }
+}
+
 app.use(cors());
 app.use(express.json()); // Parse JSON request bodies
 
@@ -29,21 +79,30 @@ const storage = multer.diskStorage({
       const quizName = req.body.quizName || 'default';
       const quizDir = path.join(process.cwd(), 'Quizes', quizName);
       if (!fs.existsSync(quizDir)) {
-        fs.mkdirSync(quizDir, { recursive: true });
+        fs.mkdirSync(quizDir, { recursive: true, mode: 0o777 });
+        setFilePermissions(quizDir, true);
+      } else {
+        setFilePermissions(quizDir, true);
       }
       cb(null, quizDir);
     } else if (file.fieldname.startsWith('image_')) {
       // Images can go to Images folder or quiz folder
       const imagesDir = path.join(process.cwd(), 'Images');
       if (!fs.existsSync(imagesDir)) {
-        fs.mkdirSync(imagesDir, { recursive: true });
+        fs.mkdirSync(imagesDir, { recursive: true, mode: 0o777 });
+        setFilePermissions(imagesDir, true);
+      } else {
+        setFilePermissions(imagesDir, true);
       }
       cb(null, imagesDir);
     } else {
       // CSV files go to Quizes folder
       const quizesDir = path.join(process.cwd(), 'Quizes');
       if (!fs.existsSync(quizesDir)) {
-        fs.mkdirSync(quizesDir, { recursive: true });
+        fs.mkdirSync(quizesDir, { recursive: true, mode: 0o777 });
+        setFilePermissions(quizesDir, true);
+      } else {
+        setFilePermissions(quizesDir, true);
       }
       cb(null, quizesDir);
     }
@@ -91,6 +150,15 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
   console.log('Body keys:', Object.keys(req.body));
   console.log('Files:', req.files ? req.files.map(f => ({ fieldname: f.fieldname, filename: f.filename })) : 'No files');
   
+  // Set permissions on all uploaded files immediately after multer processes them
+  if (req.files) {
+    req.files.forEach(file => {
+      if (fs.existsSync(file.path)) {
+        setFilePermissions(file.path, false);
+      }
+    });
+  }
+  
   try {
     const quizName = req.body.quizName;
     const mode = req.body.mode;
@@ -112,58 +180,143 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
       return res.status(400).json({ error: 'CSV file is required' });
     }
     
+    // Check if there are audio files - if so, quiz needs to be in a folder structure
+    const audioFiles = req.files ? req.files.filter(f => f.fieldname.startsWith('audio_')) : [];
+    const hasAudioFiles = audioFiles.length > 0;
+    
+    const quizesDir = path.join(process.cwd(), 'Quizes');
+    if (!fs.existsSync(quizesDir)) {
+      fs.mkdirSync(quizesDir, { recursive: true, mode: 0o777 });
+      setFilePermissions(quizesDir, true);
+    } else {
+      setFilePermissions(quizesDir, true);
+    }
+    
     // Determine the final path
     let finalPath;
-    if (mode === 'edit' && existingPath) {
-      // For editing, use the existing path structure
-      finalPath = path.join(process.cwd(), existingPath);
-      // Ensure directory exists
-      const dir = path.dirname(finalPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+    let quizDir;
+    
+    if (hasAudioFiles) {
+      // Quiz has audio files - must be in folder structure: Quizes/${quizName}/${quizName}.csv
+      quizDir = path.join(quizesDir, quizName);
+      if (!fs.existsSync(quizDir)) {
+        fs.mkdirSync(quizDir, { recursive: true, mode: 0o777 });
+        setFilePermissions(quizDir, true);
+      } else {
+        setFilePermissions(quizDir, true);
+      }
+      finalPath = path.join(quizDir, `${quizName}.csv`);
+      
+      // If editing and the old file was in a different location, we may need to clean up
+      if (mode === 'edit' && existingPath) {
+        const oldPath = path.join(process.cwd(), existingPath);
+        const oldDir = path.dirname(oldPath);
+        
+        // If old file was a flat file (Quizes/${quizName}.csv), move it to folder structure
+        if (oldPath !== finalPath && fs.existsSync(oldPath)) {
+          // Old file exists and is in a different location
+          // We'll move it below, but first check if we need to delete the old flat file
+          if (oldDir === quizesDir && path.basename(oldPath) === `${quizName}.csv`) {
+            // Old file is a flat file in Quizes folder - will be replaced by folder structure
+            console.log(`Moving quiz from flat file structure to folder structure: ${oldPath} -> ${finalPath}`);
+          }
+        }
       }
     } else {
-      // For new quizzes, save to Quizes folder
-      const quizesDir = path.join(process.cwd(), 'Quizes');
-      if (!fs.existsSync(quizesDir)) {
-        fs.mkdirSync(quizesDir, { recursive: true });
+      // No audio files - can be a flat file: Quizes/${quizName}.csv
+      if (mode === 'edit' && existingPath) {
+        // For editing without audio, try to preserve existing structure
+        const oldPath = path.join(process.cwd(), existingPath);
+        const oldDir = path.dirname(oldPath);
+        
+        // If old quiz was in a folder but has no audio now, we could flatten it
+        // But to be safe, keep it in its current location
+        if (fs.existsSync(oldPath)) {
+          finalPath = oldPath;
+          quizDir = oldDir;
+        } else {
+          // Old path doesn't exist, create as flat file
+          finalPath = path.join(quizesDir, `${quizName}.csv`);
+          quizDir = quizesDir;
+        }
+      } else {
+        // New quiz without audio - flat file
+        finalPath = path.join(quizesDir, `${quizName}.csv`);
+        quizDir = quizesDir;
       }
-      finalPath = path.join(quizesDir, `${quizName}.csv`);
+    }
+    
+    // Ensure directory exists
+    if (!fs.existsSync(quizDir)) {
+      fs.mkdirSync(quizDir, { recursive: true, mode: 0o777 });
+      setFilePermissions(quizDir, true);
+    } else {
+      // Directory exists, ensure it has correct permissions
+      setFilePermissions(quizDir, true);
+    }
+    
+    // Ensure parent directory of finalPath has correct permissions
+    const finalDir = path.dirname(finalPath);
+    if (fs.existsSync(finalDir)) {
+      setFilePermissions(finalDir, true);
+    }
+    
+    // Also ensure Quizes directory has correct permissions
+    if (fs.existsSync(quizesDir)) {
+      setFilePermissions(quizesDir, true);
     }
     
     // Move the CSV file to the final location
     fs.renameSync(csvFile.path, finalPath);
+    setFilePermissions(finalPath, false);
+    console.log(`CSV saved to: ${finalPath}`);
     
     // Handle audio files - they should be in the quiz folder
-    const audioFiles = req.files.filter(f => f.fieldname.startsWith('audio_'));
-    audioFiles.forEach(audioFile => {
-      // Audio files are already saved in the quiz folder by multer
-      // Just ensure they're in the right place
-      const quizDir = path.dirname(finalPath);
-      const audioPath = path.join(quizDir, audioFile.filename);
-      if (audioFile.path !== audioPath) {
-        // Move to correct location if needed
-        if (fs.existsSync(audioFile.path)) {
-          if (!fs.existsSync(quizDir)) {
-            fs.mkdirSync(quizDir, { recursive: true });
+    if (hasAudioFiles) {
+      audioFiles.forEach(audioFile => {
+        // Audio files are already saved in the quiz folder by multer (quizDir)
+        // Just ensure they're in the right place
+        const audioPath = path.join(quizDir, audioFile.filename);
+        if (audioFile.path !== audioPath) {
+          // Move to correct location if needed
+          if (fs.existsSync(audioFile.path)) {
+            fs.renameSync(audioFile.path, audioPath);
+            setFilePermissions(audioPath, false);
+            console.log(`Audio file moved to: ${audioPath}`);
           }
-          fs.renameSync(audioFile.path, audioPath);
+        } else {
+          // File already in correct location, just set permissions
+          setFilePermissions(audioPath, false);
+          console.log(`Audio file already in correct location: ${audioPath}`);
         }
-      }
-    });
+      });
+    }
     
     // Handle image files - they should be in the Images folder
     const imageFiles = req.files.filter(f => f.fieldname.startsWith('image_'));
     imageFiles.forEach(imageFile => {
       // Image files are already saved in the Images folder by multer
       console.log(`Image file saved: ${imageFile.filename} at ${imageFile.path}`);
-      // Verify the file exists
+      // Verify the file exists and set permissions
       if (fs.existsSync(imageFile.path)) {
+        setFilePermissions(imageFile.path, false);
         console.log(`✓ Image file confirmed at: ${imageFile.path}`);
       } else {
         console.error(`✗ Image file NOT FOUND at: ${imageFile.path}`);
       }
     });
+    
+    // For music quizzes, ensure the entire folder structure has correct permissions
+    // This is critical for allowing deletion of the folder and its contents
+    if (hasAudioFiles && quizDir && quizDir !== quizesDir) {
+      console.log(`Setting recursive permissions on quiz folder: ${quizDir}`);
+      setDirectoryPermissionsRecursive(quizDir);
+    }
+    
+    // Also ensure the Quizes directory itself has correct permissions
+    if (fs.existsSync(quizesDir)) {
+      setFilePermissions(quizesDir, true);
+    }
     
     console.log('SUCCESS: Quiz saved to', finalPath);
     res.json({ 
