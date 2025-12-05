@@ -312,6 +312,11 @@ let editQuizNameModal;
 let editQuizNameInput;
 let cancelEditQuizName;
 let saveEditQuizName;
+let deleteQuizBtn;
+let deleteQuizModal;
+let deleteConfirmInput;
+let cancelDeleteQuiz;
+let confirmDeleteQuiz;
 let quizNameDisplay;
 let quizNameDisplaySection;
 let editedQuizName = null; // Store the edited name separately
@@ -2484,6 +2489,8 @@ async function saveQuiz() {
     
 
     // Reset initial state since we just saved
+    // Also update editedQuizName to null since we've saved it
+    editedQuizName = null;
     saveInitialState();
     
     // Don't close the editor here - let the save button handler decide
@@ -2492,7 +2499,15 @@ async function saveQuiz() {
     
     // Update quiz list in editor if we're in edit mode
     if (quizEditorDisplay && !quizEditorDisplay.classList.contains('hidden')) {
-      loadQuizList();
+      await loadQuizList();
+      // Update the displayed name to match the saved name
+      if (existingQuizSelect && existingQuizSelect.selectedIndex > 0) {
+        const selectedOption = existingQuizSelect.options[existingQuizSelect.selectedIndex];
+        const quizNameText = selectedOption.textContent.replace(/\.csv$/i, '');
+        if (quizNameDisplay) {
+          quizNameDisplay.textContent = quizNameText;
+        }
+      }
     } else {
       // Only reload all quizzes if we're not in the editor
       loadAllQuizzes();
@@ -2734,6 +2749,11 @@ document.addEventListener('DOMContentLoaded', function() {
   editQuizNameInput = document.getElementById('editQuizNameInput');
   cancelEditQuizName = document.getElementById('cancelEditQuizName');
   saveEditQuizName = document.getElementById('saveEditQuizName');
+  deleteQuizBtn = document.getElementById('deleteQuizBtn');
+  deleteQuizModal = document.getElementById('deleteQuizModal');
+  deleteConfirmInput = document.getElementById('deleteConfirmInput');
+  cancelDeleteQuiz = document.getElementById('cancelDeleteQuiz');
+  confirmDeleteQuiz = document.getElementById('confirmDeleteQuiz');
   questionsList = document.getElementById('questionsList');
   addQuestionBtn = document.getElementById('addQuestionBtn');
   quizQuestionsSection = document.getElementById('quizQuestionsSection');
@@ -2855,7 +2875,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (editQuizNameModal) {
           editQuizNameModal.classList.add('hidden');
         }
-        saveInitialState(); // Update state to reflect name change
+        // Don't call saveInitialState() here - we want to detect this as a change
+        // The initial state will be updated when the quiz is actually saved
         updateQuizEditorVisibility();
       } else {
         alert('Please enter a quiz name');
@@ -2887,6 +2908,123 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         if (cancelEditQuizName) {
           cancelEditQuizName.click();
+        }
+      }
+    });
+  }
+  
+  // Delete quiz button and modal handlers
+  if (deleteQuizBtn) {
+    deleteQuizBtn.addEventListener('click', () => {
+      if (currentEditingQuiz && deleteQuizModal) {
+        if (deleteConfirmInput) {
+          deleteConfirmInput.value = '';
+          deleteConfirmInput.focus();
+        }
+        if (confirmDeleteQuiz) {
+          confirmDeleteQuiz.disabled = true;
+        }
+        deleteQuizModal.classList.remove('hidden');
+      }
+    });
+  }
+  
+  if (cancelDeleteQuiz) {
+    cancelDeleteQuiz.addEventListener('click', () => {
+      if (deleteQuizModal) {
+        deleteQuizModal.classList.add('hidden');
+      }
+      if (deleteConfirmInput) {
+        deleteConfirmInput.value = '';
+      }
+      if (confirmDeleteQuiz) {
+        confirmDeleteQuiz.disabled = true;
+      }
+    });
+  }
+  
+  // Enable/disable delete button based on input
+  if (deleteConfirmInput) {
+    deleteConfirmInput.addEventListener('input', (e) => {
+      if (confirmDeleteQuiz) {
+        confirmDeleteQuiz.disabled = e.target.value.toLowerCase() !== 'delete';
+      }
+    });
+    
+    deleteConfirmInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && confirmDeleteQuiz && !confirmDeleteQuiz.disabled) {
+        e.preventDefault();
+        confirmDeleteQuiz.click();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        if (cancelDeleteQuiz) {
+          cancelDeleteQuiz.click();
+        }
+      }
+    });
+  }
+  
+  if (confirmDeleteQuiz) {
+    confirmDeleteQuiz.addEventListener('click', async () => {
+      if (deleteConfirmInput && deleteConfirmInput.value.toLowerCase() === 'delete' && currentEditingQuiz) {
+        try {
+          // Delete the quiz file/folder
+          const response = await fetch('/api/delete-quiz', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              path: currentEditingQuiz
+            })
+          });
+          
+          if (!response.ok) {
+            const error = await response.text();
+            throw new Error(error || 'Failed to delete quiz');
+          }
+          
+          // Close modal
+          if (deleteQuizModal) {
+            deleteQuizModal.classList.add('hidden');
+          }
+          if (deleteConfirmInput) {
+            deleteConfirmInput.value = '';
+          }
+          
+          // Reset editor
+          quizEditorQuestions = [];
+          if (questionsList) questionsList.innerHTML = '';
+          currentEditingQuiz = null;
+          editedQuizName = null;
+          if (quizNameDisplaySection) quizNameDisplaySection.style.display = 'none';
+          if (quizNameDisplay) quizNameDisplay.textContent = '';
+          if (existingQuizSelect) existingQuizSelect.value = '';
+          updateQuizEditorVisibility();
+          saveInitialState();
+          
+          // Reload quiz list
+          await loadQuizList();
+          await loadAllQuizzes();
+          
+        } catch (error) {
+          console.error('Error deleting quiz:', error);
+          alert('Failed to delete quiz: ' + error.message);
+        }
+      }
+    });
+  }
+  
+  // Close delete modal when clicking overlay
+  if (deleteQuizModal) {
+    deleteQuizModal.addEventListener('click', (e) => {
+      if (e.target === deleteQuizModal) {
+        deleteQuizModal.classList.add('hidden');
+        if (deleteConfirmInput) {
+          deleteConfirmInput.value = '';
+        }
+        if (confirmDeleteQuiz) {
+          confirmDeleteQuiz.disabled = true;
         }
       }
     });

@@ -459,6 +459,46 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
   }
 });
 
+// Delete quiz endpoint
+app.post("/api/delete-quiz", (req, res) => {
+  try {
+    const { path: quizPath } = req.body;
+    
+    if (!quizPath) {
+      return res.status(400).json({ error: 'Quiz path is required' });
+    }
+    
+    const fullPath = path.join(process.cwd(), quizPath);
+    
+    // Security check: ensure path is within Quizes directory
+    const quizesDir = path.join(process.cwd(), 'Quizes');
+    if (!fullPath.startsWith(quizesDir)) {
+      return res.status(403).json({ error: 'Invalid path' });
+    }
+    
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ error: 'Quiz not found' });
+    }
+    
+    const stats = fs.statSync(fullPath);
+    
+    if (stats.isDirectory()) {
+      // Delete directory and all contents
+      fs.rmSync(fullPath, { recursive: true, force: true });
+      console.log(`Deleted quiz directory: ${fullPath}`);
+    } else {
+      // Delete file
+      fs.unlinkSync(fullPath);
+      console.log(`Deleted quiz file: ${fullPath}`);
+    }
+    
+    res.json({ success: true, message: 'Quiz deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting quiz:', error);
+    res.status(500).json({ error: 'Failed to delete quiz: ' + error.message });
+  }
+});
+
 // Quiz files listing endpoint
 app.get("/api/quiz-files", (req, res) => {
   try {
@@ -965,6 +1005,46 @@ app.get("/api/quiz-files", (req, res) => {
   } catch (error) {
     console.error('Error reading quiz files:', error);
     res.status(500).json({ error: 'Failed to read quiz files' });
+  }
+});
+
+// Delete quiz endpoint
+app.post("/api/delete-quiz", (req, res) => {
+  try {
+    const { path: quizPath } = req.body;
+    
+    if (!quizPath) {
+      return res.status(400).json({ error: 'Quiz path is required' });
+    }
+    
+    const fullPath = path.join(process.cwd(), quizPath);
+    
+    // Security check: ensure path is within Quizes directory
+    const quizesDir = path.join(process.cwd(), 'Quizes');
+    if (!fullPath.startsWith(quizesDir)) {
+      return res.status(403).json({ error: 'Invalid path' });
+    }
+    
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ error: 'Quiz not found' });
+    }
+    
+    const stats = fs.statSync(fullPath);
+    
+    if (stats.isDirectory()) {
+      // Delete directory and all contents
+      fs.rmSync(fullPath, { recursive: true, force: true });
+      console.log(`Deleted quiz directory: ${fullPath}`);
+    } else {
+      // Delete file
+      fs.unlinkSync(fullPath);
+      console.log(`Deleted quiz file: ${fullPath}`);
+    }
+    
+    res.json({ success: true, message: 'Quiz deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting quiz:', error);
+    res.status(500).json({ error: 'Failed to delete quiz: ' + error.message });
   }
 });
 
