@@ -1553,6 +1553,35 @@ button:active {
     margin-top: 6px;
 }
 
+.remove-file-btn {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.14);
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+
+.remove-file-btn:hover {
+    background: rgba(255,255,255,.1);
+    border-color: rgba(255,255,255,.2);
+    color: var(--text);
+    transform: scale(1.1);
+}
+
+.remove-file-btn:active {
+    transform: scale(0.95);
+}
+
 .quiz-editor-save-section {
     margin-top: 24px;
     padding-top: 20px;

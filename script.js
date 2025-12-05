@@ -2434,13 +2434,19 @@ function renderQuestions() {
     
     const audioPreview = q.audioFile ? 
       `<div class="file-upload-preview">
-        <div>Audio: ${q.audio}</div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <div>${q.audio}</div>
+          <button class="remove-file-btn" data-index="${index}" data-type="audio" title="Remove audio file">✕</button>
+        </div>
         <audio controls src="${URL.createObjectURL(q.audioFile)}"></audio>
       </div>` : '';
     
     const imagePreview = q.imageFile ?
       `<div class="file-upload-preview">
-        <div>Image: ${q.badge}</div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <div>${q.badge}</div>
+          <button class="remove-file-btn" data-index="${index}" data-type="image" title="Remove image file">✕</button>
+        </div>
         <img src="${URL.createObjectURL(q.imageFile)}" alt="Preview">
       </div>` : '';
     
@@ -2461,13 +2467,23 @@ function renderQuestions() {
         <div class="question-field">
           <label>Audio File</label>
           <input type="file" class="audio-input" data-index="${index}" accept="audio/*">
-          ${q.audio && !q.audioFile ? `<div class="file-upload-preview">Current: ${q.audio}</div>` : ''}
+          ${q.audio && !q.audioFile ? `<div class="file-upload-preview">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div>${q.audio}</div>
+              <button class="remove-file-btn" data-index="${index}" data-type="audio" title="Remove audio file">✕</button>
+            </div>
+          </div>` : ''}
           ${audioPreview}
         </div>
         <div class="question-field">
           <label>Image/Badge</label>
           <input type="file" class="image-input" data-index="${index}" accept="image/*">
-          ${q.badge && !q.imageFile ? `<div class="file-upload-preview">Current: ${q.badge}</div>` : ''}
+          ${q.badge && !q.imageFile ? `<div class="file-upload-preview">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div>${q.badge}</div>
+              <button class="remove-file-btn" data-index="${index}" data-type="image" title="Remove image file">✕</button>
+            </div>
+          </div>` : ''}
           ${imagePreview}
         </div>
       </div>
@@ -2498,7 +2514,32 @@ function renderQuestions() {
         handleFileUpload(index, 'image', e.target.files[0]);
       }
     });
+    
+    // Add event listeners for remove file buttons
+    const removeFileBtns = questionItem.querySelectorAll('.remove-file-btn');
+    removeFileBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const fileIndex = parseInt(btn.getAttribute('data-index'));
+        const fileType = btn.getAttribute('data-type');
+        removeFile(fileIndex, fileType);
+      });
+    });
   });
+}
+
+function removeFile(index, type) {
+  if (!quizEditorQuestions[index]) return;
+  
+  if (type === 'audio') {
+    quizEditorQuestions[index].audioFile = null;
+    quizEditorQuestions[index].audio = ''; // Clear the audio filename
+  } else if (type === 'image') {
+    quizEditorQuestions[index].imageFile = null;
+    quizEditorQuestions[index].badge = ''; // Clear the badge filename
+  }
+  
+  renderQuestions();
+  // Changes made - will be detected on exit
 }
 
 function escapeHtml(text) {
