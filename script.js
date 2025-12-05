@@ -2078,14 +2078,25 @@ function performModeSwitch(mode) {
     quizEditorQuestions = [];
     if (questionsList) questionsList.innerHTML = '';
     if (existingQuizSelect) existingQuizSelect.value = '';
+    // Clear quiz name display when switching to new mode
+    editedQuizName = null;
+    if (quizNameDisplaySection) quizNameDisplaySection.style.display = 'none';
+    if (quizNameDisplay) quizNameDisplay.textContent = '';
   } else {
     newQuizMode.classList.remove('active');
     editQuizMode.classList.add('active');
     newQuizSection.classList.add('hidden');
     editQuizSection.classList.remove('hidden');
     if (quizName) quizName.value = '';
+    // Clear quiz name display when switching to edit mode (will show when quiz is selected)
     editedQuizName = null;
-    if (editQuizNameBtn) editQuizNameBtn.style.display = 'none';
+    if (quizNameDisplaySection) quizNameDisplaySection.style.display = 'none';
+    if (quizNameDisplay) quizNameDisplay.textContent = '';
+    // Clear the selected quiz and questions when switching to edit mode
+    if (existingQuizSelect) existingQuizSelect.value = '';
+    currentEditingQuiz = null;
+    quizEditorQuestions = [];
+    if (questionsList) questionsList.innerHTML = '';
     loadQuizList();
   }
   // Save state after mode switch
