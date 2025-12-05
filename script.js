@@ -1996,10 +1996,12 @@ function executePendingQuizEditorAction() {
   }
 }
 
-function closeQuizEditor() {
+async function closeQuizEditor() {
   quizEditorDisplay.classList.add('hidden');
   resetQuizEditor();
-  showCategorySelector();
+  // Reload quizzes to include any newly saved quizzes
+  // loadAllQuizzes() will call showCategorySelector() when done, so we don't need to call it here
+  await loadAllQuizzes();
 }
 
 function resetQuizEditor() {
@@ -2150,15 +2152,108 @@ function updateQuestion(index, field, value) {
   }
 }
 
+// Helper function to sanitize filenames - removes problematic characters
+function sanitizeFilename(filename) {
+  if (!filename) return 'file';
+  
+  // Get the extension first
+  const lastDot = filename.lastIndexOf('.');
+  let name = filename;
+  let ext = '';
+  
+  if (lastDot > 0 && lastDot < filename.length - 1) {
+    name = filename.substring(0, lastDot);
+    ext = filename.substring(lastDot);
+  }
+  
+  // Remove or replace problematic characters
+  // Windows/Linux forbidden: / \ : * ? " < > |
+  // Also remove other problematic characters: multiple dots, control characters
+  let sanitized = name
+    .replace(/[/\\:*?"<>|]/g, '_')  // Replace forbidden characters with underscore
+    .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+    .replace(/\.{2,}/g, '.') // Replace multiple dots with single dot
+    .replace(/^[\s.]+|[\s.]+$/g, ''); // Remove leading/trailing spaces and dots (but keep spaces in the middle)
+  
+  // Ensure we have something left
+  if (!sanitized || sanitized.length === 0) {
+    sanitized = 'file';
+  }
+  
+  // Limit total length (including extension) to 255 characters (common filesystem limit)
+  const maxLength = 255;
+  const extLength = ext.length;
+  const maxNameLength = maxLength - extLength;
+  
+  if (sanitized.length > maxNameLength) {
+    sanitized = sanitized.substring(0, maxNameLength);
+  }
+  
+  // Validate extension - only allow alphanumeric and common safe characters
+  const safeExt = ext.replace(/[^a-zA-Z0-9._-]/g, '').toLowerCase();
+  
+  return sanitized + safeExt;
+}
+
+// Helper function to validate file extension
+function isValidFileExtension(filename, allowedExtensions) {
+  const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+  return allowedExtensions.includes(ext);
+}
+
 function handleFileUpload(index, type, file) {
   if (!quizEditorQuestions[index]) return;
   
+  // Validate file extension
+  let isValid = false;
+  let sanitizedName = sanitizeFilename(file.name);
+  
   if (type === 'audio') {
+    const allowedAudioExts = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'];
+    isValid = isValidFileExtension(file.name, allowedAudioExts);
+    
+    if (!isValid) {
+      alert(`Invalid audio file format. Please use: ${allowedAudioExts.join(', ')}`);
+      return;
+    }
+    
+    // Check if filename changed after sanitization
+    if (sanitizedName !== file.name) {
+      const confirmRename = confirm(
+        `The filename "${file.name}" contains problematic characters.\n` +
+        `It will be renamed to "${sanitizedName}".\n\n` +
+        `Continue?`
+      );
+      if (!confirmRename) {
+        return;
+      }
+    }
+    
     quizEditorQuestions[index].audioFile = file;
-    quizEditorQuestions[index].audio = file.name;
+    quizEditorQuestions[index].audio = sanitizedName; // Use sanitized name
   } else if (type === 'image') {
+    const allowedImageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+    isValid = isValidFileExtension(file.name, allowedImageExts);
+    
+    if (!isValid) {
+      alert(`Invalid image file format. Please use: ${allowedImageExts.join(', ')}`);
+      return;
+    }
+    
+    // Check if filename changed after sanitization
+    if (sanitizedName !== file.name) {
+      const confirmRename = confirm(
+        `The filename "${file.name}" contains problematic characters.\n` +
+        `It will be renamed to "${sanitizedName}".\n\n` +
+        `Continue?`
+      );
+      if (!confirmRename) {
+        return;
+      }
+    }
+    
     quizEditorQuestions[index].imageFile = file;
-    quizEditorQuestions[index].badge = file.name;
+    quizEditorQuestions[index].badge = sanitizedName; // Use sanitized name
   }
   
   renderQuestions();
@@ -2271,7 +2366,8 @@ async function saveQuiz() {
   try {
     // Create FormData for file uploads
     const formData = new FormData();
-    formData.append('quizName', name);
+    const sanitizedQuizName = sanitizeFilename(name).replace(/\.[^.]+$/, ''); // Remove extension if present
+    formData.append('quizName', sanitizedQuizName);
     formData.append('mode', quizEditorMode);
     if (currentEditingQuiz) {
       formData.append('existingPath', currentEditingQuiz);
@@ -2286,13 +2382,14 @@ async function saveQuiz() {
       let audioValue = q.audio || '';
       let badgeValue = q.badge || '';
       
-      // If a new file was uploaded, use its name
+      // If a new file was uploaded, use its sanitized name (set during upload)
       if (q.audioFile) {
-        audioValue = q.audioFile.name;
+        audioValue = q.audio || sanitizeFilename(q.audioFile.name);
       }
       if (q.imageFile) {
         // Images are saved to Images folder, so prepend the path
-        badgeValue = `Images/${q.imageFile.name}`;
+        const imageName = q.badge || sanitizeFilename(q.imageFile.name);
+        badgeValue = `Images/${imageName}`;
       } else if (badgeValue && !badgeValue.startsWith('Images/') && !badgeValue.startsWith('/') && !badgeValue.includes('/')) {
         // If badge value exists but doesn't have a path, check if it's an image file
         const imageExtensions = ['.png', '.svg', '.webp', '.jpg', '.jpeg', '.gif'];
@@ -2325,7 +2422,8 @@ async function saveQuiz() {
     
     // Create a File object for the CSV
     const csvBlob = new Blob([csvContent], { type: 'text/csv' });
-    const csvFile = new File([csvBlob], `${name}.csv`, { type: 'text/csv' });
+    const sanitizedName = sanitizeFilename(name).replace(/\.[^.]+$/, ''); // Remove extension if present
+    const csvFile = new File([csvBlob], `${sanitizedName}.csv`, { type: 'text/csv' });
     formData.append('csvContent', csvFile);
     
     // Add audio and image files
@@ -2525,8 +2623,8 @@ async function loadAllQuizzes() {
     if (availableCategories.length > 0) {
       // Only show category selector if quiz editor is not visible
       if (!quizEditorDisplay || quizEditorDisplay.classList.contains('hidden')) {
-        showCategorySelector();
-        createCategoryButtons(availableCategories);
+      showCategorySelector();
+      createCategoryButtons(availableCategories);
       } else {
         // We're in the quiz editor, just update the quiz list for editing
         loadQuizList();
@@ -2537,7 +2635,7 @@ async function loadAllQuizzes() {
     
     // Only show loaded files section if we're not in the quiz editor
     if (!quizEditorDisplay || quizEditorDisplay.classList.contains('hidden')) {
-      loadedFiles.classList.remove('hidden');
+    loadedFiles.classList.remove('hidden');
     }
     
   } catch (error) {

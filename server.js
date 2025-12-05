@@ -18,6 +18,56 @@ const io = new Server(server, {
   }
 });
 
+// Helper function to sanitize filenames - removes problematic characters
+function sanitizeFilename(filename) {
+  if (!filename) return 'file';
+  
+  // Get the extension first
+  const lastDot = filename.lastIndexOf('.');
+  let name = filename;
+  let ext = '';
+  
+  if (lastDot > 0 && lastDot < filename.length - 1) {
+    name = filename.substring(0, lastDot);
+    ext = filename.substring(lastDot);
+  }
+  
+  // Remove or replace problematic characters
+  // Windows/Linux forbidden: / \ : * ? " < > |
+  // Also remove other problematic characters: multiple dots, control characters
+  let sanitized = name
+    .replace(/[/\\:*?"<>|]/g, '_')  // Replace forbidden characters with underscore
+    .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+    .replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, '_') // Replace non-printable unicode with underscore
+    .replace(/\.{2,}/g, '.') // Replace multiple dots with single dot
+    .replace(/^[\s.]+|[\s.]+$/g, ''); // Remove leading/trailing spaces and dots (but keep spaces in the middle)
+  
+  // Ensure we have something left
+  if (!sanitized || sanitized.length === 0) {
+    sanitized = 'file';
+  }
+  
+  // Limit total length (including extension) to 255 characters (common filesystem limit)
+  const maxLength = 255;
+  const extLength = ext.length;
+  const maxNameLength = maxLength - extLength;
+  
+  if (sanitized.length > maxNameLength) {
+    sanitized = sanitized.substring(0, maxNameLength);
+  }
+  
+  // Validate extension - only allow alphanumeric and common safe characters
+  const safeExt = ext.replace(/[^a-zA-Z0-9._-]/g, '').toLowerCase();
+  
+  return sanitized + safeExt;
+}
+
+// Helper function to validate file extension
+function isValidFileExtension(filename, allowedExtensions) {
+  const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+  return allowedExtensions.includes(ext);
+}
+
 // Helper function to set file permissions (readable/writable by owner, readable/writable by group and others)
 // Using more permissive permissions to allow SFTP deletion
 function setFilePermissions(filePath, isDirectory = false) {
@@ -110,14 +160,50 @@ const storage = multer.diskStorage({
   filename: function (req, file, cb) {
     // Use original filename or the name provided in the request
     if (file.fieldname === 'csvContent') {
-      cb(null, file.originalname);
+      // Sanitize CSV filename
+      const sanitized = sanitizeFilename(file.originalname);
+      cb(null, sanitized);
     } else {
       // For audio and image files, use the name from the request
       const index = file.fieldname.split('_')[1];
       const nameField = file.fieldname.startsWith('audio_') 
         ? `audio_name_${index}` 
         : `image_name_${index}`;
-      const fileName = req.body[nameField] || file.originalname;
+      let fileName = req.body[nameField] || file.originalname;
+      
+      // Validate and sanitize filename
+      if (file.fieldname.startsWith('audio_')) {
+        // Validate audio file extension
+        const allowedAudioExts = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'];
+        if (!isValidFileExtension(fileName, allowedAudioExts)) {
+          // If invalid extension, try to preserve original extension or default to .mp3
+          const originalExt = file.originalname.substring(file.originalname.lastIndexOf('.'));
+          if (isValidFileExtension(originalExt, allowedAudioExts)) {
+            fileName = sanitizeFilename(fileName.replace(/\.[^.]+$/, '') + originalExt);
+          } else {
+            fileName = sanitizeFilename(fileName.replace(/\.[^.]+$/, '')) + '.mp3';
+          }
+        } else {
+          fileName = sanitizeFilename(fileName);
+        }
+      } else if (file.fieldname.startsWith('image_')) {
+        // Validate image file extension
+        const allowedImageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+        if (!isValidFileExtension(fileName, allowedImageExts)) {
+          // If invalid extension, try to preserve original extension or default to .jpg
+          const originalExt = file.originalname.substring(file.originalname.lastIndexOf('.'));
+          if (isValidFileExtension(originalExt, allowedImageExts)) {
+            fileName = sanitizeFilename(fileName.replace(/\.[^.]+$/, '') + originalExt);
+          } else {
+            fileName = sanitizeFilename(fileName.replace(/\.[^.]+$/, '')) + '.jpg';
+          }
+        } else {
+          fileName = sanitizeFilename(fileName);
+        }
+      } else {
+        fileName = sanitizeFilename(fileName);
+      }
+      
       cb(null, fileName);
     }
   }
@@ -173,6 +259,12 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
       return res.status(400).json({ error: 'Quiz name is required' });
     }
     
+    // Sanitize quiz name to prevent problematic folder names
+    const sanitizedQuizName = sanitizeFilename(quizName).replace(/\.[^.]+$/, ''); // Remove extension if present
+    if (sanitizedQuizName !== quizName) {
+      console.log(`WARNING: Quiz name sanitized from "${quizName}" to "${sanitizedQuizName}"`);
+    }
+    
     // Find the CSV file in the uploaded files
     const csvFile = req.files ? req.files.find(f => f.fieldname === 'csvContent') : null;
     if (!csvFile) {
@@ -205,7 +297,7 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
       } else {
         setFilePermissions(quizDir, true);
       }
-      finalPath = path.join(quizDir, `${quizName}.csv`);
+      finalPath = path.join(quizDir, `${sanitizedQuizName}.csv`);
       
       // If editing and the old file was in a different location, we may need to clean up
       if (mode === 'edit' && existingPath) {
@@ -236,12 +328,12 @@ app.post("/api/save-quiz", upload.any(), (req, res) => {
           quizDir = oldDir;
         } else {
           // Old path doesn't exist, create as flat file
-          finalPath = path.join(quizesDir, `${quizName}.csv`);
+          finalPath = path.join(quizesDir, `${sanitizedQuizName}.csv`);
           quizDir = quizesDir;
         }
       } else {
         // New quiz without audio - flat file
-        finalPath = path.join(quizesDir, `${quizName}.csv`);
+        finalPath = path.join(quizesDir, `${sanitizedQuizName}.csv`);
         quizDir = quizesDir;
       }
     }
