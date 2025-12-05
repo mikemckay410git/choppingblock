@@ -2702,22 +2702,27 @@ async function loadAllQuizzes() {
         
         if (questions.length > 0) {
           const categoryName = quizItem.name.replace('.csv', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          
+          // Check if any questions have audio files - if so, it's a music quiz
+          const hasAudioFiles = questions.some(q => q.audioFile && q.audioFile.trim() !== '');
+          const quizType = hasAudioFiles ? 'music' : (quizItem.type || 'regular');
+          
           const categoryData = {
             filename: quizItem.name,
             name: categoryName,
             questions: questions,
-            type: quizItem.type
+            type: quizType
           };
           
           // Add audio files for music quizzes
-          if (quizItem.type === 'music' && quizItem.audioFiles) {
+          if (quizType === 'music' && quizItem.audioFiles) {
             categoryData.audioFiles = quizItem.audioFiles;
           }
           
           availableCategories.push(categoryData);
           
           // Add success message to file list
-          const typeIndicator = quizItem.type === 'music' ? '🎵 ' : '';
+          const typeIndicator = quizType === 'music' ? '🎵 ' : '';
           addFileToList(quizItem.name, `${typeIndicator}${questions.length} questions`, 'success');
         } else {
           addFileToList(quizItem.name, 'No questions', 'error');
