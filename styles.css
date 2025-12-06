@@ -585,6 +585,10 @@ button:active {
     font-weight: 500;
 }
 
+.settings-select option[value=""] {
+    color: var(--muted);
+}
+
 .loaded-files {
     margin-left: auto;
     font-size: 11px;
@@ -1389,6 +1393,11 @@ button:active {
     font-weight: 500;
     transition: all 0.2s ease;
     box-sizing: border-box;
+}
+
+.quiz-input::placeholder {
+    color: var(--muted);
+    opacity: 1;
 }
 
 .quiz-input:focus {
